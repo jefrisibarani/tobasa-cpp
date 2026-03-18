@@ -1,0 +1,10 @@
+file(GLOB MY_SOURCES_LIST CONFIGURE_DEPENDS
+   ${CMAKE_CURRENT_SOURCE_DIR}/src/crypt/*.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
+)
+
+file(GLOB MY_HEADERS_LIST CONFIGURE_DEPENDS
+   ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasa/crypt/*.h
+   ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasa/*.h
+   ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasa/*.hpp
+)

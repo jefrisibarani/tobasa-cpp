@@ -1,0 +1,2 @@
+    <script src="{{ pageBaseUrl }}/vendor/fontawesome_5.3.0/js/fontawesome.min.js" crossorigin="anonymous"></script>
+    <script src="{{ pageBaseUrl }}/vendor/fontawesome_5.3.0/js/solid.min.js" crossorigin="anonymous"></script>

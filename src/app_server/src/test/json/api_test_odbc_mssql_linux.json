@@ -1,0 +1,127 @@
+{
+	"connString": "Driver={ODBC Driver 18 for SQL Server};Server=10.62.22.2;Database=tbs_coba;Uid=tbs_user;Pwd=AdmBaru98;TrustServerCertificate=Yes;",
+	"option": {
+		 "dbBackend": {
+			  "isOdbc": true,
+			  "backendType": "MSSQL"
+		 },
+		 "unicode": false,
+		 "runTestInitSampleTables": true,
+		 "runTestDirectAndPrepared": true,
+		 "runTestQueryWithParameter": true,
+		 "runTestQuerySelectInsert": true,
+		 "runTestSqlResult": true,
+		 "runTestOpenTable": true,
+		 "runTestModifyTable": true
+	},
+	"testInitSampleTables": {
+		 "initTableSampleData": true,
+		 "initTableRawData": true,
+		 "rawDataTotalRow": 10000,
+		 "disableLogOnInsert": true
+	},
+	"testDirectAndPrepared": {
+		 "useDirectMode": true,
+		 "directMode": {
+			  "insertCmd": "INSERT INTO sampledata (val_varchar, val_text, val_bigint, val_date) VALUES ( 'HELLO XU', 'TEST HELLO HELLO', 8888888888888888888,'2021-05-28' )",
+			  "selectCmd": "SELECT val_text, val_varchar, val_bigint, id FROM sampledata WHERE val_bigint = 9223372036854775807 AND val_varchar = 'HELLO 4'"
+		 },
+		 "preparedMode": {
+			  "insertCmd": "INSERT INTO sampledata (val_varchar, val_text, val_bigint, val_date) VALUES ( ?, ?, 8888888888888888888, '2021-05-28' )",
+			  "selectCmd": "SELECT val_text, val_varchar, val_bigint, id FROM sampledata WHERE val_bigint = 9223372036854775807 AND val_varchar = ?",
+			  "paramInsertVarchar": "HELLO XU",
+			  "paramInsertText": "TEST HELLO HELLO",
+			  "paramInsertBigint": 8888888888888888888,
+			  "paramInsertDate": "2021-05-28",
+			  "paramSelectVarchar": "HELLO 4"
+		 }
+	},
+	"testQueryWithParameter": {
+		 "selectQueryA": {
+			  "run": true,
+			  "cmd": "SELECT val_datetime, * FROM sampledata WHERE id = ? AND val_bigint = ?",
+			  "param1": 3,
+			  "param2": 9223372036854775806,
+			  "param3": "HELLO 3"
+		 },
+		 "selectQueryB": {
+			  "run": true,
+			  "cmd": "SELECT val_datetime, * FROM sampledata WHERE id = ? AND val_varchar = ?",
+			  "param1": 2,
+			  "param2": "HELLO 2"
+		 }
+	},
+	"testSqlResult": {
+		 "tableName": "rawdata",
+		 "optionCache": true,
+		 "optionTable": true,
+		 "useParameter": true,
+		 "selectQueryA": {
+			  "run": true,
+			  "cmd": "SELECT * FROM rawdata WHERE code = ? ORDER BY id OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY",
+			  "param1": 100,
+			  "param2": 0,
+			  "param3": ""
+		 }
+	},
+	"testQuerySelectInsert": {
+		 "useParamFromJson": true,
+		 "selectQueryB": {
+			  "run": true,
+			  "cmd": "SELECT * FROM sampledata WHERE id = ? AND val_varchar = ?",
+			  "param1": 4,
+			  "param2": "HELLO 4"
+		 },
+		 "insertQuery": {
+			  "cmd": "INSERT INTO sampledata (val_varchar, val_text) VALUES ( ?, ? )",
+			  "param1": "HELLO !!!",
+			  "param2": "HELLO WOLRD! A, HELLO WOLRD! B, HELLO WOLRD!"
+		 },
+		 "insertQueryB": {
+			  "run": true,
+			  "cmd": "INSERT INTO sampledata (val_bigint, val_char, val_bool, val_real, val_double, val_numeric, val_date, val_time, val_datetime, val_binary, val_binary1) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			  "paramBigInt": 9223372036854775807,
+			  "paramChar": "Character Data",
+			  "paramBool": true,
+			  "paramFloat": 23.1234567890,
+			  "paramDouble": 34.12345678901234567890,
+			  "paramNumeric": "333444666777.45",
+			  "paramDate": "1999-09-19",
+			  "paramTime": "09:40:19",
+			  "paramDateTime": "1999-09-14 19:19:23",
+			  "paramBinary": "4150504C49434154494F4E",
+			  "paramBinary1": "4153434949205465787420746F2048657820436F646520436F6E76657274657220486F7720746F20436F6E76657274205465787420746F2048657861646563696D616C"
+		 }
+	},
+	"testOpenTable": {
+		 "tableName": "sampledata",
+		 "customSelect": "",
+		 "option": {
+			  "pageSize": 10,
+			  "pagePos": 1,
+			  "orderBy": "id ASC"
+		 }
+	},
+	"testModifyTable": {
+		 "tableName": "sampledata",
+		 "paramId": 1,
+		 "paramVarChar": "Welcome",
+		 "paramText": "77 Welcome Selamat Datang",
+		 "paramBigInt": 9000000000000000000,
+		 "paramChar": "Character Data",
+		 "paramDate": "2000-12-31",
+		 "paramTime": "00:00:00",
+		 "paramDateTime": "2000-12-31 00:00:00",
+		 "paramFloat": 27.1234567890,
+		 "paramDouble": 37.12345678901234567890,
+		 "paramNumeric": "373444666778.68",
+		 "paramBool": false,
+		 "paramSelectId": 1,
+		 "option": {
+			  "pageSize": 100,
+			  "pagePos": 1,
+			  "orderBy": "id ASC"
+		 },
+		 "insertWithNativeVariant": true
+	}
+}

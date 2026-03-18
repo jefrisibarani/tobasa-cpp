@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package chatmsg;
+
+enum ChatMessageType {
+  MSG_TYPE_TEXT = 0;
+  MSG_TYPE_STICKER = 1;
+  MSG_TYPE_NOTIFICATION = 2;
+  MSG_TYPE_SYS = 3;
+}
+
+message ChatMessage {
+  string id = 1;
+  string content = 2;
+  string sender_id = 3;
+  string sender_name = 4;
+  string receiver_id = 5;
+  string timestamp  = 6;
+  ChatMessageType message_type = 7;
+  string message_cmd = 8;
+}
+

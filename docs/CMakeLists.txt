@@ -1,0 +1,36 @@
+set(DOCS_SRC_DIRS
+   ${PROJECT_SOURCE_DIR}/src/app_server/src
+   ${PROJECT_SOURCE_DIR}/src/tobasa/include
+   ${PROJECT_SOURCE_DIR}/src/tobasa/src
+   ${PROJECT_SOURCE_DIR}/src/tobasasql/include
+   ${PROJECT_SOURCE_DIR}/src/tobasasql/src
+   ${PROJECT_SOURCE_DIR}/src/tobasalis/include
+   ${PROJECT_SOURCE_DIR}/src/tobasalis/src
+   ${PROJECT_SOURCE_DIR}/src/tobasahttp/include
+   ${PROJECT_SOURCE_DIR}/src/tobasahttp/src
+   ${PROJECT_SOURCE_DIR}/src/tobasaweb/include
+   ${PROJECT_SOURCE_DIR}/src/tobasaweb/src )
+
+set(DOXYGEN_RECURSIVE               YES)
+set(DOXYGEN_EXTRACT_ALL             YES)
+set(DOXYGEN_BUILTIN_STL_SUPPORT     YES)
+set(DOXYGEN_JAVADOC_AUTOBRIEF       YES)
+set(DOXYGEN_INLINE_INHERITED_MEMB   YES)
+set(DOXYGEN_MULTILINE_CPP_IS_BRIEF  YES)
+set(DOXYGEN_TAB_SIZE                3  )
+set(DOXYGEN_BUILTIN_STL_SUPPORT     YES)
+set(DOXYGEN_EXTRACT_PACKAGE         YES)
+set(DOXYGEN_XTRACT_STATIC           YES)
+set(DOXYGEN_HIDE_UNDOC_MEMBERS      YES)
+set(DOXYGEN_HIDE_UNDOC_CLASSES      YES)
+set(DOXYGEN_GENERATE_TREEVIEW       YES)
+#set(DOXYGEN_HTML_COLORSTYLE_HUE     208)
+#set(DOXYGEN_HTML_COLORSTYLE_SAT     81 )
+#set(DOXYGEN_HTML_COLORSTYLE_GAMMA   80 )
+
+set(DOXYGEN_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/docs)
+
+doxygen_add_docs(
+   docs
+   ${DOCS_SRC_DIRS}
+   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

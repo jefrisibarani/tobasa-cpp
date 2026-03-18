@@ -1,0 +1,6 @@
+{
+	"crypt_salt": "C4BC3A3AC2D6D367A74580388B20BC069C96B048DFEAF5CCDC0CE1E25BF23F39BBBKOKLPMKOJ",
+	"clear_password_src": "@PGuser2004",
+	"encrypted_password_src": "AD23A632A4AFC2FB777C4C883794676E",
+	"text_to_md5": "delete from rawdata where id=1"
+}

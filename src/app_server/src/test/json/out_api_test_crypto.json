@@ -1,0 +1,11 @@
+{
+	"code": 200,
+	"message": "OK",
+	"result": {
+		 "clear_password_src": "@PGuser2004",
+		 "decrypred_password": "@PGuser2004",
+		 "encrypted_password": "AD23A632A4AFC2FB777C4C883794676E",
+		 "encrypted_password_src": "AD23A632A4AFC2FB777C4C883794676E",
+		 "text_to_md5_hash": "4AE31534F48939D4928BFED610CCEC21"
+	}
+}

@@ -1,0 +1,28 @@
+MAIN_APP_ICON ICON "tobasa_app.ico"
+
+#define IDR_VERSION 1
+IDR_VERSION VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEOS 0x00000004
+FILETYPE 0x00000001
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileVersion", "1.0.0.0\0"
+      VALUE "ProductVersion", "Tobasa HTTP Server Sample 1.0\0"
+      VALUE "CompanyName", "Tobasa\0"
+      VALUE "FileDescription", "Tobasa HTTP Server Sample\0"
+      VALUE "InternalName", "Tobasa HTTP Server Sample \0"
+      VALUE "LegalCopyright", "Copyright 2006-2026 Jefri Sibarani - jefrisibarani@gmail.com\0"
+      VALUE "OriginalFilename", "http_server.exe\0"
+      VALUE "ProductName", "Tobasa HTTP Server Sample\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 0x04B0
+  END
+END

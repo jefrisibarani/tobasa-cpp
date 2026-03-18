@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+        #messages, #errors {
+            /*width: 100%;*/
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fff;
+        }
+        #controls, #input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h2>WebSocket Test Page</h2>
+    <div id="controls">
+        <input type="text" id="endpointInput" placeholder="Enter WebSocket endpoint (e.g., wss://localhost:8085/websocket_ep)"
+           value="wss://localhost:8085/websocket_ep">
+        
+        <button id="connectButton">Connect</button>
+    </div>
+    <div>
+        <h3>Messages</h3>
+        <div id="messages"></div>
+    </div>
+
+    <div id="input-container">
+        <input type="text" id="messageInput" placeholder="Enter your message here" disabled>
+        <button id="sendButton" disabled>Send</button>
+    </div>
+
+    <div>
+        <h3>Error Messages</h3>
+        <div id="errors"></div>
+    </div>    
+
+    <script>
+        const messagesDiv   = document.getElementById('messages');
+        const errorsDiv     = document.getElementById('errors');
+        const endpointInput = document.getElementById('endpointInput');
+        const connectButton = document.getElementById('connectButton');
+        const messageInput  = document.getElementById('messageInput');
+        const sendButton    = document.getElementById('sendButton');
+
+        let socket = null;
+
+        // Append messages to the message display area
+        function appendMessage(message) {
+            const messageElement = document.createElement('div');
+
+            if (message.includes("[RECV] ")) {
+                messageElement.style.color = "blue";
+            } else {
+                messageElement.style.color = "green";
+            }
+
+            messageElement.textContent = message;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the bottom
+        }
+
+        // Append error messages to the error display area
+        function appendError(message) {
+            const errorElement = document.createElement('div');
+            errorElement.textContent = message;
+            errorsDiv.appendChild(errorElement);
+            errorsDiv.scrollTop = errorsDiv.scrollHeight; // Auto-scroll to the bottom
+        }
+
+        // Connect button event listener
+        connectButton.addEventListener('click', () => {
+            const endpoint = endpointInput.value.trim();
+
+            if (!endpoint) {
+                appendError("[ERR ] WebSocket endpoint is required.");
+                return;
+            }
+
+            // Initialize WebSocket connection
+            socket = new WebSocket(endpoint);
+
+            socket.addEventListener('open', () => {
+                appendMessage("[EVT ] Connected to WebSocket server at " + endpoint);
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+            });
+
+            socket.addEventListener('message', (event) => {
+                const lines = event.data.split('\n');
+                // Process each line
+                lines.forEach((line, index) => {
+                    appendMessage("[RECV] " + line);
+                });
+            });
+
+            socket.addEventListener('close', () => {
+                appendMessage("[EVT ] Disconnected from WebSocket server.");
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+            });
+
+            socket.addEventListener('error', (error) => {
+                appendError("[ERR ] " + (error.message || "An unknown error occurred."));
+            });
+        });
+
+        // Send button event listener
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value.trim();
+
+            if (socket && socket.readyState === WebSocket.OPEN && message) {
+                socket.send(message);
+                appendMessage("[SENT] " + message);
+                messageInput.value = ""; // Clear input
+            } else {
+                appendError("[ERR ] WebSocket is not connected or message is empty.");
+            }
+        });
+    </script>
+</body>
+</html>

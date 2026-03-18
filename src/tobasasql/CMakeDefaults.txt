@@ -1,0 +1,7 @@
+
+if(WIN32)
+   set(TOBASA_OPENSSL_DIR_DEF          "d:/dev/openssl_x64-windows-static-${MSVS_VER}" )
+   set(TOBASA_LIBPQ_DIR_DEF            "d:/dev/libpq_x64-windows-static-${MSVS_VER}" ) # or D:/programs/PostgreSQL/11.7_x64"
+else()
+endif()
+

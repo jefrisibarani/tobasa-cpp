@@ -1,0 +1,8 @@
+
+if(WIN32)
+   set(TOBASA_OPENSSL_DIR_DEF          "d:/dev/openssl_x64-windows-static-${MSVS_VER}" )
+   set(TOBASA_HTTP2_DIR_DEF            "d:/dev/nghttp2_x64-windows-static-${MSVS_VER}" )
+else()
+   set(TOBASA_HTTP2_DIR_DEF            "/opt/nghttpd" )
+endif()
+

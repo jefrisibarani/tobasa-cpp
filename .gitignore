@@ -1,0 +1,47 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+*.aps
+
+.vs/
+.vscode/tasks.json
+_notes/
+_output*/
+docs/html/
+build*/
+/src/app_server/wwwroot/assets/doctors_profile
+/src/app_server/wwwroot/assets/carousel_items
+/src/app_server/wwwroot/assets/data
+/src/app_server/wwwroot/assets/images/_default_slide.jpg
+/src/app_server/wwwroot/assets/images_user/admin_at_mangapul_dot_net.jpg
+/src/app_server/wwwroot/css/styles.min.css.map

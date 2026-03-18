@@ -1,0 +1,12 @@
+MSH|^~\&|Tobasa|DevTest|||20240302164451||ORU^R01|1007|P|2.3.1||||0||ASCII|||
+PID|1|||||||O|||||||||||||||||||||||
+OBR|1||2403010001|Tobasa^DevTest|N||20240302|||||||20240302||Admin||||||||||||||||||||||||||||||||
+OBX|1|NM|10|Asam Urat|5.4|mg/dl|2.500-7.000|N|||F||5.4|20240302||Admin||
+OBX|2|NM|1|Chol|174|mg/dl|0.000-1000.000|N|||F||174|20240302||Admin||
+OBX|3|NM|5|Creat|1|mg/dl|-|H|||F||1|20240302||Admin||
+OBX|4|NM|9|Gluc|75|mg/dl|75.000-125.000|N|||F||75|20240302||Admin||
+OBX|5|NM|18|HDL Chol|46.031|mg/dl|-|H|||F||46.031|20240302||Admin||
+OBX|6|NM|7|SGOT|32|U/L|-|H|||F||32|20240302||Admin||
+OBX|7|NM|8|SGPT|78|U/L|-|H|||F||78|20240302||Admin||
+OBX|8|NM|3|Trig|72|mg/dl|-|H|||F||72|20240302||Admin||
+OBX|9|NM|4|Ureum|30|mg/dl|-|H|||F||30|20240302||Admin||

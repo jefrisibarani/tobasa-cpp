@@ -1,0 +1,32 @@
+
+Dependencies:
+   nlohmann json
+   utf8cpp
+   date  ( with c++ 17 compiler )
+   fmt   ( with c++ 17 compiler )
+Put dependencies in folder "ext"
+With Visual Studio 2022 and GCC >= 14, Tobasa will use date and format from stdlib
+
+
+# From project root dir
+
+# Build with VS 2017:
+   cmake.EXE -S . -B build -G "Visual Studio 15 2017" -T host=x64 -A x64 ^
+      -D TOBASA_EXTERNAL_DEPS_DIR="ext"
+   cmake --build build --config=Release
+
+
+# Build with VS 2022:
+   cmake.EXE -S . -B build -G "Visual Studio 17 2022" -T host=x64 -A x64 ^
+      -D TOBASA_EXTERNAL_DEPS_DIR="ext"
+   cmake --build build --config=Release
+
+
+# Build with GCC on Linux:
+## Debug Build:
+   cmake -S . -B build_d -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Debug" -D TOBASA_EXTERNAL_DEPS_DIR="ext"
+   cmake --build build_d
+
+## Release build:
+   cmake -S . -B build_r -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="Release" -D TOBASA_EXTERNAL_DEPS_DIR="ext"
+   cmake --build build_r

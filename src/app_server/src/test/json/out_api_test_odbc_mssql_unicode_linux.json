@@ -1,0 +1,123 @@
+{
+	"code": 200,
+	"message": "OK",
+	"result": {
+		 "runQuerySelectInsert": {
+			  "insertQuery": {
+					"Result_rowsAffected": 1,
+					"Status": "PASSED"
+			  },
+			  "insertQueryB": {
+					"Result_ExecuteResult_rowsAffected": 1,
+					"Result_Execute_rowsAffected": 1,
+					"Status": "PASSED"
+			  },
+			  "selectQueryB": {
+					"Result_SelectNote": "Привет 4",
+					"Result_SelectRawdata": "Γεια σου κόσμε! 4",
+					"Status": "PASSED"
+			  },
+			  "testSqlResult": {
+					"Result_Note": "NOTE_100",
+					"Result_Variant_Id": "100",
+					"Result_Variant_Note": "NOTE_100",
+					"Result_Variant_Rawdata": "A1ycKTYy1MRNzx0L0x5FkcmFVHvcCz",
+					"Result_totalRows": 100,
+					"Status": "PASSED"
+			  }
+		 },
+		 "runQueryWithParameter": {
+			  "selectQueryA": {
+					"Result_execute": 0,
+					"Result_scalar": "2003-03-14 15:21:00.0000000",
+					"Status": "PASSED"
+			  },
+			  "selectQueryB": {
+					"Result_execute": 0,
+					"Result_scalar": "2002-02-11 19:55:00.0000000",
+					"Status": "PASSED"
+			  }
+		 },
+		 "runTestDirectAndPrepared": {
+			  "SqlConnection": {
+					"Result_SqlConnection_INSERT": 1,
+					"Result_SqlConnection_SELECT": "Γεια σου κόσμε! 4",
+					"Status": "PASSED"
+			  },
+			  "SqlQuery": {
+					"Result_SqlQuery_INSERT": 1,
+					"Result_SqllQuery_SELECT": "Γεια σου κόσμε! 4",
+					"Status": "PASSED"
+			  }
+		 },
+		 "testModifyTable": {
+			  "moveFirst": {
+					"Result_val_bigint": 9000000000000000333,
+					"Result_val_datetime": "2002-01-31 16:18:18.0000000",
+					"Result_val_numeric": "373444666778.68",
+					"Result_val_text": "77 ꦏꦢꦺꦴꦱ꧀ꦥꦸꦤ꧀ꦢꦶꦏꦧꦂꦫꦶꦥꦸꦤ? 333",
+					"Result_val_varchar": "ꦲꦭꦺꦴ333",
+					"Status": "PASSED"
+			  },
+			  "moveLast": {
+					"Result_val_bigint": 9000000000000000222,
+					"Result_val_datetime": "2002-01-30 16:18:18.0000000",
+					"Result_val_numeric": "373444666778.68",
+					"Result_val_text": "77 ꦏꦢꦺꦴꦱ꧀ꦥꦸꦤ꧀ꦢꦶꦏꦧꦂꦫꦶꦥꦸꦤ? 222",
+					"Result_val_varchar": "ꦲꦭꦺꦴ222",
+					"Status": "PASSED"
+			  },
+			  "movePrevious1": {
+					"Result_val_bigint": "9000000000000000111",
+					"Result_val_datetime": "2001-12-31 05:49:12.0000000",
+					"Result_val_numeric": "373444666778.68",
+					"Result_val_text": "77 ꦏꦢꦺꦴꦱ꧀ꦥꦸꦤ꧀ꦢꦶꦏꦧꦂꦫꦶꦥꦸꦤ? 111",
+					"Result_val_varchar": "ꦲꦭꦺꦴ111",
+					"Status": "PASSED"
+			  },
+			  "movePrevious2": {
+					"Result_val_bigint": "9223372036854775807",
+					"Result_val_datetime": "1999-09-14 19:19:23.0000000",
+					"Result_val_numeric": "333444666777.45",
+					"Result_val_text": "null",
+					"Result_val_varchar": "null",
+					"Status": "PASSED"
+			  }
+		 },
+		 "testOpenTable": {
+			  "moveFirst": {
+					"Result_val_bigint": 111111111111111111,
+					"Result_val_datetime": "2001-01-24 22:36:00.0000000",
+					"Result_val_text": "Hello World! QQQ1",
+					"Result_val_varchar": "こんにちは 1",
+					"Status": "PASSED"
+			  },
+			  "moveNext1": {
+					"Result_val_bigint": 2222222222222222222,
+					"Result_val_datetime": "2002-02-11 19:55:00.0000000",
+					"Result_val_text": "世界您好！ QQQQQQ2",
+					"Result_val_varchar": "שלום 2",
+					"Status": "PASSED"
+			  },
+			  "moveNext2": {
+					"Result_val_bigint": 9223372036854775806,
+					"Result_val_datetime": "2003-03-14 15:21:00.0000000",
+					"Result_val_text": "Բարև աշխարհ! QQQ3",
+					"Result_val_varchar": "Ողջույն 3",
+					"Status": "PASSED"
+			  }
+		 },
+		 "versionStringMain": "MySQL 5.7.24",
+		 "versionStringTest": "Microsoft SQL Server 14.00.1000",
+		 "z_time_all": "1 s 330 ms",
+		 "z_time_runTestDirectAndPrepared": "39 ms",
+		 "z_time_runTestInitRawData": "367 ms",
+		 "z_time_runTestInitSampleData": "142 ms",
+		 "z_time_runTestModifyTable": "102 ms",
+		 "z_time_runTestOpenTable": "389 ms",
+		 "z_time_runTestQuerySelectInsert": "51 ms",
+		 "z_time_runTestQueryWithParameter": "29 ms",
+		 "z_time_runTestSqlResult": "33 ms",
+		 "z_time_startConnection": "174 ms"
+	}
+}
