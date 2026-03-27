@@ -17,12 +17,6 @@ application can focus on business logic.
 - Session and connection management for reliable transfers
 - Helpers to save or forward results (DB upload, file export)
 
-## Core Components
-- `engine` — main runtime and instrument manager
-- `parser` / `message` / `record` — parsing and message model
-- `connection_tcp`, `connection_rs232` — transport implementations
-- `netsession` / `netsession_manager` — session handling for TCP/serial
-- `settings` — JSON-configurable options (see `conf::Engine` in settings.h)
 
 ## Configuration
 Settings are JSON-based (see `conf::Engine` in `settings.h`). You can
@@ -35,12 +29,21 @@ configure:
 - DB connection and result saving options
 
 
+## Supported Devices
+- Indiko Plus
+- DxH 500 Hematology Analyzer
+- GEM Premier 3500 Blood Gas Analyzer
+- Selectra Pro Clinical Chemistry Analyzer
+- DIRUI H-500 Urine Analyzer
+- DIRUI BCC-3600 Hematology Analyzer
+- VIDAS
+- VITEK 2 COMPACT
+
+
 ## Notes
 - The library focuses on protocol handling (parsing, framing, transports).
   Keep application-specific logic (mapping fields to domain objects, UI,
   business rules) outside the parser.
-- Check `include/tobasalis/lis` for concrete classes and configuration fields.
-
 - All product names and trademarks are the property of their respective owners.
   This project implements communication protocols based on publicly available information and observed device behavior.
 
