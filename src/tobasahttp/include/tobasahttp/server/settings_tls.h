@@ -33,10 +33,10 @@ class SettingsTls final
    using BaseType = SettingsServerCommon<SettingsTls>;
 
 private:
-   std::string _certificateChainFile {"localhost.crt"};
-   std::string _privateKeyFile       {"localhost.key"};
+   std::string _certificateChainFile {}; // localhost.crt
+   std::string _privateKeyFile       {}; // localhost.key
    std::string _privateKeyPassword   {};
-   std::string _tmpDhFile            {"dh2048.pem"};
+   std::string _tmpDhFile            {}; // dh2048.pem
 
    /// TLS in server mode
    bool        _serverMode           { true };

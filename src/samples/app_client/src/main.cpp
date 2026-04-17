@@ -2,12 +2,12 @@
 #include <tobasa/config.h>
 #include <tobasahttp/client/http_client.h>
 #include <tobasaweb/settings_log.h>
+#include <tobasaweb/settings_http_client.h>
 #include <tobasaweb/multi_logger.h>
 
 bool loadConfig()
 {
    using namespace tbs;
-   using namespace tbs::log;
    using namespace tbs::http;
 
    std::string _configFile;
@@ -23,7 +23,7 @@ bool loadConfig()
 
       if (Config::get().valid())
       {
-         auto logOption = Config::getOption<conf::Logging>("logging");
+         auto logOption = Config::getOption<log::conf::Logging>("logging");
          // setup Tobasa Logger actual target
          Logger::setTarget(new log::MultiLogger(std::move(logOption))) ;
 
@@ -44,19 +44,23 @@ bool loadConfig()
 
 void runClient()
 {
-   using namespace tbs::log;
+   using namespace tbs;
    using namespace tbs::http;
 
-   TobasaLogger logger;  // use tbs::Logger internally
+   log::TobasaLogger logger;  // use tbs::Logger internally
+
+   auto config = Config::getOption<http::conf::Client>("client");
 
    SettingsClient settings;
    settings
-      .address("localhost")
-      .port(8085)
-      .tlsMode(true)
-      .logVerbose(true)
-      .connectionPoolSize(4)        // create max 4 connections
-      .maxRequestsPerConnection(0); // disable
+      .address(config.address)
+      .port(config.port)
+      .tlsMode(config.tlsMode)
+      .verifyPeer(config.verifyPeer)
+      .caVerificationFile(config.caVerificationFile)
+      .logVerbose(config.logVerbose)
+      .connectionPoolSize(config.connectionPoolSize)
+      .maxRequestsPerConnection(config.maxRequestsPerConnection); // set 0 to disable
 
    SecureClient client(std::move(settings), logger);
 

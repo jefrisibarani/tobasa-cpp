@@ -87,7 +87,7 @@ public:
 
       Socket tlsSocket(std::move(socket), _tlsContex);
 
-      if (_settings.verifyPeer() && _settings.caVerificationFile().size() > 0)
+      if ( _settings.verifyPeer() && path::exists(_settings.caVerificationFile()) )
       {
          tlsSocket.set_verify_callback(
             std::bind(&ClientConnectionStarterTls::onVerifyTls, this, std::placeholders::_1, std::placeholders::_2));
@@ -134,20 +134,31 @@ private:
             //| asio::ssl::context::no_sslv2
             | asio::ssl::context::single_dh_use);
          
-         // privateKeyFile password callback
-         if (!_settings.privateKeyPassword().empty()) {
-            _tlsContex.set_password_callback([password=_settings.privateKeyPassword()](std::size_t /*max_length*/, asio::ssl::context::password_purpose /*purpose*/) {
-               return password;
-            });
-         } 
 
-         if (  _settings.verifyPeer() && _settings.caVerificationFile().size() > 0) 
+         // privateKeyFile password callback
+         if ( path::exists(_settings.certificateFile()) && path::exists(_settings.privateKeyFile()) ) 
+         {
+            // Client auth
+            _tlsContex.use_certificate_file(_settings.certificateFile(), asio::ssl::context::pem);
+            _tlsContex.use_private_key_file(_settings.privateKeyFile(),  asio::ssl::context::pem);
+
+            // privateKeyFile password callback
+            if (!_settings.privateKeyPassword().empty()) {
+               _tlsContex.set_password_callback([password=_settings.privateKeyPassword()](std::size_t /*max_length*/, asio::ssl::context::password_purpose /*purpose*/) {
+                  return password;
+               });
+            } 
+
+         }
+
+
+         if (  _settings.verifyPeer() && path::exists(_settings.caVerificationFile()) ) 
          {
             _tlsContex.set_default_verify_paths();
             // Load the certificates for one or more trusted certification authorities from a file.
             _tlsContex.load_verify_file(_settings.caVerificationFile());
             _tlsContex.set_verify_mode(
-                  asio::ssl::verify_peer
+                 asio::ssl::verify_peer
                | asio::ssl::verify_fail_if_no_peer_cert
                | asio::ssl::verify_client_once);
          }

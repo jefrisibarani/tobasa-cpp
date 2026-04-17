@@ -27,9 +27,14 @@ public:
 private:
    int32_t        _connectionPoolSize     {1};
 
+   // mTLS client
+  // ------------------------------------------------
+   std::string    _certificateFile        {}; // client.crt
+   std::string    _privateKeyFile         {}; // client.key
    std::string    _privateKeyPassword     {};
+
    /// Certificate Authorities certificates in PEM format 
-   std::string    _caVerificationFile     {"ca.pem"};
+   std::string    _caVerificationFile     {}; // ca.pem
    bool           _verifyPeer             { false };
    /// TLS in server mode
    bool           _serverMode             { false };
@@ -78,6 +83,33 @@ public:
       return std::move(self().verifyPeer(val));
    }
    bool verifyPeer() const { return _verifyPeer; }
+
+
+   // ------------------------------------------------
+   SettingsClient& certificateFile(std::string val) &
+   {
+      _certificateFile = std::move(val);
+      return self();
+   }
+   SettingsClient&& certificateFile(std::string p) &&
+   {
+      return std::move(self().certificateFile(p));
+   }
+   [[nodiscard]]
+   std::string certificateFile() const { return _certificateFile; }
+
+   // ------------------------------------------------
+   SettingsClient& privateKeyFile(std::string val) &
+   {
+      _privateKeyFile = std::move(val);
+      return self();
+   }
+   SettingsClient&& privateKeyFile(std::string val) &&
+   {
+      return std::move(self().privateKeyFile(std::move(val)));
+   }
+   [[nodiscard]]
+   std::string privateKeyFile() const { return _privateKeyFile; }
 
    // ------------------------------------------------
    SettingsClient& privateKeyPassword(std::string val) &
