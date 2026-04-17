@@ -1,6 +1,6 @@
 #include <iostream>
 #include <sstream>  // for normalizePath
-#include <vector>   // for normalizePath
+#include <vector>
 #include <filesystem>
 
 #include <tobasa/util_string.h>

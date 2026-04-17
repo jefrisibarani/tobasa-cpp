@@ -426,7 +426,11 @@ public:
 
     bool isOpen() const noexcept
     {
-        return file_ != nullptr || (_using_memory && _mem_begin != nullptr);
+        return file_ != nullptr 
+ #if USE_IN_MEMORY_TZDB
+            || (_using_memory && _mem_begin != nullptr)
+ #endif
+        ;
     }
 
 protected:

@@ -16,7 +16,7 @@ BEGIN
       VALUE "CompanyName", "Tobasa\0"
       VALUE "FileDescription", "Tobasa Web Client\0"
       VALUE "InternalName", "Tobasa Web Client\0"
-      VALUE "LegalCopyright", "Copyright 2006-2026 Jefri Sibarani - jefrisibarani@gmail.com\0"
+      VALUE "LegalCopyright", "Copyright 2016-2026 Jefri Sibarani\0"
       VALUE "OriginalFilename", "webclient.exe\0"
       VALUE "ProductName", "Tobasa Web Client\0"
     END
