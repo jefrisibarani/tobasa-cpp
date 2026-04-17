@@ -57,7 +57,7 @@ void runClient()
       checkShutdown();
    });
 
-   auto processResponse = [&](const http::ResponsePtr& response)
+   auto processResponse = [&](const http::ClientResponsePtr& response)
    {
       std::cout << "---------------------------------------------------" << std::endl;
       std::cout << "   Http Ver major  : " << response->majorVersion()   << std::endl;
@@ -121,7 +121,7 @@ void runClient()
          if (i>0)
             resource = "/api/version" + std::to_string(i);
          
-         client.get(resource, [&](const http::ResponsePtr& response) {
+         client.get(resource, [&](const http::ClientResponsePtr& response) {
             processResponse(response);
          });
       }

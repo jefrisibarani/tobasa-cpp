@@ -33,10 +33,8 @@ protected:
    asio::ip::tcp::resolver    _resolver;
    Settings&                  _settings;
    Logger&                    _logger;
-   ResponseHandler*           _pResponseHandler;
    ConnectionStarter          _starter;
    Executor                   _executor;
-
    OnConnectionCreated        _onConnectionCreated;
    OnConnectFailed            _onConnectFailed;
 
@@ -65,7 +63,7 @@ public:
    }
 
    void start(
-      ResponseHandler  responseHandler,
+      ClientResponseHandler responseHandler,
       OnConnectionCreated createdHandler,
       OnConnectFailed  failConnectHandler)
    {
@@ -107,7 +105,7 @@ protected:
     */
    auto & executor() noexcept { return _executor; }
 
-   void connect(ResponseHandler responseHandler,
+   void connect(ClientResponseHandler responseHandler,
       const asio::ip::tcp::resolver::results_type& endPointList)
    {
       asio::ip::tcp::socket socket(_ioContext);

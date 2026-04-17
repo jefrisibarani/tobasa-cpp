@@ -89,7 +89,7 @@ void runClient()
    client.addHeader("User-Agent", "Tobasa Client");
 
    // run async get request
-   client.get("/version", [&](const ResponsePtr& response)
+   client.get("/version", [&](const ClientResponsePtr& response)
    {
       std::cout << "---------------------------------------------------" << std::endl;
       std::cout << "   Http Ver major  : " << response->majorVersion()   << std::endl;

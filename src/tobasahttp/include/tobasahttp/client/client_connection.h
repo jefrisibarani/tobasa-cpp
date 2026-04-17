@@ -27,7 +27,7 @@ public:
    using Logger   = typename Traits::Logger;
 
 private:
-   ResponseHandler           _responseHandler;
+   ClientResponseHandler     _responseHandler;
    /// request to send
    std::unique_ptr<Request>  _pRequest;
 
@@ -40,10 +40,10 @@ private:
 public:
 
    explicit ClientConnection(
-      Socket          socket,
-      Settings&       settings,
-      Logger&         logger,
-      ResponseHandler handler)
+      Socket                socket,
+      Settings&             settings,
+      Logger&               logger,
+      ClientResponseHandler handler)
       : HttpConnection<Traits> { std::move(socket), settings, logger }
       , _responseHandler { std::move(handler) }
    {
@@ -266,7 +266,7 @@ protected:
          throw http::Exception("Incomplete HTTP response");
    }
 
-   bool shouldKeepAlive(ResponsePtr resp)
+   bool shouldKeepAlive(ClientResponsePtr resp)
    {
       // HTTP/1.1 default = keep-alive
       if (resp->majorVersion() == 1 && resp->minorVersion() == 1)

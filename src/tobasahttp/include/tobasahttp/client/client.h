@@ -87,7 +87,7 @@ namespace http {
          checkShutdown();
       });
 
-      auto processResponse = [&](const http::ResponsePtr& response)
+      auto processResponse = [&](const http::ClientResponsePtr& response)
       {
          for ( size_t i = 0; i < response->headers().size(); i++)
          {
@@ -119,7 +119,7 @@ namespace http {
          std::string resource = "/api/version";
          for (int i=0;i<100;i++)
          {
-            client.get("/api/version", [&](const http::ResponsePtr& response) {
+            client.get("/api/version", [&](const http::ClientResponsePtr& response) {
                processResponse(response);
             });
          }
@@ -166,7 +166,7 @@ private:
 
    Headers                   _defaultHeaders;
 
-   std::deque< std::pair<ClientRequest, ResponseHandler> > _pendingRequests;
+   std::deque< std::pair<ClientRequest, ClientResponseHandler> > _pendingRequests;
 
    enum class Mode {
       None,
@@ -341,14 +341,14 @@ public:
    // ---------------------------------------
 
    /// Async GET
-   void get(const std::string& resource, ResponseHandler handler)
+   void get(const std::string& resource, ClientResponseHandler handler)
    {
       ClientRequest r("GET", resource);
       execute(std::move(r), std::move(handler));
    }
 
    /// Async DEL
-   void del(const std::string& resource, ResponseHandler handler)
+   void del(const std::string& resource, ClientResponseHandler handler)
    {
       ClientRequest r("DEL", resource);
       execute(std::move(r), std::move(handler));
@@ -357,7 +357,7 @@ public:
    /// Async POST
    void post(const std::string& resource,
           const std::string& data,
-          ResponseHandler handler,
+          ClientResponseHandler handler,
           const std::string& contentType="application/json")
 
    {
@@ -371,7 +371,7 @@ public:
    /// Async PUT
    void put(const std::string& resource,
           const std::string& data,
-          ResponseHandler handler,
+          ClientResponseHandler handler,
           const std::string& contentType="application/json")
 
    {
@@ -388,21 +388,21 @@ public:
    // ---------------------------------------
 
    /// Sync GET
-   ResponsePtr get(const std::string& resource)
+   ClientResponsePtr get(const std::string& resource)
    {
       ClientRequest r("GET", resource);
       return execute(std::move(r));
    }
 
    /// Sync DEL
-   ResponsePtr del(const std::string& resource)
+   ClientResponsePtr del(const std::string& resource)
    {
       ClientRequest r("DEL", resource);
       return execute(std::move(r));
    }
 
    /// Sync POST
-   ResponsePtr post(const std::string& resource,
+   ClientResponsePtr post(const std::string& resource,
                   const std::string& data,
                   const std::string& contentType="application/json")
    {
@@ -414,7 +414,7 @@ public:
    }
 
    /// Sync PUT
-   ResponsePtr put(const std::string& resource,
+   ClientResponsePtr put(const std::string& resource,
                   const std::string& data,
                   const std::string& contentType="application/json")
    {
@@ -429,7 +429,7 @@ public:
    // ---------------------------------------
 
    /// Perform synchronous request
-   ResponsePtr execute(ClientRequest req)
+   ClientResponsePtr execute(ClientRequest req)
    {
       ensureMode(Mode::Sync);
 
@@ -439,7 +439,7 @@ public:
       if (_workGuard)
          throw std::logic_error("Client: cannot use sync request while async run() is active");
 
-      ResponsePtr resp;
+      ClientResponsePtr resp;
       ioContext().restart();
 
       asio::post(_clientExecutor/*ioContext()*/, 
@@ -448,7 +448,7 @@ public:
          try
          {
             doExecute(std::move(req),
-               [&](ResponsePtr response) {
+               [&](ClientResponsePtr response) {
                   resp = std::move(response);
                   // we got response, immediately stop io_context
                   // thus stopping client http connection, and finished the running thread
@@ -467,7 +467,7 @@ public:
    }
 
    /// Perform asynchronous request
-   void execute(ClientRequest req, ResponseHandler handler)
+   void execute(ClientRequest req, ClientResponseHandler handler)
    {
       ensureMode(Mode::Async);
 
@@ -578,7 +578,7 @@ protected:
 
    virtual void doExecute(
       ClientRequest req,
-      ResponseHandler handler = nullptr)
+      ClientResponseHandler handler = nullptr)
    {
       auto conn = acquireConnection();
       if (conn)

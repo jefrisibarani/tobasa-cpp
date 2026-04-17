@@ -2,16 +2,16 @@
 # Tobasa C++ Libraries
 
 Tobasa is a collection of small, focused C++ libraries that form the
-building blocks web‑service applications. Each sub‑project is self‑contained; 
-you can link only the libraries you need.
+building blocks web‑service applications.\
+Each sub‑project is self‑contained; you can link only the libraries you need.
 
 ## Projects in this repository
 
 | Module         | Description |
 |----------------|-------------|
 | `tobasa`       | **Common library** – utilities such as logging, configuration, JSON,
-|                | date/time, string helpers, plugins, task manager, etc. This is the
-|                | foundation for all other Tobasa components. |
+|                | date/time, string helpers, plugins, task manager, etc. 
+|                | This is the foundation for all other Tobasa components. |
 | `tobasahttp`   | **HTTP library** – Asio‑based HTTP/1.1 and HTTP/2(with nghttp) server and client with
 |                | optional TLS, WebSocket, multipart parsing, etc. |
 | `tobasaweb`    | **Web App/REST framework** – routing, controllers, middleware, JWT/session
@@ -62,7 +62,7 @@ See build_all.cmd and build_all.sh for example
 
 ## License
 
-Tobasa libraries are licensed under the GNU LGPL (Lesser General Public License)
+Tobasa libraries are licensed under the GNU LGPL (Lesser General Public License).\
 Tobasa applications are licensed under the GNU GPL (General Public License).
 
 ---

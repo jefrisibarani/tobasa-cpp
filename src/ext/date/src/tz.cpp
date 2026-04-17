@@ -505,9 +505,9 @@ access_install()
   #ifdef _WIN32
     if ( ::_access(install.c_str(), 0) != 0 )
         install = std::string(".") + folder_delimiter + "tzdata";
-  else
-    if (access(install.c_str(), F_OK) == 0)
-        install = std::string(".") + folder_delimiter + "tzdata";
+    else
+        if (::_access(install.c_str(), 0) == 0)
+            install = std::string(".") + folder_delimiter + "tzdata";
   #endif
   
 #else   // !INSTALL

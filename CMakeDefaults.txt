@@ -10,7 +10,7 @@ if(WIN32)
    # used to build Tobasa.
    #
    # Supported values: vs2022, vs2017
-   set(MSVS_VER "vs2022")
+   set(MSVS_VER "vs2017")
 
    if(TOBASA_BUILD_WITH_VCPKG)
       set(VCPKG_TARGET_TRIPLET_DEF     "x64-windows-static-${MSVS_VER}" )

@@ -180,13 +180,14 @@ source_group(
 # -------------------------------------------------------
 
 # Copy appsettings.json and appsettings_header_rules.json to binary dir
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration"
-   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      ${PROJECT_SOURCE_DIR}/configuration/appsettings.json $<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration/
-   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      ${PROJECT_SOURCE_DIR}/configuration/appsettings_header_rules.json $<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration/)
-
+if(EXISTS "${PROJECT_SOURCE_DIR}/configuration/appsettings.json" AND EXISTS "${PROJECT_SOURCE_DIR}/configuration/appsettings_header_rules.json")
+   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         ${PROJECT_SOURCE_DIR}/configuration/appsettings.json $<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration/
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+         ${PROJECT_SOURCE_DIR}/configuration/appsettings_header_rules.json $<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration/)   
+endif()
 
 # Copy web root (static resource) content to binary dir
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -216,9 +217,11 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 # -------------------------------------------------------
 if(TOBASA_BUILD_LIS_ENGINE)
    # Copy appsettings_lis.json to binary dir
-   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy
-         ${PROJECT_SOURCE_DIR}/configuration/appsettings_lis.json $<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration/)
+   if(EXISTS "${PROJECT_SOURCE_DIR}/configuration/appsettings_lis.json")
+      add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+         COMMAND ${CMAKE_COMMAND} -E copy
+            ${PROJECT_SOURCE_DIR}/configuration/appsettings_lis.json $<TARGET_FILE_DIR:${PROJECT_NAME}>/configuration/)
+   endif()
 
    # Copy template views content to binary dir
    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

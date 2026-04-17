@@ -37,14 +37,13 @@ public:
    void httpStatus(StatusCode code);
    HttpStatus httpStatus();
    size_t contentSize() const;
-   
+
    HttpVersion httpVersion() const   { return _httpVersion; }
    bool useChunkedEncoding() const   { return _useChunkedEncoding; }
    void useChunkedEncoding(bool val) { _useChunkedEncoding = val; }
 };
 using ClientResponsePtr = std::shared_ptr<ClientResponse>;
-using ResponsePtr       = std::shared_ptr<ClientResponse>;
-using ResponseHandler   = std::function<void(const ResponsePtr&)>;
+using ClientResponseHandler = std::function<void(const ClientResponsePtr&)>;
 
 
 /** @}*/

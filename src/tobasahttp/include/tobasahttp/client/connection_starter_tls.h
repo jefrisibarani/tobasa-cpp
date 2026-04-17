@@ -80,7 +80,7 @@ public:
    template<class ConnectionType>
    void createClientSession(
       asio::ip::tcp::socket socket,
-      ResponseHandler       responseHandler,
+      ClientResponseHandler responseHandler,
       std::function<void(std::shared_ptr<ConnectionType>)> onCreatedHandler)
    {
       _logger.debug("[{}] Starting HTTPS client connection with server", logHttpType());
