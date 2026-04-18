@@ -27,13 +27,9 @@ std::string extensionToMimeType(const std::string& ext)
    return mimetypes::fromExtension(ext);
 }
 
-   CoreController::CoreController(
-         app::DbServicePtr dbService
-      )
-      : web::ControllerBase()
-      , _dbService {dbService}
-   {}
-
+CoreController::CoreController(app::DbServicePtr dbService)
+   : web::ControllerBase()
+   , _dbService {dbService} {}
 
 void CoreController::bindHandler()
 {

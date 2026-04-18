@@ -7,7 +7,6 @@
 namespace tbs {
 namespace web {
 
-
 void buildAuthenticationMiddlewareOption(const conf::Webapp& webappOpt, AuthenticationMiddlewareOption& option);
 
 } // namespace web

@@ -1,0 +1,56 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug (Linux)",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/src/app_server/webservice",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}/build/src/app_server/",
+			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				 {
+					  "description": "Enable pretty-printing for gdb",
+					  "text": "-enable-pretty-printing",
+					  "ignoreFailures": true
+				 },
+				 {
+					  "description": "Set Disassembly Flavor to Intel",
+					  "text": "-gdb-set disassembly-flavor intel",
+					  "ignoreFailures": true
+				 }
+			]
+		},
+		{
+			"name": "Debug (Windows)",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/src/app_server/Debug/webservice.exe",
+			"symbolSearchPath": "${workspaceFolder}\\build\\src\\app_server\\Debug\\",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}\\build\\src\\app_server\\Debug\\",
+			"environment": [],
+			"console": "externalTerminal"
+		},
+		{
+			"name": "Run (Windows)",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/src/app_server/Release/webservice.exe",
+			"symbolSearchPath": "${workspaceFolder}\\build\\src\\app_server\\Release\\",
+			"args": [],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}\\build\\src\\app_server\\Release\\",
+			"environment": [],
+			"console": "externalTerminal"
+		}		
+	]
+}

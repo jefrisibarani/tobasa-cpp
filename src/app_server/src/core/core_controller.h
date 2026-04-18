@@ -17,9 +17,7 @@ public :
    CoreController( const CoreController & ) = delete;
    CoreController( CoreController && ) = delete;
 
-   explicit CoreController(
-      app::DbServicePtr dbService
-   );
+   explicit CoreController(app::DbServicePtr dbService);
 
    ~CoreController() {}
 

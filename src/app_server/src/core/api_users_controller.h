@@ -14,9 +14,7 @@ public:
    ApiUsersController( const ApiUsersController & ) = delete;
    ApiUsersController( ApiUsersController && ) = delete;
 
-   explicit ApiUsersController(
-      app::DbServicePtr dbService
-   );
+   explicit ApiUsersController(app::DbServicePtr dbService);
 
    ~ApiUsersController() {}
 

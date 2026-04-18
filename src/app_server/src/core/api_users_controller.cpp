@@ -22,13 +22,9 @@ namespace app {
 using namespace http;
 using namespace web;
 
-   ApiUsersController::ApiUsersController(
-            app::DbServicePtr dbService
-         )
+   ApiUsersController::ApiUsersController(app::DbServicePtr dbService)
       : web::ControllerBase()
-      , _dbService {dbService}
-   {
-   }
+      , _dbService {dbService} {}
 
 void ApiUsersController::bindHandler()
 {

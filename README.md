@@ -30,7 +30,7 @@ Each sub‑project is self‑contained; you can link only the libraries you need
 
 ```
 src/                   
-  app_server/         # sample application
+  app_server/         # sample webservice application
   ext/                # bundled third-party libs 
   samples/            # samples projects
   tobasa/             # core helpers library
@@ -42,12 +42,12 @@ CMakeLists.txt        # top-level CMake project
 CMakeDefaults.txt     # machine-specific default paths
 build/                # out-of-source build directory
 _output/              # packaged build result
-…
 ```
 
 ## Build
 Tobasa uses CMake as the build system. The project is currently tested with
 MSVC on Windows and GCC on Linux.
+
 ### Windows
 - Visual Studio 2017
 - Visual Studio 2022
@@ -56,8 +56,8 @@ MSVC on Windows and GCC on Linux.
 - GCC 9.4.0
 - GCC 11.1.0
 
-See build_all.cmd and build_all.sh for example
-
+See [build_all.cmd](./build_all.cmd) and [build_all.sh](./build_all.sh) for example\
+See also [BUILD](./BUILD.md) for more information 
 
 
 ## License

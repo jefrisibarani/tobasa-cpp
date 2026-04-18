@@ -7,7 +7,6 @@
 #include <tobasahttp/response.h>
 #include <tobasahttp/status_codes.h>
 #include <tobasaweb/result.h>
-
 #include "../matcher_wildcard.h"
 #include "../settings_header_rules.h"
 #include "response_header_rule.h"

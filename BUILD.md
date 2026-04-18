@@ -91,8 +91,8 @@ This will:
 
 #### Option B: Prebuilt Libraries (Windows)
 
-Download and extract prebuilt libraries to the paths specified in `CMakeDefaults.txt`:
-
+Download and extract prebuilt libraries to the paths specified in `CMakeDefaults.txt`:\
+Example:
 - OpenSSL: `d:/dev/openssl_x64-windows-static-vs2017`
 - Zlib: `d:/dev/dcmtk/dcmtk_3.6.8_x64_MT_vs2017/zlib-1.3`
 - PostgreSQL libpq: `d:/dev/libpq_x64-windows-static-vs2017`
@@ -305,16 +305,9 @@ set(TOBASA_ZLIB_DIR_DEF "C:/custom/zlib")
 - Use CMake Tools extension
 - Configure with `cmake.configureSettings`
 
-## Performance Considerations
-
-- **Release builds**: Use `-DCMAKE_BUILD_TYPE=Release` for optimized binaries
-- **Parallel builds**: Use `cmake --build . -j <num_cores>` for faster compilation
-- **Incremental builds**: Only rebuild changed files
-
 ## Getting Help
 
 - Check individual component README files for specific build instructions
 - Review CMake output for detailed error messages
 - Ensure all prerequisites are correctly installed
-- Verify compiler and library versions match requirements</content>
-<parameter name="filePath">d:\projects\tobasa_cxx_foss\BUILD.md
+- Verify compiler and library versions match requirements

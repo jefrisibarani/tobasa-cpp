@@ -3,17 +3,14 @@
 #include <tobasahttp/request.h>
 #include <tobasahttp/response.h>
 #include <tobasahttp/status_codes.h>
-
 #include "api_result.h"
 #include "../app_util.h"
 #include "../main_helper.h"
-
 #include "authorization.h"
 
 namespace tbs {
 namespace web {
 
-//SessionMiddlewareOptionBuilder
 void builAuthorizationMiddlewareOption(const conf::Webapp& webappOpt, AuthorizationMiddlewareOption& option)
 {
    // Create or set a custom result builder; otherwise, the AuthorizationMiddleware

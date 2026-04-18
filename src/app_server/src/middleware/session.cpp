@@ -3,11 +3,9 @@
 #include <tobasahttp/request.h>
 #include <tobasahttp/response.h>
 #include <tobasahttp/status_codes.h>
-
 #include "api_result.h"
 #include "../app_util.h"
 #include "../main_helper.h"
-
 #include "session.h"
 
 namespace tbs {

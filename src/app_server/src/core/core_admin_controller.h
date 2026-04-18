@@ -17,8 +17,7 @@ public:
    AdminController(AdminController &&) = delete;
 
    explicit AdminController(app::DbServicePtr dbService);
-   virtual ~AdminController()
-   {}
+   virtual ~AdminController() {}
 
    //! Handle GET request to /admin/users
    http::ResultPtr onUsers(const web::RouteArgument& arg);

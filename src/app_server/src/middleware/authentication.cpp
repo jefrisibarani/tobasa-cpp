@@ -5,16 +5,13 @@
 #include <tobasahttp/status_codes.h>
 #include <tobasahttp/authentication.h>
 #include <tobasaweb/credential_info.h>
-
 #include "api_result.h"
 #include "../app_util.h"
 #include "../main_helper.h"
-
 #include "authentication.h"
 
 namespace tbs {
 namespace web {
-
 
 void buildAuthenticationMiddlewareOption(const conf::Webapp& webappOpt, AuthenticationMiddlewareOption& option)
 {
