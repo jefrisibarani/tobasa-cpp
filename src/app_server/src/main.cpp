@@ -61,11 +61,22 @@ int main(int argc, char* argv[])
    {
       using namespace tbs;
 
+
       web::Webapp app;
 
-      std::cout << "[app] Current Working Dir: " << app::currentWorkingDir() << std::endl;
 
-      // load configuration file
+      std::cout << "[app] Current Working Dir: " << app::currentWorkingDir() << std::endl;
+#if !defined(TOBASA_USE_STD_DATE) && defined(TOBASA_DATE_USE_IN_MEMORY_TZDB)
+      std::cout << "[app] Built with in-memory time zone DB" << std::endl;
+#endif
+#ifdef TOBASA_BUILD_IN_MEMORY_RESOURCES
+      std::cout << "[app] Built with in-memory resources" << std::endl;
+#endif
+
+
+      // -------------------------------------------------------
+      // Configuration
+      // -------------------------------------------------------
       std::string configFile = app::configDir() + path::SEPARATOR + "appsettings.json";
       auto embeddedConfig = app::Resource::get("config/appsettings.json", "config");
       if (! app.loadConfig(configFile, embeddedConfig) )
@@ -74,6 +85,8 @@ int main(int argc, char* argv[])
       // Main configuration
       auto webappOpt = Config::getOption<web::conf::Webapp>("webapp");
 
+
+
 #ifdef TOBASA_BUILD_IN_MEMORY_RESOURCES
       // Force not to use in-memory resources
       web::conf::Webapp::useInMemoryResources = webappOpt.webService.useInMemoryResources;
@@ -81,7 +94,14 @@ int main(int argc, char* argv[])
       web::conf::Webapp::useInMemoryResources = false;
 #endif
 
+      if (web::conf::Webapp::useInMemoryResources) {
+         std::cout << "[app] Using in-memory resources" << std::endl;
+      }
+
+
+      // -------------------------------------------------------
       // Base database migration
+      // -------------------------------------------------------
       {
          #ifdef TOBASA_USE_TESTS_MODULE
          app.migrationJob().add<dbm::InitialBaseModuleTest>();  // add test for base database
@@ -91,6 +111,7 @@ int main(int argc, char* argv[])
          app.migrationJob().add<dbm::InitialBaseModuleLIS>();  // add lis for base database
          #endif
       }
+
 
       // create and set custom db service for webapp. webapp will own dbservice
       auto dbService = std::make_shared<app::DbServiceFactoryApp>();
@@ -106,7 +127,6 @@ int main(int argc, char* argv[])
       std::string headerRulefile = app::configDir() + path::SEPARATOR + "appsettings_header_rules.json";
       auto embeddedHeaderRule = app::Resource::get("config/appsettings_header_rules.json", "config");
       Config::addOption<web::conf::HttpResponseHeaderRule>("httpResponseHeaderRule", headerRulefile, embeddedHeaderRule);
-
 
       // Add content renderer for http::StatusResult  to replace default renderer: http::statusPageHtml()
       app.router()->addResultContentBuilder(
@@ -124,10 +144,9 @@ int main(int argc, char* argv[])
                // Instead, we use http::statusPageHtml, which generates HTTP content without using any disk files
                return http::statusPageHtml(result->httpStatus());
             }
-         },
-         "http::StatusResult"
+         }
+         , "http::StatusResult"
       );
-
 
       // Add a status page HTML renderer with a custom template to override the default renderer http::statusPageHtml()
       //app.serverStatusPageBuilder(
@@ -139,94 +158,71 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       // Middlewares
       // -------------------------------------------------------
-      
+
       // ExceptionHandler Middleware
       app.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next)
-         {
+         [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::exceptionHandlerMiddleware(context, next);
-         }
-         , "ExceptionHandler"
-      );
+         } , "ExceptionHandler" );
 
       // Add middleware to perform a database connectivity check before processing http requests
       app.addMiddleware(
-         [&app, &webappOpt, &dbService](const http::HttpContext& context, const http::RequestHandler& next)
-         {
+         [&app, &webappOpt, &dbService](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::databaseCheckMiddleware(app, dbService, context, next);
-         }
-         , "DatabaseCheck"
-      );
+         } , "DatabaseCheck" );
 
       // Multipart middleware to parse multipart body
       app.useMultipart(
-         [&webappOpt](web::MultipartMiddlewareOption& option)
-         {
+         [&webappOpt](web::MultipartMiddlewareOption& option) {
             option.temporaryDir = webappOpt.httpServer.temporaryDir;
-         }
-      );
+         } );
 
       // Add middleware to check client User-Agent, or any custom header related to our App
       app.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next)
-         {
+         [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::responseHeaderRuleMiddleware(context, next);
-         }
-         , "ResponseHeaderRule"
-      );
+         } , "ResponseHeaderRule" );
 
       // Add HTTP Response header middleware / CORS
       app.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next)
-         {
+         [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::requestIdentificationMiddleware(context, next);
-         }
-         , "RequestIdentification"
-      );
+         } , "RequestIdentification" );
 
       // Add Cache-control middleware
       app.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next)
-         {
+         [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::cacheControlMiddleware(context, next);
-         }
-         , "CacheControl"
-      );
+         } , "CacheControl" );
 
       // Add middleware to validate the content-type header before executing authentication and authorization processes
       app.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next)
-         {
+         [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::contentTypeMiddleware(context,next);
-         }
-         , "ContentType"
-      );
+         } , "ContentType" );
 
       // Session
       app.useSession(
-         [&webappOpt](web::SessionMiddlewareOption& option)
-         {
+         [&webappOpt](web::SessionMiddlewareOption& option) {
             web::builSessionMiddlewareOption(webappOpt, option);
-         }
-      );
+         } );
 
       // Authentication
       app.useAuthentication(
-         [&webappOpt](web::AuthenticationMiddlewareOption& option)
-         {
+         [&webappOpt](web::AuthenticationMiddlewareOption& option) {
             web::buildAuthenticationMiddlewareOption(webappOpt, option);
-         }
-      );
+         } );
 
       // Authorization middleware last in the chain
       app.useAuthorization(
-         [&webappOpt](web::AuthorizationMiddlewareOption& option)
-         {
+         [&webappOpt](web::AuthorizationMiddlewareOption& option) {
             web::builAuthorizationMiddlewareOption(webappOpt, option);
-         }
-      );
+         } );
 
-      // Add controllers
+
+      // -------------------------------------------------------
+      // Controllers
+      // -------------------------------------------------------
       app.addController( web::makeController<app::CoreController>(dbService) );
       app.addController( web::makeController<app::ApiUsersController>(dbService) );
       app.addController( web::makeController<app::AdminController>(dbService) );
@@ -251,12 +247,14 @@ int main(int argc, char* argv[])
       moduleConfig.stopLisEngine = [&lisModule](){
          lisModule.stopLisEngine();
       };
-#endif // TOBASA_USE_LIS_ENGINE
+#endif
 
 
-      // setup default tls resources callback
-      app.defaultTlsAssetCallback( [](http::TlsAsset asset) {
-
+      // -------------------------------------------------------
+      // Default tls resources callback
+      // -------------------------------------------------------
+      app.defaultTlsAssetCallback( [](http::TlsAsset asset) 
+      {
          if (asset==http::TlsAsset::cerificate_chain)
             return app::Resource::get("tls_asset/127.0.0.1.crt", "tls_asset");
          if (asset==http::TlsAsset::private_key)
@@ -267,26 +265,22 @@ int main(int argc, char* argv[])
          return nonstd::span<const unsigned char>();
       });
 
+
       // -------------------------------------------------------
       // APP's onStart() and onStop()
       // -------------------------------------------------------
-      app.onStart(
-         [&moduleConfig]()
-         {
+      app.onStart( [&moduleConfig]() {
+         moduleConfig.startLisEngine();
+      });
 
-            moduleConfig.startLisEngine();
-         });
-
-      app.onStop(
-         [&moduleConfig]()
-         {
-
-            moduleConfig.stopLisEngine();
-         });
+      app.onStop( [&moduleConfig]() {
+         moduleConfig.stopLisEngine();
+      });
 
 
       // Start the app
       app.start();
+
    }
    catch (const std::exception& ex)
    {

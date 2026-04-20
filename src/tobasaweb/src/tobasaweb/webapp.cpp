@@ -278,7 +278,6 @@ int Webapp::start(size_t ioPoolSize, size_t workerPoolSize)
 {
    try
    {
-      std::cerr << "[webapp] Starting Tobasa webapp..." << "\n";
       Logger::logI("[webapp] Starting Tobasa webapp...");
 
       if (! _configOk)
@@ -293,7 +292,7 @@ int Webapp::start(size_t ioPoolSize, size_t workerPoolSize)
       {
          if (_useCustomDbService)
          {
-            std::cerr << "[webapp] Invalid database instance\n";
+            Logger::logE("[webapp] Invalid database instance");
             return 1;
          }
          else
@@ -316,7 +315,6 @@ int Webapp::start(size_t ioPoolSize, size_t workerPoolSize)
          // connect to database
          if (! _dbService->connected())
          {
-            std::cerr << "[webapp] No connection to database \n";
             Logger::logE("[webapp] No connection to database");
             return 1;
          }
@@ -334,7 +332,6 @@ int Webapp::start(size_t ioPoolSize, size_t workerPoolSize)
    {
       disconnectDb();
 
-      std::cerr << "[webapp] Configuration exception: " << e.what() << "\n";
       Logger::logE("[webapp] Configuration exception: {}", e.what());
       return 1;
    }
@@ -342,13 +339,12 @@ int Webapp::start(size_t ioPoolSize, size_t workerPoolSize)
    {
       disconnectDb();
 
-      std::cerr << "[webapp] Application exception : " << e.what() << "\n";
       Logger::logE("[webapp] Application exception : {}", e.what());
       return 1;
    }
    catch (...)
    {
-      std::cerr << "[webapp] start() Unknown exception\n";
+      Logger::logE("[webapp] start() Unknown exception");
    }
 
    return 0;

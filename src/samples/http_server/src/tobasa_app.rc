@@ -16,7 +16,7 @@ BEGIN
       VALUE "CompanyName", "Tobasa\0"
       VALUE "FileDescription", "Tobasa HTTP Server Sample\0"
       VALUE "InternalName", "Tobasa HTTP Server Sample \0"
-      VALUE "LegalCopyright", "Copyright 2016-2026 Jefri Sibarani\0"
+      VALUE "LegalCopyright", "(C) 2016-2026 Jefri Sibarani\0"
       VALUE "OriginalFilename", "http_server.exe\0"
       VALUE "ProductName", "Tobasa HTTP Server Sample\0"
     END

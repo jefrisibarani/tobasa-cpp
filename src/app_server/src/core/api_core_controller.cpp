@@ -574,7 +574,7 @@ http::ResultPtr ApiCoreController::onApiServerStatus(const web::RouteArgument& a
 #ifdef TOBASA_BUILD_IN_MEMORY_RESOURCES
    buildWithInMemoryRes = true;
 #endif   
-   resp.emplace_back( Json::array_t{20, "Build with in-memory resources",  buildWithInMemoryRes } );
+   resp.emplace_back( Json::array_t{20, "Built with in-memory resources",  buildWithInMemoryRes } );
    resp.emplace_back( Json::array_t{21, "Using in-memory resources",       web::conf::Webapp::useInMemoryResources } );
 
 
@@ -583,8 +583,8 @@ http::ResultPtr ApiCoreController::onApiServerStatus(const web::RouteArgument& a
 #if !defined(TOBASA_USE_STD_DATE) && defined(TOBASA_DATE_USE_IN_MEMORY_TZDB)
    builWithInMemoryTZDB = true;
 #endif 
-   resp.emplace_back( Json::array_t{22, "Build with in-memory Timezone DB", builWithInMemoryTZDB } );
-   resp.emplace_back( Json::array_t{23, "Using in-memory Timezone DB",      DateTime::usingInMemoryTZDB() } );
+   resp.emplace_back( Json::array_t{22, "Built with in-memory time zone DB", builWithInMemoryTZDB } );
+   resp.emplace_back( Json::array_t{23, "Using in-memory time zone DB",      DateTime::usingInMemoryTZDB() } );
 
 
    resp.emplace_back( Json::array_t{24, "Web Root",      app::docRoot() } );

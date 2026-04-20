@@ -67,6 +67,4 @@ Tobasa applications are licensed under the GNU GPL (General Public License).
 
 ---
 
-(See also each subdirectory’s README for detailed information on that
-module.)
-
+(See also each subdirectory’s README for detailed information on that module.)

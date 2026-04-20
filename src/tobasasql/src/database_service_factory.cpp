@@ -63,7 +63,15 @@ bool DbServiceFactory::disconnect()
 
 bool DbServiceFactory::connected()
 {
-   return getConnector("MainAppDbOption", false)->connected();
+   try
+   {
+      return getConnector("MainAppDbOption", false)->connected();
+   }
+   catch(const std::exception& ex)
+   {
+      Logger::logE("{}", ex.what());
+   }
+   return false;
 }
 
 void DbServiceFactory::addConnectorOption(const std::string& name, const conf::ConnectorOption& option)
