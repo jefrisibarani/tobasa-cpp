@@ -150,3 +150,4 @@ endif()
 
 add_subdirectory(src/app_server)
 add_subdirectory(src/samples)
+add_subdirectory(src/samples/plugin_dummy)

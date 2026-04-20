@@ -36,15 +36,12 @@ public:
 
 private:
    std::string      _name;
-   bool             _pluginLoaded;
-   bool             _pluginEnabled;
    std::string      _path;
-
+   bool             _loaded  {false};
+   bool             _enabled {true};
+   Plugin*          _plugin  {nullptr};
+   IPluginFactory*  _factory {nullptr};
    std::unique_ptr<DynamicLib> _lib;
-
-   Plugin* _plugin {nullptr};
-   IPluginFactory* _factory {nullptr};
-   bool _loaded{false};
 
    friend class PluginManager;
 };

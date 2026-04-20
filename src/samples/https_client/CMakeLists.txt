@@ -34,10 +34,8 @@ else()
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
-   message(STATUS "${PROJECT_NAME} use cxx_std_20")
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 else()
-   message(STATUS "${PROJECT_NAME} use cxx_std_17")
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 endif()
 

@@ -31,27 +31,20 @@ endif()
 # macOS: nothing extra required (dl is in libc)
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
-   message(STATUS "${PROJECT_NAME} use cxx_std_20")
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 else()
-   message(STATUS "${PROJECT_NAME} use cxx_std_17")
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 endif()
 
 
-# Copy binary dir to _output dir
+# Copy binary to _output dir
 # -------------------------------------------------------
 if(TOBASA_CREATE_PACKAGE_OUTPUT_DIR)
    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_directory
-         $<TARGET_FILE_DIR:${PROJECT_NAME}>/ ${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>/ )
-
-   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E rm -rf ${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>/CMakeFiles )
-
-   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E rm -f ${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>/cmake_install.cmake )
-      
-   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E rm -f ${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>/Makefile )
+      COMMAND ${CMAKE_COMMAND} -E make_directory
+         "${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>"
+      COMMAND ${CMAKE_COMMAND} -E copy
+         "$<TARGET_FILE:${PROJECT_NAME}>"
+         "${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>/"
+   )
 endif()

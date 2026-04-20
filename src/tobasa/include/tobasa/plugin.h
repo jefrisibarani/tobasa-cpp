@@ -44,11 +44,11 @@ public:
    IPluginFactory() = default;
    virtual ~IPluginFactory() = default;
 
-   virtual PluginType type() const = 0;
-   virtual std::string name() const = 0;
-   virtual std::string id() const = 0;
-   virtual std::string author() const = 0;
-   virtual std::string version() const = 0;
+   virtual PluginType  type() const        = 0;
+   virtual std::string name() const        = 0;
+   virtual std::string id() const          = 0;
+   virtual std::string author() const      = 0;
+   virtual std::string version() const     = 0;
    virtual std::string description() const = 0;
 
 protected:
@@ -71,28 +71,28 @@ template <class P>
 class PluginFactory : public IPluginFactory
 {
 public:
-   PluginFactory(std::string name,
-                 std::string id,
-                 std::string author,
-                 std::string version,
-                 std::string desc = "",
+   PluginFactory(const std::string& name,
+                 const std::string& id,
+                 const std::string& author,
+                 const std::string& version,
+                 const std::string& description = "",
                  PluginType type = PluginType::addon)
-      : _pluginType(type),
-        _pluginName(std::move(name)),
-        _pluginId(std::move(id)),
-        _pluginAuthor(std::move(author)),
-        _pluginVersion(std::move(version)),
-        _pluginDesc(std::move(desc))
+      : _type(type),
+        _name(name),
+        _id(id),
+        _author(author),
+        _version(version),
+        _description(description)
    {}
 
    ~PluginFactory() override { deletePlugin(); }
 
-   PluginType type() const override { return _pluginType; }
-   std::string name() const override { return _pluginName; }
-   std::string id() const override { return _pluginId; }
-   std::string author() const override { return _pluginAuthor; }
-   std::string version() const override { return _pluginVersion; }
-   std::string description() const override { return _pluginDesc; }
+   PluginType  type() const override         { return _type; }
+   std::string name() const override         { return _name; }
+   std::string id() const override           { return _id; }
+   std::string author() const override       { return _author; }
+   std::string version() const override      { return _version; }
+   std::string description() const override  { return _description; }
 
 protected:
 
@@ -114,13 +114,13 @@ protected:
    }
 
 private:
-   Plugin* _pPlugin{nullptr};
-   PluginType _pluginType;
-   std::string _pluginName;
-   std::string _pluginId;
-   std::string _pluginAuthor;
-   std::string _pluginVersion;
-   std::string _pluginDesc;
+   Plugin*     _pPlugin {nullptr};
+   PluginType  _type;
+   std::string _name;
+   std::string _id;
+   std::string _author;
+   std::string _version;
+   std::string _description;
 };
 
 /// Exported symbol name for factory retrieval

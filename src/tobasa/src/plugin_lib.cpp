@@ -16,7 +16,6 @@ PluginLibrary::PluginLibrary(const std::string& path)
 
 PluginLibrary::~PluginLibrary()
 {
-   unloadPlugin();
    unload();
 }
 
@@ -31,10 +30,18 @@ bool PluginLibrary::load()
       return false;
    }
 
-   _factory = reinterpret_cast<IPluginFactory*>(_lib->getSymbol(GETTOBASAPLUGIN));
+   auto fn = reinterpret_cast<GetTobasaPluginFn>(_lib->getSymbol(GETTOBASAPLUGIN));
+   if (!fn)
+   {
+      Logger::logE("Factory export not found in: " + _path);
+      _lib->unload();
+      return false;
+   }
+
+   _factory = fn();
    if (!_factory)
    {
-      Logger::logE("Factory not found in: " + _path);
+      Logger::logE("Factory creation failed in: " + _path);
       _lib->unload();
       return false;
    }
@@ -47,11 +54,12 @@ void PluginLibrary::unload()
 {
    if (_loaded)
    {
-      if (_plugin != nullptr)
+      if (_factory && _factory->getPlugin() != nullptr)
          unloadPlugin();
 
       _lib->unload();
       _factory = nullptr;
+      _plugin = nullptr;
       _loaded = false;
    }
 }
@@ -71,6 +79,7 @@ bool PluginLibrary::loadPlugin()
    Plugin* plugin = _factory->getPlugin();
    if (plugin)
    {
+      _plugin = plugin;
       plugin->load();
       return true;
    }
@@ -83,9 +92,15 @@ bool PluginLibrary::loadPlugin()
 
 void PluginLibrary::unloadPlugin()
 {
-   if (_factory->getPlugin() != nullptr)
+   if (!_factory)
+      return;
+
+   Plugin* plugin = _factory->getPlugin();
+   if (plugin != nullptr)
    {
-      _factory->getPlugin()->unload();
+      plugin->unload();
+      _factory->deletePlugin();
+      _plugin = nullptr;
    }
 }
 
