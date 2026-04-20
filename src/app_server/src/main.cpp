@@ -50,28 +50,29 @@ struct ModuleConfig
 
 int main(int argc, char* argv[])
 {
+   using namespace tbs;
+
    ModuleConfig moduleConfig;
 
-   tbs::web::Page::releaseMode(false);
+   web::Page::releaseMode(false);
 
-   if (! tbs::DateTime::initTimezoneData())
+   if (! DateTime::initTimezoneData())
       return 1;
+
+
+   std::cout << "[webapp] Current Working Dir: " << app::currentWorkingDir() << std::endl;
+#if !defined(TOBASA_USE_STD_DATE) && defined(TOBASA_DATE_USE_IN_MEMORY_TZDB)
+   std::cout << "[webapp] Built with in-memory time zone DB" << std::endl;
+#endif
+#ifdef TOBASA_BUILD_IN_MEMORY_RESOURCES
+   std::cout << "[webapp] Built with in-memory resources" << std::endl;
+#endif
+
 
    try
    {
-      using namespace tbs;
-
-
-      web::Webapp app;
-
-
-      std::cout << "[app] Current Working Dir: " << app::currentWorkingDir() << std::endl;
-#if !defined(TOBASA_USE_STD_DATE) && defined(TOBASA_DATE_USE_IN_MEMORY_TZDB)
-      std::cout << "[app] Built with in-memory time zone DB" << std::endl;
-#endif
-#ifdef TOBASA_BUILD_IN_MEMORY_RESOURCES
-      std::cout << "[app] Built with in-memory resources" << std::endl;
-#endif
+      // Prepare web application object
+      web::Webapp webapp;
 
 
       // -------------------------------------------------------
@@ -79,7 +80,7 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       std::string configFile = app::configDir() + path::SEPARATOR + "appsettings.json";
       auto embeddedConfig = app::Resource::get("config/appsettings.json", "config");
-      if (! app.loadConfig(configFile, embeddedConfig) )
+      if (! webapp.loadConfig(configFile, embeddedConfig) )
          return 1;
 
       // Main configuration
@@ -95,7 +96,7 @@ int main(int argc, char* argv[])
 #endif
 
       if (web::conf::Webapp::useInMemoryResources) {
-         std::cout << "[app] Using in-memory resources" << std::endl;
+         std::cout << "[webapp] Using in-memory resources" << std::endl;
       }
 
 
@@ -104,11 +105,11 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       {
          #ifdef TOBASA_USE_TESTS_MODULE
-         app.migrationJob().add<dbm::InitialBaseModuleTest>();  // add test for base database
+         webapp.migrationJob().add<dbm::InitialBaseModuleTest>();  // add test for base database
          #endif
 
          #ifdef TOBASA_USE_LIS_ENGINE
-         app.migrationJob().add<dbm::InitialBaseModuleLIS>();  // add lis for base database
+         webapp.migrationJob().add<dbm::InitialBaseModuleLIS>();  // add lis for base database
          #endif
       }
 
@@ -116,7 +117,7 @@ int main(int argc, char* argv[])
       // create and set custom db service for webapp. webapp will own dbservice
       auto dbService = std::make_shared<app::DbServiceFactoryApp>();
       dbService->addConnectorOption("MainAppDbOption", webappOpt.dbConnection);
-      app.useDbService(dbService);
+      webapp.useDbService(dbService);
 
       // setup homepage
       auto homePage  = webappOpt.webService.homePage;
@@ -129,7 +130,7 @@ int main(int argc, char* argv[])
       Config::addOption<web::conf::HttpResponseHeaderRule>("httpResponseHeaderRule", headerRulefile, embeddedHeaderRule);
 
       // Add content renderer for http::StatusResult  to replace default renderer: http::statusPageHtml()
-      app.router()->addResultContentBuilder(
+      webapp.router()->addResultContentBuilder(
          [](std::shared_ptr<http::Result> result)
          {
             try
@@ -149,7 +150,7 @@ int main(int argc, char* argv[])
       );
 
       // Add a status page HTML renderer with a custom template to override the default renderer http::statusPageHtml()
-      //app.serverStatusPageBuilder(
+      //webapp.serverStatusPageBuilder(
       //   [](std::shared_ptr<http::StatusPageData> data) {
       //      return app::renderStatusPage(data);
       //   });
@@ -160,61 +161,61 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
 
       // ExceptionHandler Middleware
-      app.addMiddleware(
+      webapp.addMiddleware(
          [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::exceptionHandlerMiddleware(context, next);
          } , "ExceptionHandler" );
 
       // Add middleware to perform a database connectivity check before processing http requests
-      app.addMiddleware(
-         [&app, &webappOpt, &dbService](const http::HttpContext& context, const http::RequestHandler& next) {
-            return web::databaseCheckMiddleware(app, dbService, context, next);
+      webapp.addMiddleware(
+         [&webapp, &webappOpt, &dbService](const http::HttpContext& context, const http::RequestHandler& next) {
+            return web::databaseCheckMiddleware(webapp, dbService, context, next);
          } , "DatabaseCheck" );
 
       // Multipart middleware to parse multipart body
-      app.useMultipart(
+      webapp.useMultipart(
          [&webappOpt](web::MultipartMiddlewareOption& option) {
             option.temporaryDir = webappOpt.httpServer.temporaryDir;
          } );
 
       // Add middleware to check client User-Agent, or any custom header related to our App
-      app.addMiddleware(
+      webapp.addMiddleware(
          [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::responseHeaderRuleMiddleware(context, next);
          } , "ResponseHeaderRule" );
 
       // Add HTTP Response header middleware / CORS
-      app.addMiddleware(
+      webapp.addMiddleware(
          [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::requestIdentificationMiddleware(context, next);
          } , "RequestIdentification" );
 
       // Add Cache-control middleware
-      app.addMiddleware(
+      webapp.addMiddleware(
          [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::cacheControlMiddleware(context, next);
          } , "CacheControl" );
 
       // Add middleware to validate the content-type header before executing authentication and authorization processes
-      app.addMiddleware(
+      webapp.addMiddleware(
          [](const http::HttpContext& context, const http::RequestHandler& next) {
             return web::contentTypeMiddleware(context,next);
          } , "ContentType" );
 
       // Session
-      app.useSession(
+      webapp.useSession(
          [&webappOpt](web::SessionMiddlewareOption& option) {
             web::builSessionMiddlewareOption(webappOpt, option);
          } );
 
       // Authentication
-      app.useAuthentication(
+      webapp.useAuthentication(
          [&webappOpt](web::AuthenticationMiddlewareOption& option) {
             web::buildAuthenticationMiddlewareOption(webappOpt, option);
          } );
 
       // Authorization middleware last in the chain
-      app.useAuthorization(
+      webapp.useAuthorization(
          [&webappOpt](web::AuthorizationMiddlewareOption& option) {
             web::builAuthorizationMiddlewareOption(webappOpt, option);
          } );
@@ -223,14 +224,14 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       // Controllers
       // -------------------------------------------------------
-      app.addController( web::makeController<app::CoreController>(dbService) );
-      app.addController( web::makeController<app::ApiUsersController>(dbService) );
-      app.addController( web::makeController<app::AdminController>(dbService) );
-      app.addController( web::makeController<app::ApiCoreController>(dbService, app.agent()) );
+      webapp.addController( web::makeController<app::CoreController>(dbService) );
+      webapp.addController( web::makeController<app::ApiUsersController>(dbService) );
+      webapp.addController( web::makeController<app::AdminController>(dbService) );
+      webapp.addController( web::makeController<app::ApiCoreController>(dbService, webapp.agent()) );
 
 #ifdef TOBASA_USE_TESTS_MODULE
-      app.addController( web::makeController<test::TestController>() );
-      app.addController( web::makeController<test::WebsocketController>() );
+      webapp.addController( web::makeController<test::TestController>() );
+      webapp.addController( web::makeController<test::WebsocketController>() );
 #endif
 
 
@@ -239,7 +240,7 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
 #ifdef TOBASA_USE_LIS_ENGINE
       AppLisModule lisModule(moduleConfig.useLisEngine);
-      lisModule.init(dbService, app, webappOpt);
+      lisModule.init(dbService, webapp, webappOpt);
       
       moduleConfig.startLisEngine = [&lisModule](){
          lisModule.startLisEngine();
@@ -253,7 +254,7 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       // Default tls resources callback
       // -------------------------------------------------------
-      app.defaultTlsAssetCallback( [](http::TlsAsset asset) 
+      webapp.defaultTlsAssetCallback( [](http::TlsAsset asset) 
       {
          if (asset==http::TlsAsset::cerificate_chain)
             return app::Resource::get("tls_asset/127.0.0.1.crt", "tls_asset");
@@ -269,17 +270,17 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       // APP's onStart() and onStop()
       // -------------------------------------------------------
-      app.onStart( [&moduleConfig]() {
+      webapp.onStart( [&moduleConfig]() {
          moduleConfig.startLisEngine();
       });
 
-      app.onStop( [&moduleConfig]() {
+      webapp.onStop( [&moduleConfig]() {
          moduleConfig.stopLisEngine();
       });
 
 
       // Start the app
-      app.start();
+      webapp.start();
 
    }
    catch (const std::exception& ex)
@@ -288,9 +289,9 @@ int main(int argc, char* argv[])
    }
    catch(...)
    {
-      std::cerr << "[app] Exception occured\n";
+      std::cerr << "[webapp] Exception occured\n";
    }
 
-   std::cerr << "[app] App destroyed\n";
+   std::cerr << "[webapp] App destroyed\n";
    return 0;
 }

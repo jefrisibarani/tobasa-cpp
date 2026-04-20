@@ -50,7 +50,7 @@ bool DateTime::initTimezoneData(const std::string& dataFolder)
       if (!dataFolder.empty())
          tzDataFolder = dataFolder;
 
-      std::cout << "Tobasa initializing time zone DB\n";
+      std::cout << "Initializing time zone DB\n";
 
       if (path::exists(tzDataFolder))
       {
@@ -92,7 +92,7 @@ bool DateTime::usingInMemoryTZDB()
 DateTime::DateTime()
 {
    if( !_timeZoneInitialized)
-      throw std::runtime_error("Timezone not initialized");
+      throw std::runtime_error("Time zone not initialized");
 
    // get System Time miliseconds
    auto now = floor<std::chrono::milliseconds>(std::chrono::system_clock::now());
