@@ -71,6 +71,13 @@ void hexDecode(const std::string& hexString, byte_t* outBuffer);
  */
 std::string hexEncode(byte_t buffer[], size_t bufferLength);
 
+/**
+ * @brief Encodes a byte array into a hexadecimal string.
+ *
+ * @param buffer Pointer to the byte array to be encoded.
+ * @param bufferLength The length of the byte array.
+ * @param output Reference to the string that receives the hexadecimal encoding.
+ */
 void hexEncode(byte_t buffer[], size_t bufferLength, std::string& output);
 
 

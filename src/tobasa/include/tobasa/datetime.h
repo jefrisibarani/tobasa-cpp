@@ -79,9 +79,7 @@ public:
 
    ~DateTime();
 
-   /**
-    * @brief Get the current DateTime representing the current system time.
-    */
+   /// Get the current DateTime representing the current system time.
    static DateTime now();
 
    /**
@@ -177,12 +175,16 @@ public:
     */
    LocalTimeMilis& timePoint();
 
+   /// Returns the date portion of this DateTime object.
    tbsdate::year_month_day ymd();
 
+   /// Returns the time-of-day portion of this DateTime object.
    tbsdate::hh_mm_ss<std::chrono::milliseconds> hms();
 
+   /// Returns this DateTime as Unix time in milliseconds.
    long long toUnixTimeMiliSeconds();
 
+   /// Returns this DateTime as Unix time in seconds.
    long long toUnixTimeSeconds();
 
    /**
@@ -191,7 +193,7 @@ public:
     */
    bool isNullDateTime();
 
-   /// @brief Sets the DateTime object to null.
+   /// Sets the DateTime object to null.
    void setToNullDateTime();
 
 private:

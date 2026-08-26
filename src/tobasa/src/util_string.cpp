@@ -6,14 +6,15 @@ namespace util {
 
 namespace {
 
-inline char upcase(char c)
-{
-   return (c >= 'a' && c <= 'z') ? (c & ~0x20) : c;
-}
-inline char lowcase(char c)
-{
-   return (c >= 'A' && c <= 'Z') ? (c | 0x20) : c;
-}
+   inline char upcase(char c)
+   {
+      return (c >= 'a' && c <= 'z') ? (c & ~0x20) : c;
+   }
+
+   inline char lowcase(char c)
+   {
+      return (c >= 'A' && c <= 'Z') ? (c | 0x20) : c;
+   }
 
 }
 

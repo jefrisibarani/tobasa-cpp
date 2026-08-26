@@ -4,7 +4,7 @@ namespace tbs {
 namespace log {
 
 /** 
- * \ingroup SQL
+ * @ingroup TBS
  * @brief Null Logger logs nothing.
  */
 class NullLogger 

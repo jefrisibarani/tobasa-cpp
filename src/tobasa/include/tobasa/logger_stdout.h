@@ -6,7 +6,12 @@
 namespace tbs {
 namespace log {
 
-enum Level : uint8_t {
+/** @addtogroup TBS
+ * @{
+ */
+
+enum Level : uint8_t 
+{
    None  = 0,
    Error = 1 << 0, // 00001
    Warn  = 1 << 1, // 00010
@@ -37,7 +42,6 @@ class CoutLogSink;
 struct StdoutLogger
 {
 public:
-
    StdoutLogger( const StdoutLogger & ) = delete;
    StdoutLogger & operator = ( const StdoutLogger & ) = delete;
 
@@ -87,7 +91,6 @@ public:
    void setLevel(Level level) { _level = level; }
 
 private:
-
    void logT(const std::string& msg);
    void logD(const std::string& msg);
    void logI(const std::string& msg);
@@ -98,6 +101,8 @@ private:
 
    Level _level = Level::InfoMask;   
 };
+
+/** @}*/
 
 } // namespace log
 } // namespace tbs

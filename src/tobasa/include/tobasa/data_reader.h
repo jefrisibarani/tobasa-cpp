@@ -4,6 +4,13 @@
 
 namespace tbs {
 
+/**
+ * @ingroup TBS
+ * Provides an interface for reading byte data from an internal source.
+ *
+ * Implementations may support sequential reads, position-based reads, and
+ * writing read data directly to an output stream.
+ */
 class DataReader 
 {
 public:
@@ -11,17 +18,18 @@ public:
 
    virtual ~DataReader() = default;
 
-   // Read `bufSize` bytes from internal data into the buffer
+   /// Read `bufSize` bytes from internal data into the buffer
    virtual std::streamsize read(uint8_t* buffer, std::streamsize bufSize) = 0;
-   // Read `bufSize` bytes from internal data then write into ostream
+   /// Read `bufSize` bytes from internal data then write into ostream
    virtual std::streamsize read(std::ostream& ostream, std::streamsize bufSize) = 0;
 
-   // Read `bufSize` bytes starting at a specific position `position` then copy to buffer
+   /// Read `bufSize` bytes starting at a specific position `position` then copy to buffer
    virtual std::streamsize readAt(std::streampos position, uint8_t* buffer, std::streamsize bufSize) = 0;
-   // Read `bufSize` bytes starting at a specific position `position`, the write into ostream
+   /// Read `bufSize` bytes starting at a specific position `position`, the write into ostream
    virtual std::streamsize readAt(std::streampos position, std::ostream& ostream, std::streamsize bufSize) = 0;
 
    virtual std::streamsize dataSize() { return _dataSize; }
+
    virtual bool isOpen() = 0;
 
 protected:

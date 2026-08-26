@@ -14,7 +14,7 @@ namespace crypt {
 
 using byte_t = unsigned char;
 
-/// @brief SHA Types
+/// SHA Types
 enum class ShaType
 {
    SHA224,

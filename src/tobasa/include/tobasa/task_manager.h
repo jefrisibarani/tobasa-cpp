@@ -14,6 +14,10 @@
 
 namespace tbs {
 
+/** @addtogroup TBS
+ * @{
+ */
+
 /**
  * @class TaskManager
  * @brief Simple thread pool for running background task.
@@ -167,6 +171,8 @@ int TaskManager::addTask(const std::string& taskName,
    _condition.notify_one(); // Notify a worker thread to process the task
    return taskId;
 }
+
+/** @}*/
 
 } // namespace tbs
 

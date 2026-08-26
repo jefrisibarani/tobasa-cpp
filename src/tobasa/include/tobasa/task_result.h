@@ -4,6 +4,10 @@
 
 namespace tbs {
 
+/** @addtogroup TBS
+ * @{
+ */
+
 enum class OperationStatus
 {
    SUCCESS = 0,
@@ -65,5 +69,7 @@ struct TaskResult
    }
 }; 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TaskResult, container, message, code, status)
+
+/** @}*/
 
 } // namespace tbs

@@ -157,20 +157,20 @@ void hashSHA(ShaType shaType, const std::string& message, byte_t* hashOut)
 
    switch(shaType)
    {
-   case ShaType::SHA224:
-      sha224((uint8*)message.data(), msgLength, hashOut);
-      break;
-   case ShaType::SHA256:
-      sha256((uint8*)message.data(), msgLength, hashOut);
-      break;
-   case ShaType::SHA384:
-      sha384((uint8*)message.data(), msgLength, hashOut);
-      break;
-   case ShaType::SHA512:
-      sha512((uint8*)message.data(), msgLength, hashOut);
-      break;
-   default:
-      throw CryptException("Invalid SHA-2 type");
+      case ShaType::SHA224:
+         sha224((uint8*)message.data(), msgLength, hashOut);
+         break;
+      case ShaType::SHA256:
+         sha256((uint8*)message.data(), msgLength, hashOut);
+         break;
+      case ShaType::SHA384:
+         sha384((uint8*)message.data(), msgLength, hashOut);
+         break;
+      case ShaType::SHA512:
+         sha512((uint8*)message.data(), msgLength, hashOut);
+         break;
+      default:
+         throw CryptException("Invalid SHA-2 type");
    }
 }
 
@@ -181,36 +181,36 @@ std::string hashSHA(ShaType shaType, const std::string& message)
 
    switch(shaType)
    {
-   case ShaType::SHA224:
+      case ShaType::SHA224:
       {
          byte_t messageHash[SHA224_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha224((uint8*)message.data(), message.length(), messageHash);
          return hexEncode(messageHash, SHA224_DIGEST_SIZE);
       }
-   case ShaType::SHA256:
+      case ShaType::SHA256:
       {
          byte_t messageHash[SHA256_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha256((uint8*)message.data(), message.length(), messageHash);
          return hexEncode(messageHash, SHA256_DIGEST_SIZE);
       }
-   case ShaType::SHA384:
+      case ShaType::SHA384:
       {
          byte_t messageHash[SHA384_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha384((uint8*)message.data(), message.length(), messageHash);
          return hexEncode(messageHash, SHA384_DIGEST_SIZE);
       }
-   case ShaType::SHA512:
+      case ShaType::SHA512:
       {
          byte_t messageHash[SHA512_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha512((uint8*)message.data(), message.length(), messageHash);
          return hexEncode(messageHash, SHA512_DIGEST_SIZE);
       }
-   default:
-      throw CryptException("Invalid SHA-2 type");
+      default:
+         throw CryptException("Invalid SHA-2 type");
    }
 }
 
@@ -229,37 +229,36 @@ std::vector<byte_t> hmacSHABytes(
 
    switch(shaType)
    {
-   case ShaType::SHA224:
+      case ShaType::SHA224:
       {
          byte_t hashMacOut[SHA224_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA224_DIGEST_SIZE) ? macSize : SHA224_DIGEST_SIZE;
          hmac_sha224(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return std::vector<byte_t>(std::begin(hashMacOut), std::end(hashMacOut));
-
       }
-   case ShaType::SHA256:
+      case ShaType::SHA256:
       {
          byte_t hashMacOut[SHA256_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA256_DIGEST_SIZE) ? macSize : SHA256_DIGEST_SIZE;
          hmac_sha256(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return std::vector<byte_t>(std::begin(hashMacOut), std::end(hashMacOut));
       }
-   case ShaType::SHA384:
+      case ShaType::SHA384:
       {
          byte_t hashMacOut[SHA384_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA384_DIGEST_SIZE) ? macSize : SHA384_DIGEST_SIZE;
          hmac_sha384(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return std::vector<byte_t>(std::begin(hashMacOut), std::end(hashMacOut));
       }
-   case ShaType::SHA512:
+      case ShaType::SHA512:
       {
          byte_t hashMacOut[SHA512_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA512_DIGEST_SIZE) ? macSize : SHA512_DIGEST_SIZE;
          hmac_sha512(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return std::vector<byte_t>(std::begin(hashMacOut), std::end(hashMacOut));
       }
-   default:
-      throw CryptException("Invalid HMAC SHA-2 type");
+      default:
+         throw CryptException("Invalid HMAC SHA-2 type");
    }
 }
 
@@ -278,36 +277,36 @@ std::string hmacSHA(
 
    switch(shaType)
    {
-   case ShaType::SHA224:
+      case ShaType::SHA224:
       {
          byte_t hashMacOut[SHA224_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA224_DIGEST_SIZE) ? macSize : SHA224_DIGEST_SIZE;
          hmac_sha224(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return hexEncode(hashMacOut, hmacSize);
       }
-   case ShaType::SHA256:
+      case ShaType::SHA256:
       {
          byte_t hashMacOut[SHA256_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA256_DIGEST_SIZE) ? macSize : SHA256_DIGEST_SIZE;
          hmac_sha256(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return hexEncode(hashMacOut, hmacSize);
       }
-   case ShaType::SHA384:
+      case ShaType::SHA384:
       {
          byte_t hashMacOut[SHA384_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA384_DIGEST_SIZE) ? macSize : SHA384_DIGEST_SIZE;
          hmac_sha384(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return hexEncode(hashMacOut, hmacSize);
       }
-   case ShaType::SHA512:
+      case ShaType::SHA512:
       {
          byte_t hashMacOut[SHA512_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA512_DIGEST_SIZE) ? macSize : SHA512_DIGEST_SIZE;
          hmac_sha512(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
          return hexEncode(hashMacOut, hmacSize);
       }
-   default:
-      throw CryptException("Invalid HMAC SHA-2 type");
+      default:
+         throw CryptException("Invalid HMAC SHA-2 type");
    }
 }
 
@@ -415,8 +414,7 @@ std::string getCryptoRandomBase64Url(size_t byteLength)
    // collect raw random bytes
    std::string bytes;
    bytes.resize(byteLength);
-   for (size_t i = 0; i < byteLength; ++i)
-   {
+   for (size_t i = 0; i < byteLength; ++i) {
       bytes[i] = static_cast<char>(rd() & 0xFF);
    }
 
@@ -433,24 +431,26 @@ std::string getCryptoRandomBase64Url(size_t byteLength)
          valb -= 6;
       }
    }
-   if (valb > -6)
-   {
+
+   if (valb > -6) {
       out.push_back(b64_table[((val << 8) >> (valb + 8)) & 0x3F]);
    }
-   while (out.size() % 4)
-   {
+
+   while (out.size() % 4) {
       out.push_back('=');
    }
 
    // URL-safe transform
    for (char &ch : out)
    {
-      if (ch == '+') ch = '-';
-      else if (ch == '/') ch = '_';
+      if (ch == '+') 
+         ch = '-';
+      else if (ch == '/') 
+         ch = '_';
    }
+
    // remove '=' padding
-   while (!out.empty() && out.back() == '=')
-   {
+   while (!out.empty() && out.back() == '=') {
       out.pop_back();
    }
 

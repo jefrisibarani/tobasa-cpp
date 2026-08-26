@@ -73,9 +73,7 @@ public:
     */
    bool load(const std::string& path);
 
-   /**
-    * @brief Unload the currently loaded library (if any).
-    */
+   /// Unload the currently loaded library (if any).
    void unload();
 
    /**
@@ -139,10 +137,7 @@ public:
       return reinterpret_cast<T>(sym);
    }
 
-   /**
-    * @brief Get last error message (from load/getSymbol/unload).
-    * @return error string.
-    */
+   /// Get last error message (from load/getSymbol/unload).
    std::string getLastError() const;
 
 private:
@@ -245,7 +240,7 @@ public:
    bool isValid() const { return _func != nullptr; }
 
    /// Invoke like a normal function pointer.
-   // Note: two-phase lookup in templates. we explicitly use this->
+   /// Note: two-phase lookup in templates. we explicitly use this->
    template <typename... Args>
    //auto operator()(Args... args) const -> decltype(this->_func(args...))
    auto operator()(Args... args) const -> std::invoke_result_t<T, Args...>

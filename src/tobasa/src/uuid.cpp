@@ -18,60 +18,69 @@ namespace uuid {
 
 std::string generate()
 {
-   UUID uuid;
-   RPC_CSTR  uuid_str;
-   std::string result;
+   UUID uuid{};
+   RPC_CSTR uuidString = nullptr;
 
-   if (UuidCreate(&uuid) != RPC_S_OK)
-      std::cout << "couldn't create uuid\nError code" << GetLastError() << std::endl;
+   RPC_STATUS status = UuidCreate(&uuid);
+   if (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY)
+      return {};
 
-   if (UuidToStringA(&uuid, &uuid_str) != RPC_S_OK)
-      std::cout << "couldn't convert uuid to string\nError code" << GetLastError() << std::endl;
+   status = UuidToStringA(&uuid, &uuidString);
+   if (status != RPC_S_OK)
+      return {};
 
-   result = (char*)uuid_str;
-   RpcStringFreeA(&uuid_str);
+   std::string result(reinterpret_cast<const char*>(uuidString));
+   RpcStringFreeA(&uuidString);
    return result;
 }
 
 #else
 
-static std::random_device              rd;
-static std::mt19937                    gen(rd());
-static std::uniform_int_distribution<> dis(0, 15);
-static std::uniform_int_distribution<> dis2(8, 11);
+static thread_local std::mt19937 gen(std::random_device{}());
 
 std::string generate()
 {
    std::stringstream ss;
-   int i;
+   std::uniform_int_distribution<> dis(0, 15);
+   std::uniform_int_distribution<> dis2(8, 11);
+
    ss << std::hex;
-   for (i = 0; i < 8; i++)
+   for (int i = 0; i < 8; i++)
    {
       ss << dis(gen);
    }
+
    ss << "-";
-   for (i = 0; i < 4; i++)
+
+   for (int i = 0; i < 4; i++)
    {
       ss << dis(gen);
    }
+
    ss << "-4";
-   for (i = 0; i < 3; i++)
+
+   for (int i = 0; i < 3; i++)
    {
       ss << dis(gen);
    }
+
    ss << "-";
+
    ss << dis2(gen);
-   for (i = 0; i < 3; i++)
+   for (int i = 0; i < 3; i++)
    {
       ss << dis(gen);
    }
+
    ss << "-";
-   for (i = 0; i < 12; i++)
+
+   for (int i = 0; i < 12; i++)
    {
       ss << dis(gen);
-   };
+   }
+
    return ss.str();
-}   
+}
 #endif
 
 } // namespace uuid

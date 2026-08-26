@@ -6,6 +6,7 @@ namespace tbs {
 namespace log {
 
 /**
+ * @ingroup TBS 
  * @brief Logging implementation to tbs::Logger
  * Provides logging functionality with methods for tracing,
  * debugging, information, warning, and error messages. These methods use parameters
@@ -24,7 +25,6 @@ namespace log {
 struct TobasaLogger
 {
 public:
-
    /// Log Trace message
    template<class... Args>
    void trace(Args&&... args)

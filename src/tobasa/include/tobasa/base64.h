@@ -6,6 +6,10 @@
 namespace tbs {
 namespace base64 {
 
+/** @addtogroup TBS
+ * @{
+ */
+
 typedef unsigned char BYTE;
 
 /**
@@ -43,6 +47,8 @@ std::string encode(const std::string& data);
  * @return           Decoded string
  */
 std::string decode(const std::string& data);
+
+/** @}*/
 
 } // namespace base64
 } // namespace tbs

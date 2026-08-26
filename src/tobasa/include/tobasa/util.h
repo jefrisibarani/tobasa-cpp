@@ -51,14 +51,19 @@ inline std::string vetorToCsvString(const std::vector<T>& vec)
    return vts.str();
 }
 
+/// Generates an identifier using the library's ID generator.
 std::string generateUniqueId();
 
-std::string getRandomString( size_t length );
+/// Generates a random alphanumeric string of the requested length.
+std::string getRandomString(size_t length);
 
-std::string getRandomNumber( size_t length );
+/// Generates a random decimal-digit string of the requested length.
+std::string getRandomNumber(size_t length);
 
+/// Converts a thread ID to its standard stream representation.
 std::string threadId(std::thread::id tid);
 
+/// Formats milliseconds as a space-separated duration using d, h, m, s, and ms units.
 std::string readMilliseconds(long long milliseconds);
 
 /**

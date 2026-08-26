@@ -7,6 +7,10 @@
 
 namespace tbs {
 
+/** @addtogroup TBS
+ * @{
+ */
+
 /**
  * @class TaskMetadata
  * @brief Hold basic information about one task.
@@ -52,10 +56,13 @@ struct TaskMetadataDto
    std::string resultMessage;
    int         resultCode;
    
-   /// @brief Convert TaskMetadata to TaskMetadataDto
+   /// Convert TaskMetadata to TaskMetadataDto
    static TaskMetadataDto fromTaskMetadata(TaskMetadataPtr data);
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TaskMetadataDto, id, taskId, name, status, info, startTime, endTime,
    duration, userId, appModule, resultStatus, resultMessage, resultCode)
+
+
+/** @}*/
 
 } // namespace tbs

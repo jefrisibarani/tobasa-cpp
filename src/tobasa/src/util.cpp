@@ -48,14 +48,16 @@ std::string getRandomString(size_t length)
 
    std::string randomString;
    randomString.reserve(length); // efficiency
-   for (size_t i = 0; i < length; ++i) {
+
+   for (size_t i = 0; i < length; ++i) 
+   {
       randomString += chars[distribution(rng)];
    }
 
    return randomString;
 }
 
-std::string getRandomNumber( size_t length )
+std::string getRandomNumber(size_t length)
 {
    // Note: https://stackoverflow.com/a/12468109
    
@@ -68,7 +70,8 @@ std::string getRandomNumber( size_t length )
    // Create a uniform distribution for random indices
    std::uniform_int_distribution<int> distribution(0, chars.size() - 1);
 
-   for (int i = 0; i < length; ++i) {
+   for (int i = 0; i < length; ++i) 
+   {
       int randomIndex = distribution(rng);
       randomString += chars[randomIndex];
    }

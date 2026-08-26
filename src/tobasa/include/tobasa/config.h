@@ -18,8 +18,7 @@ namespace tbs {
 class Config
 {
 private:
-   
-   // protects config data
+   /// Protects config data
    mutable std::shared_mutex _mutex; 
    
    bool        _valid {false};
@@ -37,6 +36,7 @@ private:
       GOT_DEFINED_VARIABLE,
       DONE
    };
+
    ParserCallbackState _parserState = ParserCallbackState::NONE;
    static bool jsonPparserCallback(int depth, Json::parse_event_t event, Json& parsed, const std::string& configFileName="");
 
@@ -78,7 +78,7 @@ public:
     * @param optionName The name of the option to retrieve from the JSON configuration.
     * @return OptionType object corresponding to the specified option name.
     * @throws std::runtime_error if the configuration state is invalid.
-    */   
+    */
    template <typename OptionType>
    static OptionType getOption(const std::string& optionName)
    {
@@ -164,7 +164,7 @@ public:
          throw std::runtime_error("Invalid Configuration state");
    }
 
-   /// @brief Get nested option by dotted path ("a.b.c")
+   /// Get nested option by dotted path ("a.b.c")
    template <typename OptionType>
    static OptionType getNestedOption(const std::string& dottedPath)
    {
@@ -184,7 +184,7 @@ public:
       return current->get<OptionType>();
    }
 
-   /// @brief Try get nested option by dotted path ("a.b.c") with default fallback
+   /// Try get nested option by dotted path ("a.b.c") with default fallback
    template <typename OptionType>
    static OptionType tryGetNestedOption(const std::string& dottedPath, const OptionType& defaultValue)
    {
@@ -195,7 +195,7 @@ public:
       for (auto& key : util::split(dottedPath, '.') ) 
       {
          if (!current->contains(key)) {
-            return defaultValue;  // key missing → fallback
+            return defaultValue;  // key missing -> fallback
          }
          current = &((*current)[key]);
       }
@@ -203,11 +203,11 @@ public:
       try {
          return current->get<OptionType>();
       } catch (...) {
-         return defaultValue;  // type mismatch → fallback
+         return defaultValue;  // type mismatch -> fallback
       }
    }
 
-   /// @brief Set nested option by dotted path ("a.b.c")
+   /// Set nested option by dotted path ("a.b.c")
    static void setNestedOption(const std::string& dottedPath, const Json& value);
 
    const Json& getConfiguration()

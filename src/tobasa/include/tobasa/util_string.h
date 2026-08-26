@@ -88,38 +88,44 @@ std::string boolToStr(bool value, std::string valIfTrue = "true", std::string va
 /// Convert std::string to bool.
 bool strToBool(const std::string& value);
 
-/// Remove non apphabet and numeric and space from string 
+/// Remove non apphabet and numeric and space from string.
 bool removeWhiteSpace(std::string& str);
 
-/// Remove tarailing white space (including cr lf tab) from string
+/// Remove tarailing white space (including cr lf tab) from string.
 bool removeTrailingWhiteSpace(std::string& data);
 
-/// Remove trailing char from string
+/// Remove trailing char from string.
 bool removeTraillingChar(std::string& data, char ch);
 
 bool isOnlyWhiteSpace(const std::string& str); 
 
-/// Parse name and value from a string in format:  name=value
+/// Parse name and value from a string in format:  name=value.
 void parseNameValue(const std::string& tok, std::function<void(const std::string,const std::string)> handler );
 
+
 template <typename InputIt1, typename InputIt2>
-bool streq(InputIt1 first1, InputIt1 last1, InputIt2 first2, InputIt2 last2) {
+bool streq(InputIt1 first1, InputIt1 last1, InputIt2 first2, InputIt2 last2) 
+{
   if (std::distance(first1, last1) != std::distance(first2, last2)) {
     return false;
   }
+
   return std::equal(first1, last1, first2);
 }
 
-template <typename T, typename S> bool streq(const T &a, const S &b) {
+template <typename T, typename S> bool streq(const T &a, const S &b) 
+{
   return streq(a.begin(), a.end(), b.begin(), b.end());
 }
 
-template <typename T, size_t N> constexpr size_t strSize(T (&)[N]) {
+template <typename T, size_t N> constexpr size_t strSize(T (&)[N]) 
+{
   return N - 1;
 }
 
 template <typename T, typename S>
-bool streq(const T &a, const S &b, size_t blen) {
+bool streq(const T &a, const S &b, size_t blen) 
+{
   return std::equal(std::begin(a), std::end(a), std::begin(b),
                     std::next(std::begin(b), blen));
 }

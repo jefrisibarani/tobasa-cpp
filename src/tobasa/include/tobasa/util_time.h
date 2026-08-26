@@ -6,6 +6,11 @@
 
 namespace tbs {
 
+/**
+ * @ingroup TBS
+ * Provides access to the current time in UTC, local time, and Unix timestamp
+ * formats.
+ */
 class TimeUtil
 {
 private:

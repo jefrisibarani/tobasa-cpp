@@ -52,7 +52,6 @@ class NavigatorBasic
    : public Navigator
 {
 public:
-
    /// Callback type to get maximum position
    using MaxPositionHandler = std::function<long()>;
 
@@ -97,7 +96,6 @@ public:
    MaxPositionHandler maxPositionHandler;
 
 private:
-
    /// Position/Row
    long _position;
 };

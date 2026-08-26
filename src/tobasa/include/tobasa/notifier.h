@@ -39,22 +39,22 @@ using NotificationHandler = std::function<void(const NotifyEventArgs&)>;
 /// Notifier class.
 struct Notifier
 {
-   /// Process trace notification
+   /// Process trace notification.
    void onNotifyTrace(const std::string& message, const std::string& source = "") const;
 
-   /// Process debug notification
+   /// Process debug notification.
    void onNotifyDebug(const std::string& message, const std::string& source = "") const;
 
-   /// Process message notification
+   /// Process message notification.
    void onNotifyInfo(const std::string& message, const std::string& source = "") const;
 
-   /// Process warning notification
+   /// Process warning notification.
    void onNotifyWarning(const std::string& message, const std::string& source = "") const;
 
-   /// Process error notification
+   /// Process error notification.
    void onNotifyError(const std::string& message, const std::string& source = "") const;
 
-   /// Handle notification / call handler
+   /// Handle notification / call handler.
    void onNotify(const NotifyEventArgs& arg) const;
 
    /// The actual function to execute notification logic.

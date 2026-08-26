@@ -54,22 +54,23 @@ namespace path {
    /// @brief Create the given directory - and all directories leading to it
    /// @return true on success or if the directory already exists
    bool createDir(const std::string& path);
-   
-   /// Get file size.
-   /// @param path file path
+
+   /// Get the size of a file in bytes.
    size_t fileSize(const std::string& path);
 
-   /// Get absolute path.
+   /// Convert a path to an absolute path.
    std::string absolute(const std::string& path);
 
-   /// Remove file.
+   /// Remove a file and return an error message on failure.
    bool removeFile(const std::string& path, std::string& errorMessage);
 
+   /// Check whether a path is located within the given base path.
    bool isSubPath(const std::string& path, const std::string& base);
 
-   /// 
+   /// Convert a path to the operating system's path format.
    std::string convertToOsPath(const std::string& path);
 
+   /// Normalize a path.
    std::string normalize(const std::string& path);
    
    /// Resolves a path relative to the executable directory.

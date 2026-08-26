@@ -10,12 +10,12 @@ namespace tbs {
 namespace log {
 
 namespace {
-std::string threadId() 
-{
-   std::stringstream ss;
-   ss << std::this_thread::get_id();
-   return ss.str();
-}
+   std::string threadId() 
+   {
+      std::stringstream ss;
+      ss << std::this_thread::get_id();
+      return ss.str();
+   }
 }
 
 CoutLogSink::CoutLogSink()

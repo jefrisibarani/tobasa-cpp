@@ -6,7 +6,7 @@
 
 namespace tbs {
 
-/** \addtogroup TBS
+/** @addtogroup TBS
  * @{
  */
 
