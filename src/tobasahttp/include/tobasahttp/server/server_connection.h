@@ -91,11 +91,12 @@ inline std::string knownHttpMethodsCsv() {
 template <class Traits>
 class ServerConnection
    : public HttpConnection<Traits>
+   , public WebSocketSender
 {
 public:
-   using Socket         = typename Traits::Socket;
-   using Settings       = typename Traits::Settings;
-   using Logger         = typename Traits::Logger;
+   using Socket   = typename Traits::Socket;
+   using Settings = typename Traits::Settings;
+   using Logger   = typename Traits::Logger;
 
    ServerConnection(const ServerConnection&) = delete;
    ServerConnection& operator=(const ServerConnection&) = delete;
@@ -246,14 +247,14 @@ public:
          this->_sendBuffer,
          asio::bind_executor(
             this->executor(),
-            [this, self = this->shared_from_this()] (std::error_code error, std::size_t byteTransferred)
+            [self=this->selfPtr()] (std::error_code error, std::size_t byteTransferred)
             {
-               auto resp = this->_httpContext->response();
+               auto resp = self->_httpContext->response();
                resp->updateTotalTransferred(byteTransferred);
 
                // consume the bytes we just wrote from the send buffer
                if (byteTransferred > 0)
-                  this->_sendBuffer.consume(byteTransferred);
+                  self->_sendBuffer.consume(byteTransferred);
                
                if (error)
                {
@@ -261,43 +262,42 @@ public:
                   {
                      // cancelled locally (server-side).Likely socket closed before write finished
                   }
-                   else if (error == asio::error::connection_reset || error == asio::error::eof) 
+                  else if (error == asio::error::connection_reset || error == asio::error::eof) 
                   {
                      // client closed connection, safe to ignore
                      if (resp->totalTransferred() == resp->expectedTotalTransferred())
                      {
-                        this->markRequestCompletedAndLog();
-                        this->processCompleted(self->id(), error.message());
+                        self->markRequestCompletedAndLog();
+                        self->processCompleted(self->id(), error.message());
                         return;
                      }
                   } 
 
-                  if (!this->closed())
-                     this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                  if (!self->closed())
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
 
                   return;
                }
 
                if ( resp->useChunkedEncoding() && resp->compressionEnabled() && resp->compressionActive() )
-                  return write();
+                  return self->write();
                else if ( resp->useChunkedEncoding() && !resp->compressionEnabled() && resp->totalTransferred() < resp->expectedTotalTransferred() )
-                  return write();
+                  return self->write();
                else if (resp->dataSource()->readLeft > 0)
-                  return write();
+                  return self->write();
 
                if (resp->totalTransferred() != resp->expectedTotalTransferred() && !resp->compressionEnabled())
                {
-                  this->_logger.error("[{}] [conn:{}] Response total transferred {} does not match expected {}", 
-                     this->logHttpType(), self->id(), resp->totalTransferred(), resp->expectedTotalTransferred() );
+                  self->_logger.error("[{}] [conn:{}] Response total transferred {} does not match expected {}", 
+                                      self->logHttpType(), self->id(), resp->totalTransferred(), resp->expectedTotalTransferred() );
                   
-                  this->processCompleted(self->id(), "Response total transferred does not match expected");
+                  self->processCompleted(self->id(), "Response total transferred does not match expected");
                   return;
                }
 
-               this->markRequestCompletedAndLog();
-               return handleKeepAliveOrClose();
-            }
-         )
+               self->markRequestCompletedAndLog();
+               return self->handleKeepAliveOrClose();
+            })
       );
    }
 
@@ -305,7 +305,8 @@ public:
    /// This is safe because ServerConnection is always allocated via make_shared in the connection manager.
    /// Use this in lambda captures to get the properly typed shared_ptr for async callbacks:
    ///    [this, self = this->selfPtr()] { self->someMethod(); }
-   std::shared_ptr<ServerConnection> selfPtr() {
+   std::shared_ptr<ServerConnection> selfPtr() 
+   {
       return std::static_pointer_cast<ServerConnection>(this->shared_from_this());
    }
 
@@ -330,53 +331,53 @@ protected:
          this->getReadBuffer(),
          asio::bind_executor(
             this->executor(),
-            [this, self =  this->shared_from_this()](std::error_code error, size_t bytesTransferred)
+            [self= this->selfPtr()](std::error_code error, size_t bytesTransferred)
             {
                if (error)
                {
-                  if (!this->closed())
-                     this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                  if (!self->closed())
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
 
                   return;
                }
 
                // connection might be already closed (because of timed out or any other reasons)
                // when this handler run. So we stop here.
-               if ( this->closed() )
+               if ( self->closed() )
                {
-                  this->_logger.debug("[{}] [conn:{}] Attempting to read data while already closed", this->logHttpType(), this->id());
+                  self->_logger.debug("[{}] [conn:{}] Attempting to read data while already closed", self->logHttpType(), self->id());
                   return;
                }
 
                try
                {
-                  _totalBytesTransferred = _totalBytesTransferred + static_cast<int64_t>(bytesTransferred);
-                  size_t totalData = bytesTransferred <= this->_readBuffer.size() ? bytesTransferred : this->_readBuffer.size();
+                  self->_totalBytesTransferred = self->_totalBytesTransferred + static_cast<int64_t>(bytesTransferred);
+                  size_t totalData = bytesTransferred <= self->_readBuffer.size() ? bytesTransferred : self->_readBuffer.size();
 
-                  tbs::span<const char> dataSpan( this->_readBuffer.data(), totalData );
+                  tbs::span<const char> dataSpan( self->_readBuffer.data(), totalData );
                   
                   parser::Info info;
-                  if ( this->_parser.hasChunkedEncoding() )
-                     info = this->_parser.parse(bytesTransferred);
+                  if ( self->_parser.hasChunkedEncoding() )
+                     info = self->_parser.parse(bytesTransferred);
                   else 
-                     info = _httpContext->getBodyReader()->feed( dataSpan , dataSpan.size() );
+                     info = self->_httpContext->getBodyReader()->feed( dataSpan , dataSpan.size() );
 
                   if (!info.success())
                   {
-                     handleRequestError(std::move(info));
+                     self->handleRequestError(std::move(info));
                      return;
                   }
 
-                  if (info.success() &&  info.message() == "multipart-done" && _httpContext->getBodyReader()->done() )
-                     this->_processingStopWatch.lap(this->_parser.parsingId(), "multipart" );
+                  if (info.success() &&  info.message() == "multipart-done" && self->_httpContext->getBodyReader()->done() )
+                     self->_processingStopWatch.lap(self->_parser.parsingId(), "multipart" );
 
-                  if (info.success() && ! _httpContext->getBodyReader()->done())
-                     readBody();
+                  if (info.success() && ! self->_httpContext->getBodyReader()->done())
+                     self->readBody();
                }
                catch(const std::exception& ex)
                {
-                  if (!this->closed())
-                     this->processError(self->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ServerConnection");
+                  if (!self->closed())
+                     self->processError(self->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ServerConnection");
                }
          })
       );
@@ -393,140 +394,141 @@ protected:
             this->getReadBuffer(),
             asio::bind_executor(
                this->executor(),
-               [this, self =  this->shared_from_this()](std::error_code error, size_t bytesTransferred)
+               [self=this->selfPtr()](std::error_code error, size_t bytesTransferred)
                {
-                  this->_parser.isReading(false);
+                  self->_parser.isReading(false);
 
                   if (error)
                   {
-                     if ( !this->closed() )
-                        this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                     if ( !self->closed() )
+                        self->processError(self->id(), error, ErrorType::system, "ServerConnection");
 
                      return;
                   }
 
                   // connection might be already closed (because of timed out or any other reasons)
                   // when this handler run. So we stop here.
-                  if ( this->closed() )
+                  if ( self->closed() )
                   {
-                     this->_logger.debug("[{}] [conn:{}] Attempting to read data while already closed", this->logHttpType(), this->id());
+                     self->_logger.debug("[{}] [conn:{}] Attempting to read data while already closed", self->logHttpType(), self->id());
                      return;
                   }
 
                   try
                   {
-                     _totalBytesTransferred = _totalBytesTransferred + static_cast<int64_t>(bytesTransferred);
+                     self->_totalBytesTransferred = self->_totalBytesTransferred + static_cast<int64_t>(bytesTransferred);
                      
-                     if (this->_settings.logVerbose())
-                        this->_logger.trace("[{}] [conn:{}] Received {} bytes", this->logHttpType(), this->id(), _totalBytesTransferred);
+                     if (self->_settings.logVerbose())
+                        self->_logger.trace("[{}] [conn:{}] Received {} bytes", self->logHttpType(), self->id(), self->_totalBytesTransferred);
 
-                     if (this->_parser.totalParsedBytes() == 0)
+                     if (self->_parser.totalParsedBytes() == 0)
                      {
                         // TODO_JEFRI: FIX this: restart stopwatch in very beginning of receiving data
-                        //this->_processingStopWatch.start();
+                        //self->_processingStopWatch.start();
                      }
 
-                     auto info = this->_parser.parse(bytesTransferred);
+                     auto info = self->_parser.parse(bytesTransferred);
                      if ( !info.success() )
                      {
                         // process error we got from parser, e.g: unsupported http method, 
                         // request too large, invalid header
-                        handleRequestError(std::move(info));
+                        self->handleRequestError(std::move(info));
                         return;
                      }
 
                      // We need more data
-                     if ( this->_settings.enableMultipartParsing() 
-                          && info.lastIndex() == this->_readBuffer.size()-1 
-                          && (!this->_parser.contentDone() || !this->_parser.headersDone()) ) 
+                     if ( self->_settings.enableMultipartParsing() 
+                          && info.lastIndex() == self->_readBuffer.size()-1 
+                          && (!self->_parser.contentDone() || !self->_parser.headersDone()) ) 
                      {
-                        return read();
+                        return self->read();
                      }
 
-                     if ( info.httpStatus().code() == StatusCode::CONTINUE && !this->_parser.contentDone() )
+                     if ( info.httpStatus().code() == StatusCode::CONTINUE && !self->_parser.contentDone() )
                      {
-                        handleExpect100Continue(); // send 100-continue response
-                        return read();
+                        self->handleExpect100Continue(); // send 100-continue response
+                        return self->read();
                      }
 
-                     if ( this->_parser.headersDone() || this->_parser.contentDone() )
+                     if ( self->_parser.headersDone() || self->_parser.contentDone() )
                      {
-                        if ( _httpContext == nullptr ||  // new connection
-                             (_httpContext != nullptr && _httpContext->request()->id() != this->_parser.parsingId()) // new request in keep-alive connection
-                           ) {
-                           retrieveRequest(); // initialize _httpContext
+                        if ( self->_httpContext == nullptr ||  // new connection
+                             (self->_httpContext != nullptr && self->_httpContext->request()->id() != self->_parser.parsingId()) // new request in keep-alive connection
+                           ) 
+                        {
+                           self->retrieveRequest(); // initialize _httpContext
                         }
                      }
 
                      // Redirect multipart parsing into a request handler (middleware)
-                     if (    !this->_settings.enableMultipartParsing() 
-                          && !this->_parser.contentDone() 
-                          && this->_parser.hasMultipart()
-                          /* && this->_parser.hasContentLength() && this->_parser.contentLength()*/ )
+                     if (    !self->_settings.enableMultipartParsing() 
+                          && !self->_parser.contentDone() 
+                          && self->_parser.hasMultipart()
+                          /* && self->_parser.hasContentLength() && self->_parser.contentLength()*/ )
                      {
                         // create MultipartBodyReader with last _parser's state, to be used on MultipartBodyReader's read() 
                         // Note: Body reader use readBody() to retrieve data
                         std::shared_ptr<MultipartBodyReader> bodyReader = 
-                           this->makeBodyReader(info.lastIndex(), bytesTransferred-info.bytesRead() );
+                           self->makeBodyReader(info.lastIndex(), bytesTransferred - info.bytesRead() );
 
                         // Multipart with Chunked Transfer Encoding
-                        if (this->_parser.hasChunkedEncoding() && !this->_parser.hasContentLength())
+                        if (self->_parser.hasChunkedEncoding() && !self->_parser.hasContentLength())
                         {
-                           this->_parser.parseChunkedMultipartHandler = bodyReader->chunkedHandler();
-                           bodyReader->setProcessBodyStarter( this->_parser.processBodyStarter );
+                           self->_parser.parseChunkedMultipartHandler = bodyReader->chunkedHandler();
+                           bodyReader->setProcessBodyStarter( self->_parser.processBodyStarter );
                            bodyReader->setMultipartWithChunkedTransferEncoding();
                         }
 
-                        _httpContext->setBodyReader(std::move(bodyReader));
+                        self->_httpContext->setBodyReader(std::move(bodyReader));
 
                         // The request handler must parse multipart body.
                         // handleRequest() will execute request handler until completed then call write() 
                         // which internally starting write timer, which will cancel read or process timer
-                        return handleRequest();
+                        return self->handleRequest();
                      }
 
-                     if ( this->_parser.contentDone() )
+                     if ( self->_parser.contentDone() )
                      {
                      
-                        this->_logger.trace("[{}] [conn:{}] Received total {} bytes", this->logHttpType(), this->id(), _totalBytesTransferred);
+                        self->_logger.trace("[{}] [conn:{}] Received total {} bytes", self->logHttpType(), self->id(), self->_totalBytesTransferred);
                         
                         // get content from parser
-                        _httpContext->request()->content( std::move( this->_parser.content() ) );
+                        self->_httpContext->request()->content( std::move( self->_parser.content() ) );
 
-                        auto upgradeHeader = _httpContext->request()->headers().value("Upgrade");
+                        auto upgradeHeader = self->_httpContext->request()->headers().value("Upgrade");
                         if ( !upgradeHeader.empty() )
-                           return handleUpgradeRequest(upgradeHeader);
+                           return self->handleUpgradeRequest(upgradeHeader);
 
                         // We got all headers and body. Cancel read timer by starting process timer. 
                         // Connection will close after process timer expired
                         // Note: request handler activity stil running in background
-                        if (this->timeoutProcessing().value == 0)
-                           this->cancelTimer();
+                        if (self->timeoutProcessing().value == 0)
+                           self->cancelTimer();
                         else
                         {
                            // wa re going to handle the request, make sure request handler
                            // do the work within time out processing
-                           this->startTimer(this->timeoutProcessing());
+                           self->startTimer(self->timeoutProcessing());
                         }
                         
                         // We are parsing multipart here, so get the result from parser
-                        if ( this->_settings.enableMultipartParsing() && this->_parser.hasMultipart())
-                           _httpContext->request()->multipartBody( std::move( this->_parser.multipartBody() ) );
+                        if ( self->_settings.enableMultipartParsing() && self->_parser.hasMultipart())
+                           self->_httpContext->request()->multipartBody( std::move( self->_parser.multipartBody() ) );
 
                         // handleRequest() will execute request handler until completed then call write() 
                         // which internally starting write timer, which will cancel read or process timer
-                        return handleRequest();
+                        return self->handleRequest();
                      }
                      
                      // Read more data
                      {
-                        return read();
+                        return self->read();
                      }
                   }
                   catch(const std::exception& ex)
                   {
-                     if (!this->closed())
-                        this->processError(self->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ServerConnection");
+                     if (!self->closed())
+                        self->processError(self->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ServerConnection");
                   }
             })
          );
@@ -753,15 +755,14 @@ protected:
          asio::buffer(response),
          asio::bind_executor(
             this->executor(),
-            [this](std::error_code error, std::size_t) 
+            [self=this->selfPtr()](std::error_code error, std::size_t) 
             {
                if (!error)
-                  this->_parser.markContinueSent();
+                  self->_parser.markContinueSent();
 
-               if (error && !this->closed())
-                  this->processError(this->id(), error, ErrorType::system, "ServerConnection");
-            }
-         )
+               if (error && !self->closed())
+                  self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+            })
       );
    }
 
@@ -1057,50 +1058,53 @@ protected:
       asio::async_write(
          this->_socket,
          buffers,
-         [this](const std::error_code &error, std::size_t bytesTransferred)
-         {
-            this->cancelTimer();
-
-            if (!error)
+         asio::bind_executor(
+            this->executor(),
+            [self=this->selfPtr()](const std::error_code &error, std::size_t bytesTransferred)
             {
-               WsSendErrorHandler callback;
+               self->cancelTimer();
 
-               auto it = _wsConnection->sendQueue.begin();
-               if (it != _wsConnection->sendQueue.end())
+               if (!error)
                {
-                  try
+                  WsSendErrorHandler callback;
+
+                  auto it = self->_wsConnection->sendQueue.begin();
+                  if (it != self->_wsConnection->sendQueue.end())
                   {
-                     callback = std::move(it->callback);
-                     _wsConnection->sendQueue.erase(it); // erase the element after moving the callback
-                  }
-                  catch(...)
-                  {
-                     this->_logger.error("[{}] [conn:{}] {} wsSendFromQueue: error erasing websocket OutData", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
+                     try
+                     {
+                        callback = std::move(it->callback);
+                        self->_wsConnection->sendQueue.erase(it); // erase the element after moving the callback
+                     }
+                     catch(...)
+                     {
+                        self->_logger.error("[{}] [conn:{}] {} wsSendFromQueue: error erasing websocket OutData", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
+                     }
+
                   }
 
+                  if (self->_wsConnection->sendQueue.size() > 0)
+                     self->wsSendFromQueue();
+
+                  if (callback)
+                  {
+                     ErrorData err;
+                     err.code    = error.value();
+                     err.message = error.message();
+                     callback(err);
+                  }
                }
-
-               if (_wsConnection->sendQueue.size() > 0)
-                  wsSendFromQueue();
-
-               if (callback)
+               else
                {
                   ErrorData err;
                   err.code    = error.value();
                   err.message = error.message();
-                  callback(err);
-               }
-            }
-            else
-            {
-               ErrorData err;
-               err.code    = error.value();
-               err.message = error.message();
 
-               this->_logger.error("[{}] [conn:{}] {} wsSendFromQueue: error {} code {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint), error.message(), error.value());
-               wsHandleConnError(err, bytesTransferred);
-            }
-         });
+                  self->_logger.error("[{}] [conn:{}] {} wsSendFromQueue: error {} code {}", self->logHttpType(), self->id(), toString(self->_remoteEndpoint), error.message(), error.value());
+                  self->wsHandleConnError(err, bytesTransferred);
+               }
+            })
+      );
    }
 
    /// Send WebSocket Upgrade Response and start websocket communication
@@ -1117,35 +1121,35 @@ protected:
          this->_sendBuffer,
          asio::bind_executor(
             this->executor(),
-            [this, self = this->shared_from_this()] (std::error_code error, std::size_t)
+            [self=this->selfPtr()] (std::error_code error, std::size_t)
             {
                if (!error)
                {
-                  this->_processingStopWatch.stop();
-                  this->_logger.info("[{}] [conn:{}] Upgrade request finished in {}, websocket established with {} ", 
-                              this->logHttpType(),
-                              this->id(),
-                              this->_processingStopWatch.toString(this->_parser.parsingId(),true),
-                              toString(_httpContext->remoteEndpoint()) );
+                  self->_processingStopWatch.stop();
+                  self->_logger.info("[{}] [conn:{}] Upgrade request finished in {}, websocket established with {} ", 
+                              self->logHttpType(),
+                              self->id(),
+                              self->_processingStopWatch.toString(self->_parser.parsingId(),true),
+                              toString(self->_httpContext->remoteEndpoint()) );
 
-                  this->_isWebSocket = true;
+                  self->_isWebSocket = true;
                   // add websocket to wsContext and call onOpen handler
-                  _wsConnection->onOpen();
+                  self->_wsConnection->onOpen();
 
-                  readWebSocket();
+                  self->readWebSocket();
                }
                else
                {
-                  if (!this->closed())
+                  if (!self->closed())
                   {
-                     if (_wsConnection && _wsConnection->wsContext)
-                        _wsConnection->onError(error, ErrorType::system);
+                     if (self->_wsConnection && self->_wsConnection->wsContext)
+                        self->_wsConnection->onError(error, ErrorType::system);
 
-                     this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                   }
                }
-            }) // asio::bind_executor
-      ); // asio::async_write
+            })
+      );
    }
 
    void readWebSocket()
@@ -1155,134 +1159,142 @@ protected:
          this->_socket,
          _wsConnection->sendStreamBuf,
          asio::transfer_exactly(2),
-         [this, self = this->shared_from_this()](const std::error_code& error, std::size_t bytesTransferred)
-         {
-            this->cancelTimer();
-
-            if (!error)
+         asio::bind_executor(
+            this->executor(),
+            [self=this->selfPtr()](const std::error_code& error, std::size_t bytesTransferred)
             {
-               if (bytesTransferred == 0)
+               self->cancelTimer();
+
+               if (!error)
                {
-                  readWebSocket();
-                  return;
-               }
+                  if (bytesTransferred == 0)
+                  {
+                     self->readWebSocket();
+                     return;
+                  }
 
-               std::istream istream(&_wsConnection->sendStreamBuf);
-               std::array < unsigned char, 2 > firstBytes;
-               istream.read((char * ) & firstBytes[0], 2);
+                  std::istream istream( & self->_wsConnection->sendStreamBuf );
+                  std::array < unsigned char, 2 > firstBytes;
+                  istream.read((char * ) & firstBytes[0], 2);
 
-               unsigned char finRsvOpcode = firstBytes[0];
+                  unsigned char finRsvOpcode = firstBytes[0];
 
-               // Close connection if unmasked message from client (protocol error)
-               if (firstBytes[1] < 128)
-               {
-                  const std::string reason("message from client not masked");
-                  wsSendClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
-                  _wsConnection->onClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
+                  // Close connection if unmasked message from client (protocol error)
+                  if (firstBytes[1] < 128)
+                  {
+                     const std::string reason("message from client not masked");
+                     self->wsSendClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
+                     self->_wsConnection->onClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
 
-                  this->processCompleted(self->id(), "websocket, " + reason);
-                  return;
-               }
+                     self->processCompleted(self->id(), "websocket, " + reason);
+                     return;
+                  }
 
-               std::size_t length = (firstBytes[1] & 127);
+                  std::size_t length = (firstBytes[1] & 127);
 
-               if (length == 126)
-               {
-                  // 2 next bytes is the size of content
-                  this->startTimer(this->timeoutRead());
-                  asio::async_read(
-                     this->_socket,
-                     _wsConnection->sendStreamBuf,
-                     asio::transfer_exactly(2),
-                     [this, self = self->shared_from_this(), finRsvOpcode](const std::error_code& error, std::size_t /*bytesTransferred*/ )
-                     {
-                        this->cancelTimer();
-
-                        if (!error)
-                        {
-                           std::istream istream(&_wsConnection->sendStreamBuf);
-
-                           std::array<unsigned char,2> lengthBytes;
-                           istream.read((char * ) & lengthBytes[0], 2);
-
-                           std::size_t length = 0;
-                           std::size_t numBytes = 2;
-                           for (std::size_t c = 0; c < numBytes; c++)
-                              length += static_cast < std::size_t > (lengthBytes[c]) << (8 * (numBytes - 1 - c));
-
-                           wsReadMessageContent(length, finRsvOpcode);
-                        }
-                        else
-                        {
-                           if (!this->closed())
+                  if (length == 126)
+                  {
+                     // 2 next bytes is the size of content
+                     self->startTimer(self->timeoutRead());
+                     asio::async_read(
+                        self->_socket,
+                        self->_wsConnection->sendStreamBuf,
+                        asio::transfer_exactly(2),
+                        asio::bind_executor(
+                           self->executor(),
+                           [self, finRsvOpcode](const std::error_code& error, std::size_t /*bytesTransferred*/ )
                            {
-                              if (_wsConnection && _wsConnection->wsContext)
-                                 _wsConnection->onError(error, ErrorType::system);
+                              self->cancelTimer();
 
-                              this->processError(self->id(), error, ErrorType::system, "ServerConnection");
-                           }
-                           return;
-                        }
-                     }
-                  );
-               }
-               else if (length == 127)
-               {
-                  // 8 next bytes is the size of content
-                  this->startTimer(this->timeoutRead());
-                  asio::async_read(
-                     this->_socket,
-                     _wsConnection->sendStreamBuf,
-                     asio::transfer_exactly(8),
-                     [this, self = self->shared_from_this(), finRsvOpcode](const std::error_code& error, std::size_t /*bytesTransferred*/ )
-                     {
-                        this->cancelTimer();
+                              if (!error)
+                              {
+                                 std::istream istream(&self->_wsConnection->sendStreamBuf);
 
-                        if (!error)
-                        {
-                           std::istream istream(&_wsConnection->sendStreamBuf);
+                                 std::array<unsigned char,2> lengthBytes;
+                                 istream.read((char * ) & lengthBytes[0], 2);
 
-                           std::array<unsigned char,8> lengthBytes;
-                           istream.read((char * ) & lengthBytes[0], 8);
+                                 std::size_t length = 0;
+                                 std::size_t numBytes = 2;
+                                 for (std::size_t c = 0; c < numBytes; c++)
+                                    length += static_cast < std::size_t > (lengthBytes[c]) << (8 * (numBytes - 1 - c));
 
-                           std::size_t length = 0;
-                           std::size_t numBytes = 8;
-                           for (std::size_t c = 0; c < numBytes; c++)
+                                 self->wsReadMessageContent(length, finRsvOpcode);
+                              }
+                              else
+                              {
+                                 if (!self->closed())
+                                 {
+                                    if (self->_wsConnection && self->_wsConnection->wsContext)
+                                       self->_wsConnection->onError(error, ErrorType::system);
+
+                                    self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                                 }
+                                 return;
+                              }
+                           })
+                     );
+                  }
+                  else if (length == 127)
+                  {
+                     // 8 next bytes is the size of content
+                     self->startTimer(self->timeoutRead());
+                     asio::async_read(
+                        self->_socket,
+                        self->_wsConnection->sendStreamBuf,
+                        asio::transfer_exactly(8),
+                        asio::bind_executor(
+                           self->executor(),
+                           [self, finRsvOpcode](const std::error_code& error, std::size_t /*bytesTransferred*/ )
                            {
-                              length += static_cast < std::size_t > (lengthBytes[c]) << (8 * (numBytes - 1 - c));
-                           }
+                              self->cancelTimer();
 
-                           wsReadMessageContent(length, finRsvOpcode);
-                        }
-                        else
-                        {
-                           if (!this->closed())
-                           {
-                              if (_wsConnection && _wsConnection->wsContext)
-                                 _wsConnection->onError(error, ErrorType::system);
+                              if (!error)
+                              {
+                                 std::istream istream(&self->_wsConnection->sendStreamBuf);
 
-                              this->processError(self->id(), error, ErrorType::system, "ServerConnection");
-                           }
-                           return;
-                        }
-                     }); // asio::async_read()
+                                 std::array<unsigned char,8> lengthBytes;
+                                 istream.read((char * ) & lengthBytes[0], 8);
+
+                                 std::size_t length = 0;
+                                 std::size_t numBytes = 8;
+                                 for (std::size_t c = 0; c < numBytes; c++)
+                                 {
+                                    length += static_cast < std::size_t > (lengthBytes[c]) << (8 * (numBytes - 1 - c));
+                                 }
+
+                                 self->wsReadMessageContent(length, finRsvOpcode);
+                              }
+                              else
+                              {
+                                 if (!self->closed())
+                                 {
+                                    if (self->_wsConnection && self->_wsConnection->wsContext)
+                                       self->_wsConnection->onError(error, ErrorType::system);
+
+                                    self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                                 }
+                                 return;
+                              }
+                           })
+                     );
+                  }
+                  else
+                     self->wsReadMessageContent(length, finRsvOpcode);
                }
                else
-                  wsReadMessageContent(length, finRsvOpcode);
-            }
-            else
-            {
-               if (!this->closed())
                {
-                  if (_wsConnection && _wsConnection->wsContext)
-                     _wsConnection->onError(error, ErrorType::system);
+                  if (!self->closed())
+                  {
+                     if (self->_wsConnection && self->_wsConnection->wsContext)
+                        self->_wsConnection->onError(error, ErrorType::system);
 
-                  this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                  }
+                  return;
                }
-               return;
-            }
-         }); // asio::async_read()
-   } // readWebSocket()
+            })
+      );
+   }
 
    void wsReadMessageContent(std::size_t length, unsigned char finRsvOpcode)
    {
@@ -1303,104 +1315,106 @@ protected:
          this->_socket,
          _wsConnection->sendStreamBuf,
          asio::transfer_exactly(4 + length),
-         [this, length, finRsvOpcode, self = this->shared_from_this()](const std::error_code &error, std::size_t /*bytes_transferred*/)
-         {
-            this->cancelTimer();
-
-            if (!error)
+         asio::bind_executor(
+            this->executor(),
+            [self=this->selfPtr(), length, finRsvOpcode](const std::error_code &error, std::size_t /*bytes_transferred*/)
             {
-               std::istream istream( & _wsConnection->sendStreamBuf );
+               self->cancelTimer();
 
-               // Read mask
-               std::array < unsigned char, 4> mask;
-               istream.read((char*) &mask[0], 4);
-
-               std::shared_ptr<ws::InMessage> inMessage;
-
-               // If fragmented message
-               if ((finRsvOpcode & 0x80) == 0 || (finRsvOpcode & 0x0f) == 0)
+               if (!error)
                {
-                  if (!_wsConnection->fragmentedInMessage)
+                  std::istream istream( & self->_wsConnection->sendStreamBuf );
+
+                  // Read mask
+                  std::array < unsigned char, 4> mask;
+                  istream.read((char*) &mask[0], 4);
+
+                  std::shared_ptr<ws::InMessage> inMessage;
+
+                  // If fragmented message
+                  if ((finRsvOpcode & 0x80) == 0 || (finRsvOpcode & 0x0f) == 0)
                   {
-                     _wsConnection->fragmentedInMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
-                     _wsConnection->fragmentedInMessage->finRsvOpcode |= 0x80;
+                     if (! self->_wsConnection->fragmentedInMessage)
+                     {
+                        self->_wsConnection->fragmentedInMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
+                        self->_wsConnection->fragmentedInMessage->finRsvOpcode |= 0x80;
+                     }
+                     else
+                        self->_wsConnection->fragmentedInMessage->length += length;
+
+                     inMessage = self->_wsConnection->fragmentedInMessage;
                   }
                   else
-                     _wsConnection->fragmentedInMessage->length += length;
+                     inMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
 
-                  inMessage = _wsConnection->fragmentedInMessage;
-               }
-               else
-                  inMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
+                  std::ostream ostream(&inMessage->streambuf);
+                  for (std::size_t c = 0; c < length; c++)
+                     ostream.put(istream.get() ^ mask[c % 4]);
 
-               std::ostream ostream(&inMessage->streambuf);
-               for (std::size_t c = 0; c < length; c++)
-                  ostream.put(istream.get() ^ mask[c % 4]);
-
-               // If connection close
-               if ((finRsvOpcode & 0x0f) == 8)
-               {
-                  int32_t status = 0;
-                  if (length >= 2)
+                  // If connection close
+                  if ((finRsvOpcode & 0x0f) == 8)
                   {
-                     unsigned char byte1 = inMessage->get();
-                     unsigned char byte2 = inMessage->get();
-                     status = (static_cast<int32_t> (byte1) << 8) + byte2;
+                     int32_t status = 0;
+                     if (length >= 2)
+                     {
+                        unsigned char byte1 = inMessage->get();
+                        unsigned char byte2 = inMessage->get();
+                        status = (static_cast<int32_t> (byte1) << 8) + byte2;
+                     }
+
+                     auto reason = inMessage->string();
+                     self->wsSendClose(status, reason);
+                     self->_wsConnection->onClose(status, reason);
+
+                     self->processCompleted(self->id(), "websocket, " + reason);
+                     return;
                   }
+                  // If ping
+                  else if ((finRsvOpcode & 0x0f) == 9)
+                  {
+                     // Send pong
+                     auto outMessage = std::make_shared<ws::OutMessage> ();
+                     *outMessage << inMessage->string();
+                     self->wsSend(outMessage, nullptr, finRsvOpcode + 1);
 
-                  auto reason = inMessage->string();
-                  wsSendClose(status, reason);
-                  _wsConnection->onClose(status, reason);
+                     self->_wsConnection->onPing();
 
-                  this->processCompleted(self->id(), "websocket, " + reason);
-                  return;
-               }
-               // If ping
-               else if ((finRsvOpcode & 0x0f) == 9)
-               {
-                  // Send pong
-                  auto outMessage = std::make_shared<ws::OutMessage> ();
-                  *outMessage << inMessage->string();
-                  wsSend(outMessage, nullptr, finRsvOpcode + 1);
-
-                  _wsConnection->onPing();
-
-                  // Next message
-                  readWebSocket();
-               }
-               // If pong
-               else if ((finRsvOpcode & 0x0f) == 10)
-               {
-                  _wsConnection->onPong();
-                  // Next message
-                  readWebSocket();
-               }
-               // If fragmented message and not final fragment
-               else if ((finRsvOpcode & 0x80) == 0)
-               {
-                  // Next message
-                  readWebSocket();
+                     // Next message
+                     self->readWebSocket();
+                  }
+                  // If pong
+                  else if ((finRsvOpcode & 0x0f) == 10)
+                  {
+                     self->_wsConnection->onPong();
+                     // Next message
+                     self->readWebSocket();
+                  }
+                  // If fragmented message and not final fragment
+                  else if ((finRsvOpcode & 0x80) == 0)
+                  {
+                     // Next message
+                     self->readWebSocket();
+                  }
+                  else
+                  {
+                     self->_wsConnection->onMessage(inMessage->string());
+                     // Next message
+                     // Only reset _wsFragmentedInMessage for non-control frames (control frames can be in between a fragmented message)
+                     self->_wsConnection->fragmentedInMessage = nullptr;
+                     self->readWebSocket();
+                  }
                }
                else
                {
-                  _wsConnection->onMessage(inMessage->string());
-                  // Next message
-                  // Only reset _wsFragmentedInMessage for non-control frames (control frames can be in between a fragmented message)
-                  _wsConnection->fragmentedInMessage = nullptr;
-                  readWebSocket();
-               }
-            }
-            else
-            {
-               if (!this->closed())
-               {
-                  if (_wsConnection && _wsConnection->wsContext)
-                     _wsConnection->onError(error, ErrorType::system);
+                  if (!self->closed())
+                  {
+                     if (self->_wsConnection && self->_wsConnection->wsContext)
+                        self->_wsConnection->onError(error, ErrorType::system);
 
-                  this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                  }
                }
-            }
-         }
+            })
       );
    }
 
@@ -1462,42 +1476,64 @@ protected:
    void wsSendClose(int32_t status, const std::string &reason = "", WsSendErrorHandler callback = nullptr)
    {
       // Send close only once (in case close is initiated by server)
-      if (_wsConnection->closed)
-         return;
+      auto self = selfPtr();
 
-      _wsConnection->closed = true;
+      asio::dispatch(
+         this->executor(),
+         [self, status, reason, callback = std::move(callback)]() mutable
+         {
+            if (self->closed() ||  !self->_wsConnection ||  self->_wsConnection->closed)
+            {
+               return;
+            }
 
-      auto sendStream = std::make_shared<ws::OutMessage>();
+            self->_wsConnection->closed = true;
 
-      sendStream->put(status >> 8);
-      sendStream->put(status % 256);
+            auto sendStream = std::make_shared<ws::OutMessage>();
+            sendStream->put(status >> 8);
+            sendStream->put(status % 256);
+            *sendStream << reason;
+            
+            // finRsvOpcode=136: message close
+            self->wsSend(std::move(sendStream), std::move(callback), static_cast<unsigned char>(136));
+         });
 
-      *sendStream << reason;
-
-      // finRsvOpcode=136: message close
-      wsSend(std::move(sendStream), std::move(callback), 136);
    }
 
    void wsSendBinary(const std::string& data, WsSendErrorHandler callback = nullptr)
    {
-      if (this->closed())
-      {
-         this->_logger.debug("[{}] [conn:{}] WebSocket connection with {} already closed", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
-         return;
-      }
+      auto self = selfPtr();
 
-      wsSend(data, callback, (unsigned char)130);
+      asio::dispatch(
+         this->executor(),
+         [self, data, callback = std::move(callback)]() mutable
+         {
+            if (self->closed() || !self->_wsConnection)
+            {
+               self->_logger.debug("[{}] [conn:{}] WebSocket connection with {} already closed", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
+               return;
+            }
+
+            self->wsSend( std::string_view(data), std::move(callback), static_cast<unsigned char>(130));
+         });
    }
 
    void wsSendText(const std::string& data, WsSendErrorHandler callback = nullptr)
    {
-      if (this->closed())
-      {
-         this->_logger.debug("[{}] [conn:{}] WebSocket connection with {} already closed", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
-         return;
-      }
+      auto self = selfPtr();
 
-      wsSend(data, callback, (unsigned char)129);
+      asio::dispatch(
+         this->executor(),
+         [self, data, callback = std::move(callback)]() mutable
+         {
+            if (self->closed() || !self->_wsConnection)
+            {
+               self->_logger.debug("[{}] [conn:{}] WebSocket connection with {} already closed", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
+               return;
+            }
+
+            self->wsSend(std::string_view(data), std::move(callback), static_cast<unsigned char>(129));
+         });
    }
 
    void wsHandleConnError(const http::ErrorData& error, std::size_t bytes_transferred=-1)
@@ -1542,16 +1578,17 @@ protected:
          this->id(), &this->_sendBuffer, this->_http2Option);
 
       this->_http2Session->writeHandler(
-         [this](http2::HandlerCallback cb)
+         [self=this->selfPtr()](http2::HandlerCallback cb)
          {
-            asio::post(this->executor(),
-               [this, cb=std::move(cb)] () {
-                  cb(); // ses->writeSignaled(false);
+            asio::post(self->executor(),
+               [self, cb=std::move(cb)]() 
+               {
+                  cb();
 
-                  if (this->_http2Option->logVerbose)
-                     this->_logger.trace("[{}] [conn:{}] writeHandler call writeHttp2", this->logHttpType(), this->id());
+                  if (self->_http2Option->logVerbose)
+                     self->_logger.trace("[{}] [conn:{}] writeHandler call writeHttp2", self->logHttpType(), self->id());
 
-                  this->writeHttp2();
+                  self->writeHttp2();
                });
          }
       );
@@ -1594,57 +1631,57 @@ protected:
          this->getReadBuffer(),
          asio::bind_executor(
             this->executor(),
-            [this, self =  this->shared_from_this()](std::error_code error, size_t bytesTransferred)
+            [self=this->selfPtr()](std::error_code error, size_t bytesTransferred)
             {
-               this->cancelTimer();
+               self->cancelTimer();
 
                if (!error)
                {
                   // connection might be already closed(because of timed out or any other reasons)
                   // when this handler run. so we stop here.
-                  if ( this->closed() )
+                  if ( self->closed() )
                   {
-                     this->_logger.trace("[{}] [conn:{}] [http2] read, attempting to read data while already closed", this->logHttpType(), this->id());
+                     self->_logger.trace("[{}] [conn:{}] [http2] read, attempting to read data while already closed", self->logHttpType(), self->id());
                      return;
                   }
                   else
                   {
-                     if (this->_http2Option->logVerbose)
+                     if (self->_http2Option->logVerbose)
                      {
-                        this->_logger.trace("[{}] [conn:{}] [http2] read,  Receive {} bytes", this->logHttpType(), this->id(), bytesTransferred);
-                        this->_logger.trace("[{}] [conn:{}] [http2] read,  calling readIncomingData", this->logHttpType(), this->id());
+                        self->_logger.trace("[{}] [conn:{}] [http2] read,  Receive {} bytes", self->logHttpType(), self->id(), bytesTransferred);
+                        self->_logger.trace("[{}] [conn:{}] [http2] read,  calling readIncomingData", self->logHttpType(), self->id());
                      }
 
-                     auto result = this->_http2Session->readIncomingData(this->getReadBuffer(), bytesTransferred);
+                     auto result = self->_http2Session->readIncomingData(self->getReadBuffer(), bytesTransferred);
                      if (! result.success() )
                      {
-                        this->_logger.error("[{}] [conn:{}] {}", this->logHttpType(), this->id(), result.message() );
-                        this->processError(self->id(), result.message(), ErrorType::internal, ERROR_CODE_READ_FAIL , "ServerConnection");
+                        self->_logger.error("[{}] [conn:{}] {}", self->logHttpType(), self->id(), result.message() );
+                        self->processError(self->id(), result.message(), ErrorType::internal, ERROR_CODE_READ_FAIL , "ServerConnection");
                         return;
                      }
 
-                     if (this->_http2Option->logVerbose)
-                        this->_logger.trace("[{}] [conn:{}] [http2] read, call writeHttp2", this->logHttpType(), this->id());
+                     if (self->_http2Option->logVerbose)
+                        self->_logger.trace("[{}] [conn:{}] [http2] read, call writeHttp2", self->logHttpType(), self->id());
 
-                     this->writeHttp2();
+                     self->writeHttp2();
 
-                     if ( !this->_http2Session->writingData() &&  this->_http2Session->shouldStop())
+                     if ( !self->_http2Session->writingData() &&  self->_http2Session->shouldStop())
                      {
-                        this->processCompleted(self->id(), "all HTTP/2 data processed [R]");
+                        self->processCompleted(self->id(), "all HTTP/2 data processed [R]");
                         return;
                      }
 
                      // Once data is written, ensure to continue reading for further frames
-                     if (this->_http2Option->logVerbose)
-                        this->_logger.trace("[{}] [conn:{}] [http2] read,  call readHttp2", this->logHttpType(), this->id());
+                     if (self->_http2Option->logVerbose)
+                        self->_logger.trace("[{}] [conn:{}] [http2] read,  call readHttp2", self->logHttpType(), self->id());
 
-                     this->readHttp2();
+                     self->readHttp2();
                   }
                }
                else
                {
-                  if (! this->closed())
-                     this->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                  if (! self->closed())
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                }
             })
       );
@@ -1684,7 +1721,7 @@ protected:
          this->_sendBuffer,
          asio::bind_executor(
             this->executor(),
-            [this, self = this->selfPtr(), bytesToTransfer] (std::error_code error, std::size_t bytesTransferred)
+            [self=this->selfPtr(), bytesToTransfer] (std::error_code error, std::size_t bytesTransferred)
             {
                self->cancelTimer();
                self->_http2Session->writingData(false);
@@ -1711,8 +1748,8 @@ protected:
                   if (! self->closed())
                      self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                }
-            }) // asio::bind_executor
-      ); // asio::async_write
+            })
+      );
    }
 
    http2::Result handleHttp2Request(int32_t streamId)

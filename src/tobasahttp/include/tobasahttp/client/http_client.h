@@ -15,8 +15,8 @@ namespace http {
 using PlainClientDefault  = Client<ClientTraits<SettingsClient, log::StdoutLogger>>;
 using SecureClientDefault = Client<ClientTlsTraits<SettingsClient, log::StdoutLogger>>;
 
-using PlainClient     = Client<ClientTraits<SettingsClient, log::TobasaLogger>>;
-using SecureClient    = Client<ClientTlsTraits<SettingsClient, log::TobasaLogger>>;
+using PlainClient  = Client<ClientTraits<SettingsClient, log::TobasaLogger>>;
+using SecureClient = Client<ClientTlsTraits<SettingsClient, log::TobasaLogger>>;
 
 /** @}*/
 

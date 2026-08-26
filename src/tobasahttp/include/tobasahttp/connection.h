@@ -82,10 +82,7 @@ public:
    void onError(OnError handler);
    void onTimeOut(OnTimeOut handler);
    void onClosed(OnClosed handler);
-
-   virtual void wsSendBinary(const std::string& data, WsSendErrorHandler callback = nullptr) {}
-   virtual void wsSendText(  const std::string& data, WsSendErrorHandler callback = nullptr) {}
-   virtual void wsSendClose( int status, const std::string &reason = "", WsSendErrorHandler callback = nullptr) {}
+  
 };
 
 /** @}*/

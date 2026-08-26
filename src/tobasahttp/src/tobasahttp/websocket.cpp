@@ -77,9 +77,8 @@ WebSocket::WebSocket(ConnectionPtr connection, std::any& userData, const asio::i
    : _connection {connection}
    , _userData   {userData}
    , _remoteEndpoint {std::move(ep)}
-   , _requestHeaders {requestHeader}
-{
-}
+   , _requestHeaders {requestHeader} 
+{}
 
 void WebSocket::sendText(const std::string& data, WsSendErrorHandler callback)
 {
@@ -88,7 +87,12 @@ void WebSocket::sendText(const std::string& data, WsSendErrorHandler callback)
       Logger::logT("[websocket] Connection {} already closed", _connection->id());
       return;
    }
-   _connection->wsSendText(data, callback);
+   
+   auto sender = std::dynamic_pointer_cast<WebSocketSender>(_connection);
+   if (sender)
+      sender->wsSendText(data, callback);
+   else
+      Logger::logT("[websocket] Connection {} does not support wsSendText", _connection->id());
 }
 
 void WebSocket::sendBinary(const std::string& data, WsSendErrorHandler callback)
@@ -98,12 +102,21 @@ void WebSocket::sendBinary(const std::string& data, WsSendErrorHandler callback)
       Logger::logT("[websocket] Connection {} already closed", _connection->id());
       return;
    }
-   _connection->wsSendBinary(data, callback);
+
+   auto sender = std::dynamic_pointer_cast<WebSocketSender>(_connection);
+   if (sender)
+      sender->wsSendBinary(data, callback);
+   else
+      Logger::logT("[websocket] Connection {} does not support wsSendBinary", _connection->id());
 }
 
 void WebSocket::close(const std::string& reason, int32_t closeCode)
 {
-   _connection->wsSendClose(closeCode, reason);
+   auto sender = std::dynamic_pointer_cast<WebSocketSender>(_connection);
+   if (sender)
+      sender->wsSendClose(closeCode, reason);
+   else
+      Logger::logT("[websocket] Connection {} does not support wsSendClose", _connection->id());
 
    // Use callClose() to ensure the ConnectionManager properly handles the closure of this connection.
    _connection->callClose(reason);

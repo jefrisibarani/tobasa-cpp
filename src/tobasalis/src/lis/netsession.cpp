@@ -33,12 +33,13 @@ void NetSession::startReceive()
       asio::buffer(_readBufRaw, CONNECTION_READ_BUF_SIZE),
       asio::bind_executor(
          this->executor(),
-         [this, self=shared_from_this()](std::error_code error, std::size_t bytesTransferred)
+         [self=this->
+            shared_from_this()](std::error_code error, std::size_t bytesTransferred)
          {
             if (!error)
             {
                // connection might be already closed so we stop here.
-               if ( _closed )
+               if ( self->_closed )
                {
                   Logger::logE("[lis_link] Attempting to read data while already closed");
                   return;
@@ -46,32 +47,32 @@ void NetSession::startReceive()
 
                for (unsigned int i = 0; i < bytesTransferred; ++i)
                {
-                  char c = _readBufRaw[i];
+                  char c = self->_readBufRaw[i];
 
-                  _readBufStr += c;
+                  self->_readBufStr += c;
                   if (i == (bytesTransferred - 1))
                   {
                      try
                      {
-                        if (onReceiveData)
-                           onReceiveData(_readBufStr);
+                        if (self->onReceiveData)
+                           self->onReceiveData(self->_readBufStr);
                      }
                      catch(const std::exception& ex)
                      {
-                        _sessionManager.stop(self, ex.what());
+                        self->_sessionManager.stop(self, ex.what());
 
-                        if (!_listener && onDisconnected)
+                        if (! self->_listener && self->onDisconnected)
                         {
                            // Exception occurred in onReceiveData, most likely Message format error
                            // if we a a client, we need to reconnect
-                           onDisconnected("");
+                           self->onDisconnected("");
                         }
                      }
                      
-                     _readBufStr.clear();
+                     self->_readBufStr.clear();
                   }
                }
-               startReceive();
+               self->startReceive();
             }
             else if (error == asio::error::operation_aborted)
             {
@@ -79,9 +80,9 @@ void NetSession::startReceive()
             }
             else if (error != asio::error::operation_aborted)
             {
-               _sessionManager.stop(self, error.message());
-               if (onDisconnected)
-                  onDisconnected("");
+               self->_sessionManager.stop(self, error.message());
+               if (self->onDisconnected)
+                  self->onDisconnected("");
             }
          }
       )
@@ -125,12 +126,13 @@ void NetSession::send(const std::string& data)
 void NetSession::asyncSend(const std::string& data)
 {
    asio::post(this->executor(),
-      [this, data]()
+      [self=this->shared_from_this(), data]()
       {
-         bool _writeInProgress = !_writeDataQueue.empty();
-         _writeDataQueue.push_back(data);
-         if (!_writeInProgress)
-            doAsyncSend();
+         bool _writeInProgress = ! self->_writeDataQueue.empty();
+         self->_writeDataQueue.push_back(data);
+
+         if (! self->_writeInProgress)
+            self->doAsyncSend();
       });
 }
 
@@ -146,12 +148,12 @@ void NetSession::doAsyncSend()
          {
             if (!error)
             {
-               if (OnDataSent)
-                  OnDataSent(bytes_transferred);
+               if (self->OnDataSent)
+                  self->OnDataSent(bytes_transferred);
 
-               _writeDataQueue.pop_front();
-               if (!_writeDataQueue.empty())
-                  doAsyncSend();
+               self->_writeDataQueue.pop_front();
+               if (! self->_writeDataQueue.empty())
+                  self->doAsyncSend();
             }
             else if (error == asio::error::operation_aborted)
             {
@@ -159,10 +161,10 @@ void NetSession::doAsyncSend()
             } 
             else if (error != asio::error::operation_aborted)
             {
-               _sessionManager.stop(self, error.message());
+               self->_sessionManager.stop(self, error.message());
                
-               if (onDisconnected)
-                  onDisconnected("");
+               if (self->onDisconnected)
+                  self->onDisconnected("");
             }
          }) 
    );
@@ -190,22 +192,24 @@ void NetSession::asyncConnect(tcp::resolver::results_type endpoints)
 /// Client mode async_connect handler
 void NetSession::ConnectHandler(const std::error_code& error, const tcp::endpoint& endpoint)
 {
+   auto self(this->shared_from_this());
+
    if (!error)
    {
       Logger::logI("[lis_link] NetSesion successfully connected to {}",  toString(endpoint) );
       // publish connected event
-      if (onConnected)
-         onConnected("");
+      if (self->onConnected)
+         self->onConnected("");
 
-      startReceive();
+      self->startReceive();
       return;
    }
 
    // All endpoints failed
    Logger::logE("[lis_link] NetSession connect error : {}", error.message());
    // publish connect failed event
-   if (onConnectFailed)
-      onConnectFailed(error.message() );
+   if (self->onConnectFailed)
+      self->onConnectFailed(error.message() );
 }
 
 } // namespace lis

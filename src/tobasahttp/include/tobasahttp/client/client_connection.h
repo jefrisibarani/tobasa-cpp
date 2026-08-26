@@ -27,11 +27,11 @@ public:
    using Logger   = typename Traits::Logger;
 
 private:
-   ClientResponseHandler     _responseHandler;
+   ClientResponseHandler    _responseHandler;
    /// request to send
-   std::unique_ptr<Request>  _pRequest;
+   std::unique_ptr<Request> _pRequest;
 
-   std::function<void()>     _responseHandledCb;
+   std::function<void()>    _responseHandledCb;
    bool                     _busy {false};
    size_t                   _requestsHandled {0};
    size_t                   _maxRequests {200};
@@ -89,11 +89,11 @@ public:
    virtual void write()
    {
       this->_logger.info("[{}] [conn:{}] Processing request to: {} {} {} {}", this->logHttpType(),
-         this->id(), toString(this->_remoteEndpoint), _pRequest->target(),
-         _pRequest->contentType(), _pRequest->contentLength() );
+         this->id(), toString(this->_remoteEndpoint), this->_pRequest->target(),
+         this->_pRequest->contentType(), this->_pRequest->contentLength() );
 
       std::ostream sendStream(&this->_sendBuffer);
-      RequestSerializer serializer(*_pRequest);
+      RequestSerializer serializer(* this->_pRequest);
 
       auto rawRequest = serializer.getString();
       sendStream << std::move(rawRequest);
@@ -103,20 +103,20 @@ public:
          this->_sendBuffer,
          asio::bind_executor(
             this->executor(),
-            [this, self = this->shared_from_this()](std::error_code error, std::size_t)
+            [self=this->selfPtr()](std::error_code error, std::size_t)
             {
                if (!error)
                {
-                  this->_processingStopWatch.stop();
+                  self->_processingStopWatch.stop();
 
                   // start async read, this will return immediately
-                  read();
+                  self->read();
                   // fire up read timer
-                  this->startTimer(this->timeoutRead());
+                  self->startTimer(self->timeoutRead());
                }
                else
                {
-                  this->processError(self->id(), error, ErrorType::system, "ClientConnection");
+                  self->processError(self->id(), error, ErrorType::system, "ClientConnection");
                }
          })
       );
@@ -170,44 +170,44 @@ protected:
             this->getReadBuffer(),
             asio::bind_executor(
                this->executor(),
-               [this, self = this->shared_from_this()](std::error_code error, size_t bytesTransferred)
+               [self=this->selfPtr()](std::error_code error, size_t bytesTransferred)
                {
-                  this->_parser.isReading(false);
+                  self->_parser.isReading(false);
 
                   if ( !error )
                   {
                      // connection might be already closed(because of timed out or any other reasons)
                      // when this handler run. so we stop here.
-                     if ( this->closed() )
+                     if ( self->closed() )
                      {
-                        this->_logger.warn("[{}] [conn:{}] Attempting to read data while already closed", this->logHttpType(), this->_connId);
+                        self->_logger.warn("[{}] [conn:{}] Attempting to read data while already closed", self->logHttpType(), self->_connId);
                         return;
                      }
                      else
                      {
                         try
                         {
-                           this->_logger.trace("[{}] [conn:{}] Received {} bytes", this->logHttpType(), this->_connId, bytesTransferred);
+                           self->_logger.trace("[{}] [conn:{}] Received {} bytes", self->logHttpType(), self->_connId, bytesTransferred);
 
-                           auto info = this->_parser.parse(bytesTransferred);
+                           auto info = self->_parser.parse(bytesTransferred);
                            if ( info.success() )
                            {
-                              if ( this->_parser.contentDone() )
-                                 retrieveResponse();
+                              if ( self->_parser.contentDone() )
+                                 self->retrieveResponse();
                               else
-                                 read();
+                                 self->read();
                            }
                            else
-                              this->processError(self->id(), std::string{info.message()}, ErrorType::internal, ERROR_CODE_PARSER_FAIL, "ClientConnection");
+                              self->processError(self->id(), std::string{info.message()}, ErrorType::internal, ERROR_CODE_PARSER_FAIL, "ClientConnection");
                         }
                         catch(const std::exception& ex)
                         {
-                           this->processError(self->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ClientConnection");
+                           self->processError(self->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ClientConnection");
                         }
                      }
                   }
                   else {
-                     this->processError(self->id(), error, ErrorType::system, "ClientConnection");
+                     self->processError(self->id(), error, ErrorType::system, "ClientConnection");
                   }
             })
          );
@@ -291,6 +291,10 @@ protected:
       return false;
    }
 
+   std::shared_ptr<ClientConnection> selfPtr() 
+   {
+      return std::static_pointer_cast<ClientConnection>(this->shared_from_this());
+   }
 
 };
 

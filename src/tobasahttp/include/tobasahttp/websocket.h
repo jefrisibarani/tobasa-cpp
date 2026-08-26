@@ -42,6 +42,17 @@ constexpr int32_t WS_CLOSE_CODE_MANDATORY_EXTENSION   = 1010;
 constexpr int32_t WS_CLOSE_CODE_INTERNAL_ERROR        = 1011;
 constexpr int32_t WS_CLOSE_CODE_TLS_FAILURE           = 1015;
 
+// Minimal non-templated interface for sending WebSocket frames
+class WebSocketSender
+{
+public:
+   virtual ~WebSocketSender() = default;
+
+   virtual void wsSendBinary(const std::string& data, WsSendErrorHandler callback = nullptr) = 0;
+   virtual void wsSendText(const std::string& data, WsSendErrorHandler callback = nullptr) = 0;
+   virtual void wsSendClose(int32_t status, const std::string &reason = "", WsSendErrorHandler callback = nullptr) = 0;
+};
+
 namespace ws {
 
 class InMessage: public std::istream
@@ -98,12 +109,12 @@ public:
 class OutData
 {
    public:
-      OutData(std::shared_ptr<OutMessage> outHeader_,
-            std::shared_ptr<OutMessage> outMessage_,
-            WsSendErrorHandler &&callback_) noexcept
-         : outHeader(std::move(outHeader_))
-         , outMessage(std::move(outMessage_))
-         , callback(std::move(callback_))
+      OutData(std::shared_ptr<OutMessage> outHdr,
+              std::shared_ptr<OutMessage> outMsg,
+              WsSendErrorHandler &&cb) noexcept
+         : outHeader(std::move(outHdr))
+         , outMessage(std::move(outMsg))
+         , callback(std::move(cb))
       {}
 
       std::shared_ptr<OutMessage> outHeader;
@@ -114,13 +125,13 @@ class OutData
 /// @brief WebSocket connection context, used internally by ServerConnection
 struct WebSocketConn
 {
-   asio::streambuf       sendStreamBuf;
-   bool                  closed;
-   InMessagePtr          fragmentedInMessage;
-   std::list<OutData>    sendQueue;
-   WebSocketContextPtr   wsContext;
+   asio::streambuf     sendStreamBuf;
+   bool                closed;
+   InMessagePtr        fragmentedInMessage;
+   std::list<OutData>  sendQueue;
+   WebSocketContextPtr wsContext;
 
-   http::WebSocketPtr    wsPtr;
+   http::WebSocketPtr  wsPtr;
 
    void onOpen();
    void onClose(int32_t status, const std::string& reason);
@@ -130,15 +141,15 @@ struct WebSocketConn
    void onPing();
    void onPong();
 };
-using WebSocketConnPtr   = std::shared_ptr<WebSocketConn>;
-using WebSocketConnUPtr  = std::unique_ptr<WebSocketConn>;
+using WebSocketConnPtr  = std::shared_ptr<WebSocketConn>;
+using WebSocketConnUPtr = std::unique_ptr<WebSocketConn>;
 
-using OnOpenHandler      = std::function<void(http::WebSocketPtr)>;
-using OnCloseHandler     = std::function<void(http::WebSocketPtr, int32_t, const std::string&)>;
-using OnPingHandler      = std::function<void(http::WebSocketPtr)>;
-using OnPongHandler      = std::function<void(http::WebSocketPtr)>;
-using OnMessageHandler   = std::function<void(http::WebSocketPtr, const std::string&)>;
-using OnErrorHandler     = std::function<void(http::WebSocketPtr, const ErrorData&)>;
+using OnOpenHandler     = std::function<void(http::WebSocketPtr)>;
+using OnCloseHandler    = std::function<void(http::WebSocketPtr, int32_t, const std::string&)>;
+using OnPingHandler     = std::function<void(http::WebSocketPtr)>;
+using OnPongHandler     = std::function<void(http::WebSocketPtr)>;
+using OnMessageHandler  = std::function<void(http::WebSocketPtr, const std::string&)>;
+using OnErrorHandler    = std::function<void(http::WebSocketPtr, const ErrorData&)>;
 
 using SkipSendHandler   = std::function<bool(ConnectionId)>;
 } // namespace ws
