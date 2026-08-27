@@ -8,6 +8,10 @@
 namespace tbs {
 namespace web {
 
+/** \addtogroup WEB
+ * @{
+ */
+
 struct webappError
 {
    std::string task;
@@ -39,6 +43,8 @@ public:
 
    std::vector<webappError>  errors;
 };
+
+/** @}*/
 
 } // namespace web
 } // namespace tbs

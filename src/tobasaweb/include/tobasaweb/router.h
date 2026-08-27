@@ -52,8 +52,11 @@ public:
    /// Invoke route handler
    std::shared_ptr<http::Result> invokeHandler(RouteArgument && routeArg);
 
-   /// Inspect route entry and request path
-   // check for match:  /version/{id}/build/{name} with /version/909/build/jhon
+   /**
+    * Check whether the route entry matches the request path.
+    * For example, match /version/{id}/build/{name} against
+    * /version/909/build/jhon.
+    */ 
    virtual bool canHandlePath(const http::HttpContext& context);
 };
 
@@ -70,8 +73,10 @@ class Router
 protected:
    std::vector<RouteEntry> _routeEntries;
 
-   // Acts as the default handler for routes that do not have
-   // a specific handler registered in _routeEntries
+   /**
+    * Acts as the default handler for routes that do not have
+    * a specific handler registered in _routeEntries
+    */ 
    RouteHandler _defaultHandler;
 
 public:
@@ -87,27 +92,32 @@ public:
 
    virtual void defaultHandler(RouteHandler&& handler);
 
-   // Check HTTP request path handler and authentication type,
-   // set up HTTP context route handler and authentication scheme,
-   // apply routing rule from configuration file (appsettings.json),
-   // initialize and set up route's AuthContext.
-   // This function is called in MiddlewareManager::invoke()
+   /**
+    * Check HTTP request path handler and authentication type,
+    * set up HTTP context route handler and authentication scheme,
+    * apply routing rule from configuration file (appsettings.json),
+    * initialize and set up route's AuthContext.
+    * This function is called in MiddlewareManager::invoke()
+    */
    virtual void setupRoute(const http::HttpContext& context);
 
    http::RequestStatus invoke(const http::HttpContext& context);
 
 protected:
-   /// Do some initialization if needed
-   /// Factory call this method in initRouter()
+   /**
+    * Do some initialization if needed
+    * Factory call this method in initRouter()
+    */ 
    virtual void onInit();
 
    void addHandler(http::Method method, const std::string& path, RouteHandler&& handler, http::AuthScheme authScheme=http::AuthScheme::NONE, const std::string& matchRule="");
    
    conf::RouteAuth readAuthConfigurationRule(const std::vector<conf::RouteAuth>& rules, const std::string& requestPath);
 
-
-   // Check authentication requirements from the configuration file
-   // and determine the effective authentication scheme.
+   /**
+    * Check the authentication requirements defined in the configuration file
+    * and determine the effective authentication scheme.
+    */ 
    void setupAuthenticationRule(const http::HttpContext& context);   
 
 

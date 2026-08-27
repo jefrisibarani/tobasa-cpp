@@ -5,6 +5,7 @@ namespace tbs {
 namespace web {
 
 MiddlewareManager::MiddlewareManager() {}
+
 MiddlewareManager::MiddlewareManager(std::shared_ptr<RouterBase> router)
 {
    _router = router;

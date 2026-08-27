@@ -13,7 +13,7 @@ namespace web {
 
 /** 
  * Router factory
- * @tparam RouterImpl
+ * \tparam RouterImpl
  */
 template <typename RouterImpl>
 class RouterFactory
@@ -57,10 +57,9 @@ public:
       {
          _router->setDbServiceFactory( webService->dbServiceFactory() );
 
-         // _pRouter is a RouterImpl
-         // RouterFactory<RouterImpl> is a friend of RouterBase, NOT RouterImpl
-         // we need RouterBase pointer, thus allowing RouterFactory<RouterImpl>
-         // to call RouterBase::onInit, whichs is a protected method
+         // _router is a RouterImpl. RouterFactory<RouterImpl> is a friend of
+         // RouterBase, but not of RouterImpl. Cast to RouterBase so the
+         // factory can call the protected RouterBase::onInit() method.
          auto basePtr = std::static_pointer_cast<RouterBase>(_router);
          basePtr->onInit();
 

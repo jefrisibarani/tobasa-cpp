@@ -28,9 +28,7 @@ struct AuthenticationMiddlewareOption
    std::function<bool(const http::HttpContext& context, AuthenticationMiddleware& middleware)> authHandler;
 };
 
-/**
- * \brief Functor for configuring AuthenticationMiddlewareOption members.
- */
+/// Functor for configuring AuthenticationMiddlewareOption members.
 using AuthenticationMiddlewareOptionBuilder =
    std::function<void(AuthenticationMiddlewareOption& option)>;
 

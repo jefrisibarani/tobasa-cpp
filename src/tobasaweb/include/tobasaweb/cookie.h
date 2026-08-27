@@ -7,6 +7,7 @@ namespace tbs {
 namespace web {
 
 /**
+ * \ingroup WEB
  * \brief Represents options for cookie-based authentication.
  */
 struct CookieAuthOption

@@ -14,12 +14,12 @@ http::RequestStatus requestIdentificationMiddleware(const http::HttpContext& con
 {
    auto& headers = context->request()->headers();
 
-   auto userAgent           = headers.value("User-Agent");
-   auto projectId           = headers.value("X-Project-Id");
-   auto clientAppId         = headers.value("X-Client-App-Id");
-   auto webserviceVersion   = headers.value("X-WebService-Version");
-   auto deviceToken         = headers.value("X-Device-Token");
-   auto chatProtocolVersion = headers.value("X-ChatProto-Version");
+   auto userAgent     = headers.value("User-Agent");
+   auto projectId     = headers.value("X-Project-Id");
+   auto clientAppId   = headers.value("X-Client-App-Id");
+   auto webserviceVer = headers.value("X-WebService-Version");
+   auto deviceToken   = headers.value("X-Device-Token");
+   auto chatProtoVer  = headers.value("X-ChatProto-Version");
 
    if ( (    context->request()->path() == "/chat_app_socket" 
           || util::startsWith(context->request()->path(), "/api/chat")

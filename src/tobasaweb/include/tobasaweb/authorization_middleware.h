@@ -23,9 +23,7 @@ struct AuthorizationMiddlewareOption
    std::function<std::string(const http::HttpContext& context)> loginPathBuilder;
 };
 
-/**
- * \brief Functor for configuring AuthorizationMiddlewareOption members.
- */
+/// Functor for configuring AuthorizationMiddlewareOption members.
 using AuthorizationMiddlewareOptionBuilder =
    std::function<void(AuthorizationMiddlewareOption& option)>;
 

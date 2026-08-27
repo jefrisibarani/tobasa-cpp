@@ -6,6 +6,7 @@ namespace tbs
 {
 
 /** 
+ * \ingroup WEB
  * Exception generated validation check
  */
 class ValidationException

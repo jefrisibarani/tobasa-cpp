@@ -33,10 +33,8 @@ struct AuthResult
    Identity    identity;
    std::string errorMessage;
    bool        credentialsValid    { false };
-   
-   /**
-    * @brief Represents the expiration time of an authenticated user in UTC seconds.
-    */   
+
+   /// Represents the expiration time of an authenticated user in UTC seconds.
    long long   expirationTime {0} ;
 
    bool        loggedIn()  { return credentialsProvided && credentialsValid; }

@@ -25,8 +25,8 @@ using ResultContentBuilder = std::function<std::string(std::shared_ptr<Result> r
 
 
 /**
- * @class Result
- * @brief Request/route handler result base class.
+ * \class Result
+ * \brief Request/route handler result base class.
  * 
  * The Result class encapsulates the content, content type, HTTP status, and other metadata
  * related to an HTTP response. It provides methods to manipulate these properties and to

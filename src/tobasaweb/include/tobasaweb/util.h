@@ -6,6 +6,9 @@
 namespace tbs {
 namespace util {
 
+/** \addtogroup WEB
+ * @{
+ */
 
 sql::SqlQueryOption getSqlQueryOption(
    const web::RouteArgument& arg,
@@ -32,6 +35,7 @@ void createSecureHash(const std::string& message,std::string& messageHashOut, st
  */
 bool verifySecureHash(const std::string& message, const std::string& storedMessageHash, const std::string& storedSaltHash);
 
+/** @}*/
 
 } // namespace util
 } // namespace tbs

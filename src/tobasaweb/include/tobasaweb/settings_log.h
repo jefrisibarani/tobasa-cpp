@@ -25,6 +25,9 @@ namespace log {
 /// Configuration option classes
 namespace conf {
 
+/** \addtogroup WEB
+ * @{
+ */
 
 /// Stdout log options
 struct LogStdout
@@ -56,6 +59,8 @@ struct Logging
    spdlog::level::level_enum multiSinkLevel; ///< multi_sink logging level
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Logging, stdoutColor, fileSink, fileSinkD, multiSinkLevel)
+
+/** @}*/
 
 } // namespace conf
 } // namespace log

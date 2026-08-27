@@ -27,13 +27,13 @@ public:
    MiddlewareManager(std::shared_ptr<RouterBase> router);
    ~MiddlewareManager();
 
-   /// Add middleware into our list
+   /// Add middleware to the middleware list
    void use(MiddlewarePtr middleware)
    {
       _middlewares.push_back(middleware);
    }
 
-   /// Add RequestHandlerChained into middleware list
+   /// Add RequestHandlerChained to the middleware list
    void use(http::RequestHandlerChained handler, const std::string& name={})
    {
       auto middleware = std::make_shared<AutoMiddleware>(handler);
@@ -41,7 +41,7 @@ public:
       _middlewares.push_back(middleware);
    }
 
-   /// HTTP server request handler, to be called by Http server instance
+   /// HTTP request handler invoked by the HTTP server instance.
    http::RequestStatus invoke( const http::HttpContext& context )
    {
       return doInvoke(context);

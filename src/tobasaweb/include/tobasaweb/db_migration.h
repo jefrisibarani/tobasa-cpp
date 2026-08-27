@@ -11,6 +11,10 @@
 namespace tbs {
 namespace dbm {
 
+/** \addtogroup WEB
+ * @{
+ */
+
 template<typename Driver, typename Migration>
 void doRunMigration(sql::SqlConnection<Driver>& conn)
 {
@@ -116,5 +120,7 @@ private:
 
 
 void runDbMigration(const sql::conf::ConnectorOption* option, MigrationJob& job);
+
+/** @}*/
 
 }} // namespace tbs::dbm

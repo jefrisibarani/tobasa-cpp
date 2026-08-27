@@ -8,6 +8,10 @@
 namespace tbs {
 namespace web {
 
+/** \addtogroup WEB
+ * @{
+ */
+
 class Webapp;
 
 class WebappAgent
@@ -27,6 +31,8 @@ private:
 
    WebappStatus _status;
 };
+
+/** @}*/
 
 } // namespace web
 } // namespace tbs

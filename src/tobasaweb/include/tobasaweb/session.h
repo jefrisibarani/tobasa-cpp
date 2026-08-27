@@ -9,6 +9,10 @@
 namespace tbs {
 namespace web {
 
+/** \addtogroup WEB
+ * @{
+ */
+
 class Session;
 
 using SessionPtr = std::shared_ptr<Session>;
@@ -73,6 +77,7 @@ public:
    std::string generate() const; 
 };
 
+/** @}*/
 
 } // namespace web
 } // namespace tbs

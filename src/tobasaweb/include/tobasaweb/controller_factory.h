@@ -48,16 +48,16 @@ public:
    {
       if ( ! _initialized )
       {
-         // this class, ControllerFactory<ControllerImpl> is a friend of ControllerBase
-         // so it can access ControllerBase' private and protected member
+         // ControllerFactory<ControllerImpl> is a friend of ControllerBase, 
+         // allowing it to access ControllerBase's private and protected members.
          _controller->setRouter(webService->router() );
 
          _controller->setDbServiceFactory( webService->dbServiceFactory() );
 
-         // _pController is a ControllerImpl
-         // ControllerFactory<ControllerImpl> is a friend of ControllerBase, NOT ControllerImpl
-         // we need ControllerBase pointer, thus allowing ControllerFactory<ControllerImpl>
-         // to call ControllerBase::bindHandler, whichs is a protected method
+         // _controller is a ControllerImpl. ControllerFactory<ControllerImpl> is
+         // a friend of ControllerBase, but not of ControllerImpl. Cast to the
+         // ControllerBase interface so the factory can call the protected
+         // ControllerBase::bindHandler() method.
          auto basePtr = std::static_pointer_cast<ControllerBase>(_controller);
          basePtr->bindHandler();
 
@@ -69,7 +69,6 @@ public:
    virtual void reconfigureDb(WebServiceBase* webService)
    {
       _controller->setDbServiceFactory( webService->dbServiceFactory() );
-
    }
 };
 

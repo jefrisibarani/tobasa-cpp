@@ -32,8 +32,8 @@ public:
 
    virtual UserPtr authenticate(const web::dto::LoginUser& userDto) = 0;
 
-   /// @brief Add user into database
-   /// @note this method use SQL Transaction
+   /// @brief Adds a user to the database.
+   /// @note This method runs within an SQL transaction.
    virtual UserPtr enrollNewUSer(const User& user, const std::string& password, bool checkAll=true) = 0;
 
    virtual UserPtr updateUserProfile(const User& user) = 0;

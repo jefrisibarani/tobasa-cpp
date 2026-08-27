@@ -50,7 +50,7 @@ private:
    void applyHttpResult(
       const http::HttpContext& context,
       http::StatusCode statusCode,
-      const std::string& message);   
+      const std::string& message);
 
    /// Skip session processing for AuthScheme::NONE,  request path '/' and login path
    bool skipSessionProcessing(const http::HttpContext& context);

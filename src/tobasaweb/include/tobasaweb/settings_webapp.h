@@ -10,6 +10,10 @@ namespace web {
 /// Configuration option classes
 namespace conf {
 
+/** \addtogroup WEB
+ * @{
+ */
+
 struct RouteSession
 {
    std::string path;
@@ -94,6 +98,8 @@ struct Webapp
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Webapp, 
    dbConnection, httpServer, webService, dbConnectionPoolSize)
+
+/** @}*/
 
 } // namespace conf
 } // namespace web

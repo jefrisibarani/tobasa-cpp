@@ -27,8 +27,8 @@ using MultipartMiddlewareOptionBuilder =
 
 
 /**
- * @class MultipartMiddleware
- * @brief Middleware for parsing multipart/form-data uploads.
+ * \class MultipartMiddleware
+ * \brief Middleware for parsing multipart/form-data uploads.
  *
  * MultipartMiddleware detects requests with Content-Type multipart/form-data
  * and uses MultipartBodyReader + MultipartParser to stream and parse the body.
@@ -50,7 +50,7 @@ public:
    virtual ~MultipartMiddleware() = default;
 
    /**
-    * @brief Entry point for multipart middleware.
+    * \brief Entry point for multipart middleware.
     *
     * If the request is multipart/form-data, this method:
     * - Configures and starts a MultipartParser.
@@ -62,8 +62,8 @@ public:
     *
     * If the request is not multipart, it simply calls next(context).
     *
-    * @param context Current HTTP context (request + response).
-    * @return RequestStatus::async if parsing multipart, otherwise result of next().
+    * \param context Current HTTP context (request + response).
+    * \return RequestStatus::async if parsing multipart, otherwise result of next().
     */
    virtual http::RequestStatus invoke(const http::HttpContext& context);
    
@@ -75,8 +75,6 @@ public:
 
 protected:
    MultipartMiddlewareOption _option;
-   //std::unique_ptr<http::parser::MultipartParser> _parser {nullptr};
-   //std::unique_ptr<http::MultipartBody> _multipartBody {nullptr};
 };
 
 /** @}*/

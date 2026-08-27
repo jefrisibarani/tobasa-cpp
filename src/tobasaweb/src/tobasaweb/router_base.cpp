@@ -31,7 +31,7 @@ std::optional<ArgumentDataPtr> RouteArgument::get(int position) const
    if (_pathArguments) 
       return _pathArguments->get(position);
    else
-      return std::nullopt;      
+      return std::nullopt;
 }
 
 } // namespace http

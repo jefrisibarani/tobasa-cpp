@@ -78,14 +78,12 @@ public:
       _resultContentBuilderMap[resultClassName] = std::move(builder);
    }
 
-   
+
 
 protected:
-
    /// Do some initialization if needed
    /// Factory call this method in initRouter()
    virtual void onInit() {}
-
 };
 
 using RouterPtr = std::shared_ptr<RouterBase>;

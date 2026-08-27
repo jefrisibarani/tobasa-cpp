@@ -11,7 +11,6 @@
 namespace tbs {
 namespace web {
 
-//SessionMiddlewareOptionBuilder
 void builSessionMiddlewareOption(const conf::Webapp& webappOpt, SessionMiddlewareOption& option)
 {
    option.cookieAuthOption.loginPath  = webappOpt.webService.loginPage;

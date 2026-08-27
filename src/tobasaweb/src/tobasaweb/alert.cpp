@@ -13,7 +13,7 @@ AlertPtr Alert::create(const std::string& sessionId)
 Alert::Alert(const std::string& sessionId)
 {
    _sessionId = sessionId;
-}   
+}
 
 void Alert::success(const std::string& message, const std::string& location, bool autoClose)
 {
