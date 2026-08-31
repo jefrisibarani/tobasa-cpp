@@ -9,21 +9,21 @@ Each sub‑project is self‑contained; you can link only the libraries you need
 
 | Module         | Description |
 |----------------|-------------|
-| `tobasa`       | **Common library** – utilities such as logging, configuration, JSON,
+| [`tobasa`](src/tobasa/README.md)       | **Common library** – utilities such as logging, configuration, JSON,
 |                | date/time, string helpers, plugins, task manager, etc. 
 |                | This is the foundation for all other Tobasa components. |
-| `tobasahttp`   | **HTTP library** – Asio‑based HTTP/1.1 and HTTP/2(with nghttp) server and client with
+| [`tobasahttp`](src/tobasahttp/README.md)   | **HTTP library** – Asio‑based HTTP/1.1 and HTTP/2(with nghttp) server and client with
 |                | optional TLS, WebSocket, multipart parsing, etc. |
-| `tobasaweb`    | **Web App/REST framework** – routing, controllers, middleware, JWT/session
+| [`tobasaweb`](src/tobasaweb/README.md)    | **Web App/REST framework** – routing, controllers, middleware, JWT/session
 |                | support built on top of `tobasahttp` and `tobasasql`. |
-| `tobasasql`    | **SQL abstraction** – lightweight wrapper around SQLite/MySQL/Postgres
+| [`tobasasql`](src/tobasasql/README.md)    | **SQL abstraction** – lightweight wrapper around SQLite/MySQL/Postgres
 |                | and MSSQL(through ODBC and ADO) with connection pools, query helpers. |
-| `tobasalis`    | **LIS (Lab Instrument) library** – message parsing (LIS2‑A2/ASTM and HL7), 
+| [`tobasalis`](src/tobasalis/README.md)    | **LIS (Lab Instrument) library** – message parsing (LIS2‑A2/ASTM and HL7), 
 |                | TCP/serial transports, session management. |
-| `webservice`   | **Production-ready web service application** – demonstrates a complete,
+| [`webservice`](src/app_server/README.md)   | **Production-ready web service application** – demonstrates a complete,
 |                | scalable REST API with JWT/session authentication, middleware pipeline,
 |                | database migrations, controllers, and configurable TLS support. |
-| `webclient`    | **HTTP client demo** – simple client using `tobasahttp`.
+| [`webclient`](src/samples/app_client/README.md)    | **HTTP client demo** – simple client using `tobasahttp`.
 
 
 

@@ -37,7 +37,7 @@ The server will start and listen for HTTPS requests.
 Send HTTPS requests to the running server:
 
 ```bash
-curl -k https://localhost:8443/
+curl -k https://localhost:8085/
 ```
 
 (Use `-k` to skip certificate verification in development)

@@ -38,7 +38,7 @@ The server will start and listen for HTTP requests on the default port.
 Send HTTP requests to the running server. Example:
 
 ```bash
-curl http://localhost:8080/
+curl http://localhost:8084/
 ```
 
 ## Example Endpoints

@@ -106,13 +106,13 @@ we can safely delete views and wwwroot and /tzdata
 
 Configuration is handled through:
 
-1. **Embedded Defaults** (`configuration_embed/`): Default settings compiled into the binary
-2. **Runtime Configuration** (`configuration/`): Override defaults at runtime
+1. **Embedded Defaults** ([`configuration_embed/`](configuration_embed/appsettings.json)): Default settings compiled into the binary
+2. **Runtime Configuration** ([`configuration/`](configuration/appsettings.json)): Override defaults at runtime
 
 
 ### TLS/SSL Setup
 
-TLS certificates and keys should be placed in the `tls_asset/` directory:
+TLS certificates and keys should be placed in the [`tls_asset/`](tls_asset) directory:
 
 - Server certificate: typically `server.crt` or `server.pem`
 - Private key: typically `server.key`
@@ -154,7 +154,7 @@ Or from the build directory:
 
 ## Key Components
 
-### Application Initialization (`main.cpp`, `main_helper.cpp`)
+### Application Initialization ([`main.cpp`](src/main.cpp), `main_helper.cpp`)
 
 Startup sequence for a production-ready application:
 
@@ -225,17 +225,6 @@ Data access layer (DAL) abstracting database operations via `tobasasql`. Provide
 - **Custom Queries** – Repository methods wrap parameterized SQL calls, returning strongly-typed entities or collections
 - **Entity/DTO Mapping** – Automatic JSON serialization via NLOHMANN_JSON macros (see `test_sql_json_dto.h`)
 - **Connection Abstraction** – Queries run transparently against SQLite, MySQL, PostgreSQL, or MSSQL
-
-**Example Repository Pattern:**
-
-```cpp
-class UserRepository : public RepositoryBase<User> {
-public:
-    std::vector<User> getAllUsers();
-    User getUserById(int id);
-    bool updateUser(const User& user);
-};
-```
 
 **Key Features:**
 

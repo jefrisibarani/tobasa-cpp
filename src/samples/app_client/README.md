@@ -51,12 +51,6 @@ The client connects to the app_server and performs various API requests:
 
 Configure the server connection in `appsettings.json`:
 
-## Dependencies
-
-- Tobasa core library
-- tobasahttp library
-- nlohmann JSON library
-
 ## License
 
 See LICENSE file in the root directory.
