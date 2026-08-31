@@ -1,10 +1,10 @@
 # Tobasa Web Service Application
 
-A comprehensive sample web service application demonstrating the integration of Tobasa libraries into a production-ready server.
+A production-grade REST API and web service demonstrating enterprise-level architecture, scalability, and best practices using the Tobasa framework.
 
 ## Overview
 
-The **app_server** (webservice) is an example application that showcases how to build a full-featured web service using the Tobasa framework. It integrates multiple Tobasa components to provide HTTP/HTTPS capabilities, REST routing, database connectivity, and more.
+The **app_server** (webservice) is a complete, deployable web service application built with the Tobasa framework. It demonstrates how to architect a modern REST API with layered controllers, pluggable middleware, JWT/session authentication, database migrations, and multi-protocol support (HTTP/1.1, HTTP/2, WebSocket, TLS). Suitable for immediate adaptation to production workloads.
 
 ## Features
 
@@ -156,33 +156,131 @@ Or from the build directory:
 
 ### Application Initialization (`main.cpp`, `main_helper.cpp`)
 
-- Loads configuration
-- Initializes logging via `tobasa`
-- Sets up the HTTP server with `tobasahttp`
-- Registers routes and controllers
-- Connects to the database via `tobasasql`
-- Starts the server
+Startup sequence for a production-ready application:
+
+1. **Timezone Initialization** – Loads timezone database (in-memory or system)
+2. **Configuration Loading** – Merges embedded defaults with runtime config files (`appsettings.json`)
+3. **Logging Setup** – Initializes structured logging via `tobasa` with configurable levels
+4. **Database Service** – Creates connection pool and registers with `tobasasql` abstraction layer
+5. **Database Migrations** – Automatically applies pending schema migrations on startup
+6. **Middleware Pipeline** – Registers 10-layer middleware chain in execution order
+7. **Controller Registration** – Registers route handlers (CoreController, ApiCoreController, ApiUsersController, AdminController)
+8. **TLS Asset Callbacks** – Sets up resource loading for certificates and keys (embedded or filesystem)
+9. **Lifecycle Hooks** – Registers `onStart()` and `onStop()` handlers (e.g., for LIS engine startup)
+10. **Thread Pool Setup** – Configures IO thread pool and worker thread pool for request handling
+11. **Server Start** – Launches HTTP/HTTPS listeners and enters async event loop
 
 ### Controllers & Routing (`core/`)
 
-Dynamic request handlers organized by functionality. Routes are matched using configurable matchers (regex or wildcard patterns).
+Request handlers organized by domain concern, following the MVC/MVT pattern. Routes are matched using configurable matchers (regex or wildcard patterns) with per-route authentication/authorization rules.
+
+**Controllers:**
+
+- **CoreController** – Primary UI handlers for authentication, dashboards, user profiles, login/logout, resource serving
+  - Routes: `/`, `/index`, `/dashboard`, `/login`, `/register`, `/logout`, `/password`, `/user_profile/{id}`, `/resource/{type}/{name}`
+
+- **ApiCoreController** – Core API endpoints for versioning, server status, encryption/decryption, logs, configuration
+  - Routes: `/api/version`, `/api/server_status`, `/api/authenticate`, `/api/refresh_auth_token`, `/api/decrypt`, `/api/encrypt`, `/api/running_configuration`
+
+- **ApiUsersController** – User management REST API
+  - Routes: `/api/users`, `/api/users/{id}`, `/api/users/{id}/roles`, etc.
+
+- **AdminController** – Administrative dashboard and system management
+  - Routes: `/admin`, `/admin/dashboard`, `/admin/system`, etc.
+
+**Route Features:**
+
+- **Pattern Matching** – Supports path parameters: `/api/users/{id}/roles/{roleId}`
+- **Authentication** – Per-route JWT or session-based auth via `RouteAuth` configuration
+- **Authorization** – Role-based access control (ACL) per endpoint
+- **HTTP Methods** – GET, POST, PUT, DELETE, HEAD, OPTIONS
+- **Response Types** – JSON API responses, HTML pages, file downloads, redirects
+
+Routes are configured in `bindHandler()` method of each controller and registered during application startup.
 
 ### Middleware Stack (`middleware/`)
 
-Request/response processing chain for cross-cutting concerns like:
+Ordered request/response processing pipeline for cross-cutting concerns. Middleware executes sequentially before reaching the router/controllers:
 
-- Authentication/authorization
-- Logging and monitoring
-- CORS handling
-- Request validation
+1. **Exception Handler** – Catches and formats unhandled exceptions
+2. **Database Check** – Validates database connectivity before processing requests
+3. **Multipart Body Parser** – Parses multipart/form-data for file uploads
+4. **Response Header Rules** – Applies CORS policies and custom response headers
+5. **Request Identification** – Tracks request ID, client info, and User-Agent validation
+6. **Cache Control** – Manages HTTP caching headers (ETag, Cache-Control, etc.)
+7. **Content-Type Validation** – Validates request Content-Type before processing
+8. **Session Management** – Loads/maintains user sessions with configurable expiration
+9. **Authentication** – Validates JWT tokens or session cookies
+10. **Authorization** – Enforces route-level access control and permissions
+
+Custom middleware can be inserted at any point in the chain.
 
 ### Database Repository (`db_repo_app.h`)
 
-Data access layer providing queries and operations on the connected database.
+Data access layer (DAL) abstracting database operations via `tobasasql`. Provides type-safe, multi-database compatible queries without writing SQL directly.
+
+**Architecture:**
+
+- **Base Repositories** – Inherit from `RepositoryBase<Entity>` providing CRUD operations (Create, Read, Update, Delete)
+- **Custom Queries** – Repository methods wrap parameterized SQL calls, returning strongly-typed entities or collections
+- **Entity/DTO Mapping** – Automatic JSON serialization via NLOHMANN_JSON macros (see `test_sql_json_dto.h`)
+- **Connection Abstraction** – Queries run transparently against SQLite, MySQL, PostgreSQL, or MSSQL
+
+**Example Repository Pattern:**
+
+```cpp
+class UserRepository : public RepositoryBase<User> {
+public:
+    std::vector<User> getAllUsers();
+    User getUserById(int id);
+    bool updateUser(const User& user);
+};
+```
+
+**Key Features:**
+
+- **Parameterized Queries** – Prevents SQL injection via bound parameters
+- **Connection Pooling** – Reuses database connections for performance
+- **Transaction Support** – Explicit transaction management for multi-step operations
+- **Error Handling** – Exceptions on query failures with detailed diagnostics
+
+Controllers instantiate repositories and call methods to fetch/persist data. No SQL strings exposed to business logic layer.
 
 ### Resource Management (`app_resource.cpp`)
 
-Handles loading static assets (views, configuration, TLS certificates) from either embedded binary resources or filesystem.
+Flexible asset loading system supporting both embedded binary resources and filesystem fallback. Enables containerized deployments without external file dependencies.
+
+**Resource Types:**
+
+- **HTML/Template Files** (`views/`, `views_lis/`) – Inja templates for rendering responses
+- **Static Assets** (`wwwroot/`) – CSS, JavaScript, images served via `/resource` routes
+- **Configuration Files** – `appsettings.json` with embedded defaults as fallback
+- **TLS Assets** – Server certificates, private keys, DH parameters (loaded on startup)
+- **Timezone Database** – In-memory timezone data (when `TOBASA_BUILD_IN_MEMORY_TZDB` enabled)
+
+**Loading Strategy:**
+
+1. **Embedded First** – If CMake flag `TOBASA_BUILD_IN_MEMORY_RESOURCES` is ON, resources are compiled into binary
+2. **Filesystem Fallback** – If embedded resource not found, attempts to load from disk
+3. **Error Handling** – Returns embedded defaults if filesystem access fails
+
+**Configuration:**
+
+```cpp
+// In main.cpp, resource loading via callbacks:
+webapp.defaultTlsAssetCallback([](http::TlsAsset asset) {
+    if (asset == http::TlsAsset::cerificate_chain)
+        return app::Resource::get("tls_asset/127.0.0.1.crt", "tls_asset");
+    // ... fallback handling
+});
+```
+
+**CMake Build Options:**
+
+- `TOBASA_BUILD_IN_MEMORY_RESOURCES=ON` – Embeds all assets, enables single-file deployment
+- `TOBASA_BUILD_IN_MEMORY_TZDB=ON` – Embeds timezone data, eliminates `tzdata/` folder requirement
+
+With embedded resources, only the executable is needed for deployment (no external files required).
 
 ### Utilities (`app_util.cpp`, `app_common.cpp`)
 
@@ -190,18 +288,50 @@ Common helper functions for date/time handling, string processing, JSON manipula
 
 ## Development & Testing
 
-### Unit Tests
-Located in `src/test/`:
+### Integrated Test Modules
 
+Tests are compiled conditionally via the `TOBASA_USE_TESTS_MODULE` CMake flag and accessible through controller endpoints.
 
-### WebSocket Tests / Chat app
-WebSocket-specific tests in `src/test_ws/`:
+#### SQL Database Tests (`src/test/`)
 
+Multi-driver database compatibility tests validating `tobasasql` abstraction across all supported databases:
 
+- **SQLite** (`test_sql_sqlite_defs.h`) – File-based database tests
+- **MySQL/MariaDB** (`test_sql_mysql_defs.h`, `test_sql_odbc_mysql_defs.h`) – Native and ODBC connectors
+- **PostgreSQL** (`test_sql_pgsql_defs.h`) – Native connector
+- **MSSQL** (`test_sql_ado_defs.h`, `test_sql_odbc_mssql_defs.h`) – ADO.NET and ODBC connectors
+- **DTO/JSON Serialization** (`test_sql_json_dto.h`) – Entity-to-JSON mapping validation
+
+Accessible via `/test/sql` endpoint when enabled.
+
+#### WebSocket Tests / Real-Time Chat (`src/test_ws/`)
+
+Interactive WebSocket test application demonstrating:
+
+- Real-time bidirectional messaging
+- Connection lifecycle management (open, ping, pong, close)
+- Broadcast messaging to multiple clients
+- Message routing between client connections
+
+Accessible via `/test_websocket` endpoint when enabled. Full HTML chat UI included.
+
+#### Upload & File Handling (`src/test/`)
+
+Tests for multipart/form-data parsing and file upload processing, validating:
+
+- Large file uploads
+- Multiple file handling
+- Temporary file cleanup
 
 ### Database Migrations
 
-Database schema changes are managed in `src/db_migrations/`. The application automatically applies pending migrations on startup or via CLI.
+Database schema changes are managed in `src/db_migrations/`. Migrations are versioned and applied automatically on startup:
+
+- **Base Module** – Core schema (users, roles, permissions)
+- **Test Module** (optional) – Test data and schemas (enabled via `TOBASA_USE_TESTS_MODULE`)
+- **LIS Module** (optional) – Healthcare LIS integration schema (enabled via `TOBASA_USE_LIS_ENGINE`)
+
+New migrations can be added as new C++ classes inheriting from the migration base.
 
 ## Dependencies
 

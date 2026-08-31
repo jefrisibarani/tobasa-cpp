@@ -564,14 +564,27 @@ protected:
 
    void handleConnectionClosed(ConnectionId connId)
    {
-      _activeConnections--;
+      if (_activeConnections > 0)
+         _activeConnections--;
+
+      while (!_pendingRequests.empty() &&
+            _activeConnections < _maxConnections)
+      {
+         auto [request, handler] = std::move(_pendingRequests.front());
+         _pendingRequests.pop_front();
+
+         doExecute(std::move(request), std::move(handler));
+      }
+
       if (_onConnectionClosed)
          _onConnectionClosed(connId);
    }
 
    void handleConnectionFailed(const std::string& message)
    {
-      _activeConnections--;
+      if (_activeConnections > 0)
+         _activeConnections--;
+
       if (_onConnectFailed)
          _onConnectFailed(message);
    }

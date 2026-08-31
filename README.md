@@ -20,8 +20,9 @@ Each sub‑project is self‑contained; you can link only the libraries you need
 |                | and MSSQL(through ODBC and ADO) with connection pools, query helpers. |
 | `tobasalis`    | **LIS (Lab Instrument) library** – message parsing (LIS2‑A2/ASTM and HL7), 
 |                | TCP/serial transports, session management. |
-| `webservice`   | **Example web service application** – integrates the above libraries
-|                | into a runnable server with configuration and database helpers. |
+| `webservice`   | **Production-ready web service application** – demonstrates a complete,
+|                | scalable REST API with JWT/session authentication, middleware pipeline,
+|                | database migrations, controllers, and configurable TLS support. |
 | `webclient`    | **HTTP client demo** – simple client using `tobasahttp`.
 
 

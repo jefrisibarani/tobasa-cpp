@@ -1,56 +1,136 @@
 
 # Tobasa Web Library
-C++ library for building Web applications and REST APIs using the Tobasa ecosystem.
+
+A production-ready C++ web framework for building REST APIs and server-side applications with routing, middleware, and authentication.
 
 ## Overview
-Tobasa Web is a server-side C++ library for building HTTP services such as Web APIs or backend applications.
 
-It builds on top of tobasahttp for HTTP transport and tobasasql for database access, and adds higher-level web application features such as routing, controllers, middleware, session handling, and authentication helpers.
+Tobasa Web provides comprehensive server-side application infrastructure built on top of the Tobasa ecosystem. It combines HTTP transport (`tobasahttp`), database abstraction (`tobasasql`), and authentication/session management into a cohesive framework for building scalable REST APIs and web services.
 
-The library focuses on backend infrastructure (request handling, routing, authentication, etc.).
-Frontend rendering or templating is intentionally outside its scope.
+The library handles all infrastructure concerns—routing, middleware pipelines, request/response handling, authentication, and database integration—so you can focus on business logic in controllers and services.
 
 ## Features
-- HTTP routing and controller-based request handling
-- Middleware pipeline for request processing
-- Integration with `tobasahttp` (HTTP transport, TLS)
-- Integration with `tobasasql` (database access and initialization)
-- Built-in support for JWT authentication, session management, and logging
+
+**Routing & Controllers:**
+- RESTful routing with path parameters and HTTP method matching
+- Controller-based request handlers
+- Pattern matching for flexible route definitions
+- Per-route authentication and authorization rules
+
+**Middleware Pipeline:**
+- 10-layer middleware chain (exception handling, authentication, session management, etc.)
+- Pluggable middleware components
+- Request/response interception and transformation
+- Error handling and logging integration
+
+**Authentication & Security:**
+- JWT token validation and generation
+- Session management with configurable storage
+- Cookie handling and secure defaults
+- Per-route and per-controller access control (ACL)
+- Role-based authorization
+
+**Database Integration:**
+- Seamless `tobasasql` integration
+- Connection pooling and transaction support
+- Automatic database initialization
+- Migration support
+
+**HTTP Features:**
+- Full HTTP/1.1 support via `tobasahttp`
+- HTTP/2 support (optional)
+- TLS/HTTPS with certificate management
+- WebSocket support
+- Multipart form data and file uploads
+- Content negotiation
+
+## Building
+
+The library is built as part of the main build system:
+
+```bash
+cmake -B build
+cmake --build build
+```
+
+Enable optional features:
+```bash
+cmake -B build -DENABLE_HTTP2=ON -DENABLE_COMPRESSION=ON
+cmake --build build
+```
 
 ## Core Components
-- `Webapp` — application builder and runtime (load config, start servers)
-- `Router` and `RouteEntry` — define HTTP routes and handlers
-- `ControllerBase` / `ControllerFactory` — create request handlers grouped by controller
-- Middleware (authentication, session, multipart) — pluggable request processing
 
-## Dependencies
-- tobasa — core framework utilities
-- tobasasql — database abstraction and helpers
-- tobasahttp — HTTP transport layer
-- spdlog — logging
-- jwtcpp — JSON Web Token handling
-
+| Component | Purpose |
+|-----------|---------|
+| **Webapp** | Application builder and lifecycle management |
+| **Router** | HTTP route definition and matching |
+| **ControllerBase** | Base class for request handlers |
+| **ControllerFactory** | Dependency injection and controller creation |
+| **Middleware** | Request processing pipeline (10-layer chain) |
 
 ## Configuration
-Settings live in `appsettings.json` (see `conf::Webapp` / `conf::WebService` in
-`settings_webapp.h`). You can configure:
 
-- HTTP server options (ports, TLS settings)
-- DB connection settings and pool size
-- Session lifetime and storage path
-- JWT issuer/secret and token timeouts
-- Route authentication rules and sessions
-
-## Design Notes
-The library handles infrastructure concerns such as routing, middleware, and HTTP protocol handling.
-Application-specific logic should be implemented inside controllers or separate service classes.
+Configure your application in `appsettings.json`:
 
 
-## Where to look in the code
-- `include/tobasaweb/webapp.h` — app builder and runtime
-- `include/tobasaweb/router.h` — routing and route matching
-- `include/tobasaweb/controller_base.h` — controller base class
-- `include/tobasaweb/*_middleware.h` — built-in middleware
+## Middleware Pipeline
+
+The 10-layer middleware chain processes each request:
+
+1. **Exception Handler** – Catches unhandled exceptions
+2. **Database Check** – Validates database connectivity
+3. **Multipart Parser** – Parses file uploads
+4. **Response Headers** – Applies CORS and security headers
+5. **Request Identification** – Tracks request ID and client info
+6. **Cache Control** – Manages HTTP caching
+7. **Content-Type Validation** – Validates request content
+8. **Session Management** – Loads/maintains sessions
+9. **Authentication** – Validates JWT or session
+10. **Authorization** – Enforces access control (ACL)
+
+
+## Architecture
+
+**Layered Design:**
+- **Transport Layer** – `tobasahttp` handles HTTP/TLS
+- **Framework Layer** – `tobasaweb` provides routing, middleware, controllers
+- **Data Layer** – `tobasasql` abstracts database operations
+- **Application Layer** – Your business logic in controllers and services
+
+**Separation of Concerns:**
+- Infrastructure (routing, middleware) handled by the framework
+- Business logic isolated in controllers and service classes
+- Database queries in repository classes
+- Views/templates outside the scope (API-focused)
+
+## Dependencies
+
+- **tobasa** – Core framework
+- **tobasahttp** – HTTP transport layer
+- **tobasasql** – Database abstraction
+- **asio** – Async I/O
+- **nlohmann/json** – JSON handling
+- **spdlog** – Logging
+- **jwtcpp** – JWT token handling
+- **OpenSSL** – TLS/HTTPS support
+
+## Use Cases
+
+- RESTful API backends
+- Microservices
+- Web service applications
+- Real-time applications (with WebSocket)
+- Backend integration layers
+
+## Performance Characteristics
+
+- Non-blocking async I/O
+- Efficient request routing (trie-based)
+- Connection pooling reduces latency
+- Middleware pipeline optimized for throughput
+- Suitable for high-concurrency scenarios
 
 ## License
+
 GNU LESSER GENERAL PUBLIC LICENSE

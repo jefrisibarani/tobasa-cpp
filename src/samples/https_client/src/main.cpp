@@ -2,7 +2,7 @@
 //#include <tobasa/logger.h>  // for tbs::Logger
 #include "tobasahttp/client/http_client.h"
 
-void runClient()
+void runClient(int totalRequest, bool asyncMode)
 {
    using namespace tbs;
 
@@ -82,13 +82,11 @@ void runClient()
    client.addHeader("User-Agent", "Tobasa Client");
 
    // Note: Do not mix async and sync request. use only one mode
-   bool useSync = true;
-   if (useSync)
+   if (!asyncMode)
    {
-      // run 100 Sync requests
-
+      // run Sync request
       std::string resource = "/api/version";
-      for (int i=0;i<10;i++)
+      for (int i=0; i<totalRequest; i++)
       {
          if (i>0)
             resource = "/api/version" + std::to_string(i);
@@ -113,10 +111,9 @@ void runClient()
    }
    else
    {
-      // run 100 Async requests
-
+      // run Async request
       std::string resource = "/api/version";
-      for (int i=0;i<10;i++)
+      for (int i=0; i<totalRequest; i++)
       {
          if (i>0)
             resource = "/api/version" + std::to_string(i);
@@ -135,11 +132,14 @@ int main(int argc, char* argv[])
 {
    try
    {
+      int totalRequest = 10;
+      bool asyncMode = true;
+
       if (! tbs::DateTime::initTimezoneData())
          return 1;
 
       std::cout << "TOBASA HTTPS Client\n";
-      runClient();
+      runClient(totalRequest,asyncMode);
    }
    catch (std::exception& ex)
    {

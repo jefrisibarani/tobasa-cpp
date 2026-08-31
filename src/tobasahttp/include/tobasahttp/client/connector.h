@@ -35,8 +35,7 @@ protected:
    Logger&                    _logger;
    ConnectionStarter          _starter;
    Executor                   _executor;
-   OnConnectionCreated        _onConnectionCreated;
-   OnConnectFailed            _onConnectFailed;
+   bool                       _stopped = false;
 
 public:
 
@@ -56,45 +55,53 @@ public:
 
    virtual ~Connector()
    {
-      _onConnectionCreated = nullptr;
-      _onConnectFailed = nullptr;
-
       _logger.trace("[http_client] Connector destroyed");
    }
 
    void start(
       ClientResponseHandler responseHandler,
       OnConnectionCreated createdHandler,
-      OnConnectFailed  failConnectHandler)
+      OnConnectFailed failedHandler)
    {
-      _onConnectionCreated = std::move(createdHandler);
-      _onConnectFailed     = std::move(failConnectHandler);
+      _stopped = false;
 
-      _resolver.async_resolve( _settings.protocol(), _settings.address(),
+      _resolver.async_resolve( 
+         _settings.protocol(), 
+         _settings.address(),
          std::to_string(_settings.port()),
-         [this, responseHandler=std::move(responseHandler)]
-         (const asio::error_code& error, const asio::ip::tcp::resolver::results_type& endPointList)
+         [this,
+         responseHandler = std::move(responseHandler),
+         createdHandler = std::move(createdHandler),
+         failedHandler = std::move(failedHandler)]
+         (const asio::error_code& error, asio::ip::tcp::resolver::results_type endPointList) mutable
          {
-            if (!error)
-               connect(responseHandler, endPointList);
-            else
+            if (_stopped)
+               return;
+
+            if (error)
             {
                auto message = error.message();
-               _logger.error("[http_client] {}, address is: {}", message, _settings.address());
+               _logger.error("[http_client] Resolve failed: {}, address is: {}", message, _settings.address());
 
-               if (_onConnectFailed)
-                  _onConnectFailed(message);
+               if (error != asio::error::operation_aborted && failedHandler) {
+                  failedHandler(error.message());
+               }
+
+               return;
             }
+
+            connect(
+               std::move(responseHandler),
+               std::move(createdHandler),
+               std::move(failedHandler),
+               std::move(endPointList));
          });
    }
 
    void stop()
    {
-   }
-
-   void onConnectFailed(OnConnectFailed handler)
-   {
-      _onConnectFailed = std::move(handler);
+      _stopped = true;
+      _resolver.cancel();
    }
 
 protected:
@@ -105,53 +112,79 @@ protected:
     */
    auto & executor() noexcept { return _executor; }
 
-   void connect(ClientResponseHandler responseHandler,
-      const asio::ip::tcp::resolver::results_type& endPointList)
+   void connect(
+      ClientResponseHandler responseHandler,
+      OnConnectionCreated createdHandler,
+      OnConnectFailed failedHandler,
+      asio::ip::tcp::resolver::results_type endPointList)
    {
       asio::ip::tcp::socket socket(_ioContext);
       // note compile error with GCC
       // expected ‘template’ keyword before dependent template name [-Wmissing-template-keyword]
       // we need to add template keyword
-      _starter.template createClientSession<Connection>( std::move(socket), std::move(responseHandler),
-         [this, &endPointList](ConnectionPtr connection)
+      _starter.template createClientSession<Connection>( 
+         std::move(socket), 
+         std::move(responseHandler),
+         [this,
+         createdHandler = std::move(createdHandler),
+         failedHandler = std::move(failedHandler),
+         endPointList = std::move(endPointList)]  (ConnectionPtr connection) mutable
          {
-            doConnect(std::move(connection), endPointList);
+            doConnect(
+               std::move(connection),
+               endPointList,
+               std::move(createdHandler),
+               std::move(failedHandler));
          });
    }
 
-   void doConnect(ConnectionPtr connection,
-      const asio::ip::tcp::resolver::results_type& endPointList)
+   void doConnect(
+      ConnectionPtr connection,
+      const asio::ip::tcp::resolver::results_type& endPointList,
+      OnConnectionCreated createdHandler,
+      OnConnectFailed failedHandler)
    {
       // Start the asynchronous connect operation.
-      asio::async_connect( connection->socket().lowest_layer(), endPointList,
+      asio::async_connect(
+         connection->socket().lowest_layer(), 
+         endPointList,
          // connect condition
-         [this](const asio::error_code& error, const asio::ip::tcp::endpoint& next)
+         [this](const asio::error_code& error, const asio::ip::tcp::endpoint& endpoint)
          {
-            auto message = error.message();
-            if (error)
-               _logger.error("[http_client] Connector error, ", message);
+            if (_stopped)
+               return false;
 
-            _logger.info("[http_client] Trying connect to {}", toString(next));
-            
+            if (error)
+               _logger.error("[http_client] Connector error, ", error.message());
+
+            _logger.info("[http_client] Trying connect to {}", toString(endpoint));
+
             return true;
          },
          //  completion token/ completion handler
-         [this,connection](const std::error_code& error, const asio::ip::tcp::endpoint& ep)
+         [this,
+          connection,
+          createdHandler = std::move(createdHandler),
+          failedHandler = std::move(failedHandler)]
+         (const asio::error_code& error, const asio::ip::tcp::endpoint& endpoint) mutable
          {
+            if (_stopped)
+               return;
+
             if (!error)
             {
-               _logger.info("[http_client] Connected to {}", toString(ep));
+               _logger.info("[http_client] Connected to {}", toString(endpoint));
                // hand over new connection to connection manager
-               if (_onConnectionCreated)
-                  _onConnectionCreated(std::move(connection));
+               if (createdHandler)
+                  createdHandler(std::move(connection));
             }
             else
             {
-               auto message = error.message();
-               _logger.error("[http_client] {}", message);
+               _logger.error("[http_client] Connection failed: {}", error.message());
 
-               if (_onConnectFailed)
-                  _onConnectFailed(message);
+               if (error != asio::error::operation_aborted && failedHandler) {
+                  failedHandler(error.message());
+               }
             }
          }
       );
