@@ -13,12 +13,11 @@ class Resource
 public:
 
    static nonstd::span<const unsigned char> get(const std::string& path, const std::string& searchContext);
+   
    static std::string getString(const std::string& path, const std::string& searchContext);
 
    static bool exists(const std::string& path, const std::string& searchContext);
    
-   static void add(const std::string& path, const std::string& content);
-
    struct Object
    {
       Object() {}

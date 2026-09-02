@@ -48,17 +48,6 @@ The library handles all infrastructure concerns—routing, middleware pipelines,
 
 The library is built as part of the main build system:
 
-```bash
-cmake -B build
-cmake --build build
-```
-
-Enable optional features:
-```bash
-cmake -B build -DENABLE_HTTP2=ON -DENABLE_COMPRESSION=ON
-cmake --build build
-```
-
 ## Core Components
 
 | Component | Purpose |

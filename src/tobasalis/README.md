@@ -33,17 +33,6 @@ Tobasa LIS provides production-grade communication with laboratory analyzers and
 
 The library is built as part of the main build system:
 
-```bash
-cmake -B build
-cmake --build build
-```
-
-Enable LIS support with CMake:
-```bash
-cmake -B build -DTOBASA_USE_LIS_ENGINE=ON
-cmake --build build
-```
-
 ## Configuration
 
 Settings are JSON-based in `appsettings.json`. Configure:

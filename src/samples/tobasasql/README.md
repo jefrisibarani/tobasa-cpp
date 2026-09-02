@@ -17,12 +17,6 @@ This sample demonstrates how to use `tobasasql` for database operations. It show
 ## Building
 
 The sample is built as part of the main build system:
-
-```bash
-cmake -B build
-cmake --build build
-```
-
 The compiled executable will be in `_output/test_tobasasql/debug/`
 
 ## Running

@@ -4,7 +4,9 @@ A high-performance C++ library for building HTTP/HTTPS servers and clients with 
 
 ## Overview
 
-Tobasa HTTP provides production-ready HTTP/1.1 and HTTP/2 protocol support built on Asio. It handles low-level network I/O, protocol parsing, TLS encryption, and WebSocket communication, allowing you to focus on application logic.
+Tobasa HTTP provides production-ready HTTP/1.1 and HTTP/2 protocol support built on Asio. \
+It handles low-level network I/O, protocol parsing, TLS encryption, and WebSocket communication,\
+allowing you to focus on application logic.
 
 ## Features
 
@@ -33,20 +35,10 @@ Tobasa HTTP provides production-ready HTTP/1.1 and HTTP/2 protocol support built
 
 The library is built as part of the main build system:
 
-```bash
-cmake -B build
-cmake --build build
-```
-
-Enable optional features with CMake flags:
-```bash
-cmake -B build -DENABLE_HTTP2=ON -DENABLE_COMPRESSION=ON
-cmake --build build
-```
-
 ## Usage
 
-Tobasahttp is used by higher-level frameworks like `tobasaweb` for routing and middleware. For direct use, see the samples in `src/samples/http_server/` and `src/samples/https_client/`.
+Tobasahttp is used by higher-level frameworks like `tobasaweb` for routing and middleware. \
+For direct use, see the samples in `src/samples/http_server/` and `src/samples/https_client/`.
 
 ## Dependencies
 

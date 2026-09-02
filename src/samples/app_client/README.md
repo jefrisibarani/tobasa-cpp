@@ -16,12 +16,6 @@ This sample demonstrates how to build a client that communicates with the app_se
 ## Building
 
 The sample is built as part of the main build system:
-
-```bash
-cmake -B build
-cmake --build build
-```
-
 The compiled executable will be in `_output/app_client/debug/`
 
 ## Running

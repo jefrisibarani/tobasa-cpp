@@ -127,8 +127,6 @@ bool Resource::exists(const std::string& path, const std::string& searchContext 
    return  ! get(path, searchContext ).empty();
 }
 
-void Resource::add(const std::string& path, const std::string& content)
-{}
 
 } // namespace app
 } // namespace tbs

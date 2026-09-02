@@ -32,17 +32,6 @@ Tobasa SQL provides a thin, efficient abstraction layer for SQL database operati
 
 The library is built as part of the main build system:
 
-```bash
-cmake -B build
-cmake --build build
-```
-
-Optional database drivers can be enabled:
-```bash
-cmake -B build -DENABLE_POSTGRESQL=ON -DENABLE_MYSQL=ON
-cmake --build build
-```
-
 ## Supported Databases
 
 | Database | Driver | Use Case |

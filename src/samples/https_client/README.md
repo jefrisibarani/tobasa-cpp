@@ -16,12 +16,6 @@ This sample demonstrates how to make secure HTTPS requests to remote servers. It
 ## Building
 
 The sample is built as part of the main build system:
-
-```bash
-cmake -B build
-cmake --build build
-```
-
 The compiled executable will be in `_output/https_client/debug/`
 
 ## Running

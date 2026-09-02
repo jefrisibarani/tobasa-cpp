@@ -46,6 +46,7 @@ app_server/
 │   └── test_ws/             # WebSocket test
 ├── configuration/           # Runtime configuration files
 ├── configuration_embed/     # Embedded configuration defaults
+├── doc                      # Documentation files
 ├── views/                   # HTML/template files
 ├── views_lis/               # LIS-specific view templates
 ├── wwwroot/                 # Static web assets (CSS, JS, images)
@@ -68,20 +69,6 @@ The recommended way is to build from the project root:
 
 # Linux
 ./build_all.sh
-```
-
-### Build Just This Component
-
-```bash
-# Configure with CMake
-cmake -B build -S .
-
-# Build
-cmake --build build --target webservice --config Debug
-
-# Or use your build script
-./build_all.cmd  # Windows
-./build_all.sh   # Linux
 ```
 
 The built executable will be located in `_output/webservice/debug/` or the configured output directory.
@@ -253,16 +240,6 @@ Flexible asset loading system supporting both embedded binary resources and file
 2. **Filesystem Fallback** – If embedded resource not found, attempts to load from disk
 3. **Error Handling** – Returns embedded defaults if filesystem access fails
 
-**Configuration:**
-
-```cpp
-// In main.cpp, resource loading via callbacks:
-webapp.defaultTlsAssetCallback([](http::TlsAsset asset) {
-    if (asset == http::TlsAsset::cerificate_chain)
-        return app::Resource::get("tls_asset/127.0.0.1.crt", "tls_asset");
-    // ... fallback handling
-});
-```
 
 **CMake Build Options:**
 
@@ -270,6 +247,8 @@ webapp.defaultTlsAssetCallback([](http::TlsAsset asset) {
 - `TOBASA_BUILD_IN_MEMORY_TZDB=ON` – Embeds timezone data, eliminates `tzdata/` folder requirement
 
 With embedded resources, only the executable is needed for deployment (no external files required).
+
+Further Documentation See [doc/app_resource.md](doc/app_resource.md)
 
 ### Utilities (`app_util.cpp`, `app_common.cpp`)
 
@@ -340,14 +319,6 @@ This application depends on:
 - **Resource Embedding**: In-memory resources reduce filesystem I/O
 - **Request Buffering**: Configurable for optimal memory usage
 
-## Debugging
-
-Build with debug symbols for full IDE support:
-
-```bash
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --config Debug
-```
 
 ## License
 
@@ -358,7 +329,6 @@ See [LICENSE](LICENSE) in this directory for licensing information.
 - Main project README: See `README.md` at repository root
 - Tobasa Libraries Documentation: Each library has its own documentation
 - CMake Configuration: See `cmake/` directory
-- Version History: See `VERSION` file
 
 ## Support & Contributing
 

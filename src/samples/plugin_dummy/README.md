@@ -13,18 +13,7 @@ DummyPlugin is a minimal implementation of the Tobasa plugin system, showing:
 ## Building
 
 The plugin is built automatically as part of the main build:
-
-```bash
-cmake --build . --target plugin_dummy
-```
-
-Or as part of the full build:
-
-```bash
-cmake --build .
-```
-
-The compiled plugin (`.dll` on Windows, `.so` on Linux) will be located in the build output directory.
+The compiled plugin (`.dll` on Windows, `.so` on Linux) will be located in `_output/plugin_dummy/debug/`.
 
 ## Usage
 

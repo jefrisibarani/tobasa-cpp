@@ -12,21 +12,8 @@ The sample application loads a dummy plugin (`plugin_dummy.dll`) and demonstrate
 
 ## Building
 
-1. Ensure the Tobasa framework is built and installed.
-2. Build the dummy plugin:
-   ```bash
-   cd src/plugins/dummy
-   mkdir build && cd build
-   cmake .. -DCMAKE_BUILD_TYPE=Release
-   cmake --build .
-   ```
-3. Build the sample:
-   ```bash
-   cd src/samples/tobasa
-   mkdir build && cd build
-   cmake .. -DCMAKE_BUILD_TYPE=Release
-   cmake --build .
-   ```
+The sample is built as part of the main build system:
+The compiled executable will be in `_output/test_tobasa/debug/`
 
 ## Running
 
