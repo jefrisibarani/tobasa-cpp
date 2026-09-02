@@ -2,8 +2,11 @@
 
 ## Overview
 
-Tobasa implements a **flexible asset loading system** supporting both embedded binary resources and filesystem fallback. \
+Tobasa implements a **flexible asset loading system** through `app::Resource`, supporting both embedded binary resources and filesystem fallback. \
 This enables containerized deployments without external file dependencies while maintaining development flexibility with disk-based resource access.
+
+The public resource API is declared by [`app::Resource`](../src/app_resource.h#L10),
+and the main lookup behavior is implemented by [`Resource::get`](../src/app_resource.cpp#L73).
 
 ### Key Features
 
@@ -50,6 +53,8 @@ tls_asset        → tls_asset/               (TLS certificates/keys)
 ## Loading Strategy
 
 ### Resource Resolution Flow
+
+Path normalization is performed as part of the resource lookup process.
 
 
 **Directory Structure:**
@@ -297,14 +302,3 @@ app::Resource::get("views/dashboard/panel.html", "appview");
 ```cpp
 app::Resource::get("views\\dashboard\\panel.html", "appview");  // Works but ugly
 ```
-
-
-## References
-
-### Source Files
-
-- [app_resource.h](../src/app_resource.h) - Resource API header
-- [app_resource.cpp](../src/app_resource.cpp) - Resource implementation
-- [generate_resources.cpp](../../cmake/generate_resources.cpp) - Binary file generator
-- [generate_tzdata_assets.cpp](../../cmake/generate_tzdata_assets.cpp) - Timezone data generator
-- [sources.cmake](cmake/sources.cmake) - Resource build definitions
