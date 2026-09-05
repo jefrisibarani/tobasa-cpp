@@ -1,8 +1,6 @@
-# TobasaSQL Samples
+# TobasaSQL Sample
 
-This folder contains focused examples of the TobasaSQL APIs in use. For the
-library overview, backend configuration details, and general usage patterns, see
-[`../tobasasql/doc/quick_start.md`](../tobasasql/doc/quick_start.md).
+A database abstraction layer example using the Tobasa framework.
 
 ## Sample programs
 

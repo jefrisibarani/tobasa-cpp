@@ -114,17 +114,17 @@ replace SQL with an ORM.
 
 ## Sample programs
 
-The repository includes three focused examples in [`../samples/tobasasql`](../samples/tobasasql):
+The repository includes three focused examples in [`../../samples/tobasasql`](../../samples/tobasasql):
 
-* [`simple.cpp`](../samples/tobasasql/simple.cpp) — direct typed-connection smoke test for enabled backends;
-* [`connector.cpp`](../samples/tobasasql/connector.cpp) — runtime configuration via `DatabaseConnector`;
-* [`dbservice.cpp`](../samples/tobasasql/dbservice.cpp) — service-layer example using `DbServiceFactory`.
-* [`pool.cpp`](../samples/tobasasql/pool.cpp) — pooled-connection example using `DbServiceFactory`.
+* [`simple.cpp`](../../samples/tobasasql/simple.cpp) — direct typed-connection smoke test for enabled backends;
+* [`connector.cpp`](../../samples/tobasasql/connector.cpp) — runtime configuration via `DatabaseConnector`;
+* [`dbservice.cpp`](../../samples/tobasasql/dbservice.cpp) — service-layer example using `DbServiceFactory`.
+* [`pool.cpp`](../../samples/tobasasql/pool.cpp) — pooled-connection example using `DbServiceFactory`.
 
 ## Minimal SQLite program
 
 The following is the smallest useful pattern for a **direct typed connection**.
-It follows the setup performed by [`../samples/tobasasql/simple.cpp`](../samples/tobasasql/simple.cpp), which also uses direct typed connections for each enabled backend. This pattern does not use `DatabaseConnector` or `DbServiceFactory`.
+It follows the setup performed by [`../../samples/tobasasql/simple.cpp`](../../samples/tobasasql/simple.cpp), which also uses direct typed connections for each enabled backend. This pattern does not use `DatabaseConnector` or `DbServiceFactory`.
 
 ```cpp
 #include <iostream>
@@ -287,7 +287,7 @@ unsignedness, time-zone information, or a type not present in `DataType`.
 When using `DbServiceFactory`, a service can expose a non-templated interface
 to the rest of the application while keeping the backend-specific SQL code in
 a templated implementation. This is the pattern shown in
-[`../samples/tobasasql/dbservice.cpp`](../samples/tobasasql/dbservice.cpp).
+[`../../samples/tobasasql/dbservice.cpp`](../../samples/tobasasql/dbservice.cpp).
 
 The public service interface derives from `sql::SqlServiceBase` and declares
 only operations that application code needs:
