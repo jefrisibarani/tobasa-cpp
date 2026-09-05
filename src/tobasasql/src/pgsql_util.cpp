@@ -19,12 +19,12 @@
 | text                         [Y] | DataType::text         | std::string          | std::string             | UTF-8 character types                        | TEXT
 | bpchar_array (1014)          [Y] | DataType::varchar      | std::string          | std::string             |                                              | CHAR[]
 | varchar_array (1015          [Y] | DataType::varchar      | std::string          | std::string             |                                              | VARCHAR[]
-| varbit (1562)                [Y] | DataType::varchar      | std::string          | std::string             |                                              | VARBIT
-
 | bpchar (1042)                [Y] | DataType::varchar      | std::string          | std::string             |                                              | CHARACTER/CHAR,CHARACTER(n)/CHAR(n)
 | varchar (1043)               [Y] | DataType::varchar      | std::string          | std::string             |                                              |
 | xml (142)                    [Y] | DataType::varchar      | std::string          | std::string             | XML text data                                |
-| bit (1560)                   [Y] | DataType::character    | std::string          | std::string             | Fixed-length bit string                      | BIT(n)
+
+| bit (1560)                   [Y] | DataType::varbit       | std::vector<uint8_t> | std::vector<uint8_t>    | Fixed-length bit string                      | BIT(n)
+| varbit (1562)                [Y] | DataType::varbit       | std::vector<uint8_t> | std::vector<uint8_t>    |                                              | VARBIT
 
 | bytea                        [Y] | DataType::varbinary    | std::vector<uint8_t> | std::vector<uint8_t>    | Binary (BLOB) data                           |
 
@@ -52,7 +52,7 @@
 | array (e.g. int[])           [N] |                        |                      |                         | Array of base elements                       |
 | range                        [N] |                        |                      |                         | Inclusive/exclusive range                    |
 | tsvector(3614)/tsquery(3615) [N] |                        |                      |                         | Full-text search data                        |
-+ ----------------------------+ -----------------------+ ---------------------+ ------------------------+----------------------------------------------+
++ ----------------------------+ ---+------------    --------+ ---------------------+ ------------------------+----------------------------------------------+
 
 */
 
@@ -231,6 +231,8 @@ PgsqlType pgsqlDataTypeFromDataType(DataType type)
       return PgsqlType::timestamp;
    case DataType::varbinary:
       return PgsqlType::bytea;
+   case DataType::varbit:
+      return PgsqlType::varbit;
    default:
       throw TypeException("Invalid DataType conversion to PostgreSQL data type", "PgsqlUtil");
    }
@@ -265,12 +267,12 @@ DataType pgsqlDataTypeToDataType(PgsqlType ftype)
       return DataType::boolean;
    case PgsqlType::character:
    case PgsqlType::bit:
-      return DataType::character;
+   case PgsqlType::varbit:
+      return DataType::varbit;
    case PgsqlType::name:
    case PgsqlType::char_array:
    case PgsqlType::bpchar_array:
    case PgsqlType::varchar_array:
-   case PgsqlType::varbit:
    case PgsqlType::bpchar:
    case PgsqlType::varchar:
    case PgsqlType::xml:
@@ -320,9 +322,9 @@ TypeClass typeClassFromPgsqlType(const long type)
    case PgsqlType::float8:
    case PgsqlType::numeric:
    case PgsqlType::money:
+      return TypeClass::numeric;
    case PgsqlType::bit:
    case PgsqlType::varbit:
-      return TypeClass::numeric;
    case PgsqlType::bytea:
       return TypeClass::blob;
    case PgsqlType::boolean:

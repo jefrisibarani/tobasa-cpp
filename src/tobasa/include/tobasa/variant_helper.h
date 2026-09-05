@@ -97,6 +97,11 @@ public:
       return false;
    }
 
+   /**
+    * @brief Convert VariantType type value into std::string representation.
+    * @note: for VariantType storing std::vector<uint8_t> or bytes,
+    * returns hexadecimal string
+    */
    static std::string toString(const VariantType& variantValue)
    {
       try
@@ -113,12 +118,12 @@ public:
          {
             int8_t val = std::get<int8_t>(variantValue);
             return std::to_string(val);
-         }         
+         }
          else if (std::holds_alternative<int16_t>(variantValue))
          {
             int16_t val = std::get<int16_t>(variantValue);
             return std::to_string(val);
-         }          
+         }
          else if (std::holds_alternative<int32_t>(variantValue))
          {
             auto val = std::get<int32_t>(variantValue);

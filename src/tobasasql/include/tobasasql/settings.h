@@ -30,16 +30,30 @@ struct ConnectionOptions
    bool connectTimeoutSeconds;   // 120 seconds
 };
 
-/// Database context configuration options.
+/// Database configuration options.
 struct Database
 {
    sql::BackendType dbDriver;
+   /**
+    * Connection string used to connect to the database, excluding the password.
+    * The connector builds the final connection string by injecting the password
+    * at runtime.
+    */
    std::string      connectionString;
+   /**
+    * Password used to authenticate to the database.
+    * If this value is encrypted, then securitySalt must be set to a valid salt
+    * for decryption. Otherwise, the password is treated as plaintext.
+    */
    std::string      password;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Database, dbDriver, connectionString, password)
 
-/// Connection option.
+/**
+ * Connector configuration options.
+ * This option provides two database configurations to choose from:
+ * development and production.
+ */
 struct ConnectorOption
 {
    Database    production;
@@ -47,7 +61,12 @@ struct ConnectorOption
    std::string environment;      // development, production
    bool        logInternalSqlQuery;
    bool        logSqlQuery;
-   std::string securitySalt;     // optional
+   /**
+    * Optional salt used to decrypt an encrypted password.
+    * When securitySalt is non-empty, the password in the corresponding Database
+    * entry must be stored in encrypted form and decrypted with this salt.
+    */
+   std::string securitySalt;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ConnectorOption, production, development, 
    environment, logInternalSqlQuery, logSqlQuery, securitySalt)

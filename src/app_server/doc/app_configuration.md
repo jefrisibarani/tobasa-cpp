@@ -33,8 +33,8 @@ auto embeddedConfig = app::Resource::get("config/appsettings.json", "config");
 webapp.loadConfig(configFile, embeddedConfig);
 ```
 
-[`Webapp::loadConfig`](../../tobasaweb/src/tobasaweb/webapp.cpp#L187) delegates to [`Config::load`](../../tobasa/src/config.cpp#L26)(configFile,
-embeddedConfig)`. `Config::load` uses this order:
+`Webapp::loadConfig` delegates to `Config::load`(configFile,
+embeddedConfig). `Config::load` uses this order:
 
 1. Open and parse the file at `configFile`.
 2. If the file cannot be opened and `embeddedConfig` is non-empty, parse the
@@ -139,11 +139,11 @@ process environment.
 
 ### Startup adjustments
 
-After parsing, [`Webapp::loadConfig`](../../tobasaweb/src/tobasaweb/webapp.cpp#L187) copies the top-level `securitySalt` into
+After parsing, `Webapp::loadConfig` copies the top-level `securitySalt` into
 `webapp.dbConnection.securitySalt` with:
 
 ```cpp
-[`Config::setNestedOption`](../../tobasa/src/config.cpp#L141)("webapp.dbConnection.securitySalt", globalSalt);
+Config::setNestedOption("webapp.dbConnection.securitySalt", globalSalt);
 ```
 
 It also normalizes the configured temporary directory and TLS certificate

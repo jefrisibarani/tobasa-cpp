@@ -69,6 +69,7 @@ SqliteType sqliteTypeFromDataType(DataType type)
    case DataType::time:
    case DataType::timestamp:
       return SqliteType::text;
+   case DataType::varbit:
    case DataType::varbinary:
       return SqliteType::blob;
    default:

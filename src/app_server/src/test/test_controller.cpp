@@ -42,8 +42,8 @@ void TestController::onInit()
 
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
    // Initialize COM
-   // only do this if Webapp main database driver is not adodb
-   if (dbOption.dbDriver != sql::BackendType::adodb)
+   // only do this if Webapp main database driver is adodb
+   if (dbOption.dbDriver == sql::BackendType::adodb)
    {
       if ( FAILED(::CoInitializeEx(NULL, COINIT_MULTITHREADED)) )
          Logger::logI("[test] TestController: Initializing COM library has failed");

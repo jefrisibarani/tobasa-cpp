@@ -164,6 +164,14 @@ enum class DataType
    varbinary,
 
    /** 
+    * \brief Bit-string like "10101010".
+    * C++   : std::vector<uint8_t>
+    * MySQL : BIT
+    * PGSQL : BIT VARBIT
+    */
+   varbit,
+
+   /** 
     * \brief Unknown / not mapped type.
     */
    unknown
@@ -271,6 +279,8 @@ inline std::string dataTypeToString(DataType type)
       return "timestamp";
    case DataType::varbinary:
       return "varbinary";
+   case DataType::varbit:
+      return "varbit";
    default:
       return "unknown";
    }
@@ -278,6 +288,7 @@ inline std::string dataTypeToString(DataType type)
 
 const std::string NULLSTR = "null";
 const std::string BLOBSTR = "blob";
+const std::string BITSTR  = "bit";
 
 /** @}*/
 

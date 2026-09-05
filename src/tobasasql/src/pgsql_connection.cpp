@@ -188,9 +188,7 @@ ConnectionStatus PgsqlConnection::status()
    return _connStatus;
 }
 
-int PgsqlConnection::execute(
-   const std::string& sql,
-   const SqlParameterCollection& parameters)
+int PgsqlConnection::execute(const std::string& sql, const SqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
       return -1;
@@ -250,9 +248,7 @@ int PgsqlConnection::execute(
    return -1;
 }
 
-std::string PgsqlConnection::executeScalar(
-   const std::string& sql,
-   const SqlParameterCollection& parameters)
+std::string PgsqlConnection::executeScalar(const std::string& sql, const SqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
       throw tbs::SqlException("Invalid connection status", "PgsqlConnection");
@@ -293,7 +289,13 @@ std::string PgsqlConnection::executeScalar(
       else
       {
          // Retrieve the query result and return it.
-         result = PQgetvalue(qryRes, 0, 0);
+         if (PQgetisnull(qryRes, 0, 0))
+         {
+            onNotifyDebug(logId() + "Scalar query returned SQL NULL");
+            result = sql::NULLSTR;
+         }
+         else
+            result = PQgetvalue(qryRes, 0, 0);
       }
 
       // clear the result
@@ -314,13 +316,13 @@ std::string PgsqlConnection::executeScalar(
       throw tbs::SqlException(errmsg, "PgsqlConnection");
    }
 
-   return "";
+   return {};
 }
 
 std::string PgsqlConnection::versionString()
 {
    if (status() != ConnectionStatus::ok)
-      return "";
+      return {};
 
    SqlApplyLogInternal applyLogRule(this);   
 
@@ -332,7 +334,7 @@ std::string PgsqlConnection::versionString()
 std::string PgsqlConnection::databaseName()
 {
    if (status() != ConnectionStatus::ok)
-      return "";
+      return {};
    
    SqlApplyLogInternal applyLogRule(this);
    return executeScalar("SELECT current_database()");
@@ -398,19 +400,9 @@ PGresult* PgsqlConnection::executeParams(const std::string& sql, const SqlParame
          PgsqlType pgtype = pgsqlDataTypeFromDataType(param->type());
          paramTypes[i] = static_cast<Oid>(pgtype);
 
-         /*
-         std::string value    = tbs::sql::util::variantToString(param->value());
-         char* valueChar      = static_cast<char*>((char*)value.c_str());
-         char* valueCharFinal = (char*)malloc(strlen(valueChar)+1);
-         if (valueCharFinal!= nullptr)
-            strcpy(valueCharFinal, valueChar);
-
-         paramValues[i] = valueCharFinal;
-         */
-
          if (std::holds_alternative<std::monostate>(param->value()))
          {
-            paramValues[i]  = nullptr;
+            paramValues[i] = nullptr;
          }
          else
          {
@@ -426,7 +418,6 @@ PGresult* PgsqlConnection::executeParams(const std::string& sql, const SqlParame
          
          paramLengths[i] = static_cast<int>(param->size());
          paramFormats[i] = 0;
-
       }
 
       qryRes = PQexecParams(
@@ -437,7 +428,8 @@ PGresult* PgsqlConnection::executeParams(const std::string& sql, const SqlParame
                   paramValues,   // const int *paramLengths
                   paramLengths,  // const int *paramLengths
                   paramFormats,  // const int *paramFormats
-                  0);            // int resultFormat
+                  0              // int resultFormat
+               );
 
       delete[] paramTypes;
       delete[] paramValues;

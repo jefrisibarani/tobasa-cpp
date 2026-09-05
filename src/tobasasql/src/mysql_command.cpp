@@ -3,6 +3,7 @@
 #include "tobasasql/sql_dataset.h"
 #include "tobasasql/mysql_util.h"
 #include "tobasasql/mysql_command.h"
+#include "tobasasql/util.h"
 
 namespace tbs {
 namespace sql {
@@ -81,9 +82,8 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   _paramContext.binds[i].buffer      = nullptr;
                   _paramContext.binds[i].is_null     = &_paramContext.isNulls[i];
                   _paramContext.binds[i].length      = 0;
-               }
                   break;
-               case MYSQL_TYPE_BIT:
+               }
                case MYSQL_TYPE_TINY:
                {
                   if (param->forceUnsigned())
@@ -140,8 +140,8 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                      else
                         throw SqlException(errMsg, "MysqlCommand");
                   }
-               }
                   break;
+               }
                case MYSQL_TYPE_SHORT: // SMALLINT
                {
                   if (param->forceUnsigned())
@@ -284,27 +284,25 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_DOUBLE:
                   _paramContext.binds[i].buffer = (void*) &(VariantHelper::value<double>(param->value(), errMsg));
                   break;
+               //case MYSQL_TYPE_VARCHAR: // mysql_stmt_bind_param does not support
                case MYSQL_TYPE_DECIMAL:
                case MYSQL_TYPE_NEWDECIMAL:
                case MYSQL_TYPE_STRING:
                case MYSQL_TYPE_VAR_STRING:
-               //case MYSQL_TYPE_VARCHAR: // mysql_stmt_bind_param does not support
                {
                   const std::string& strValue   = VariantHelper::value<std::string>(param->value(), errMsg);
                   unsigned long strValueLen     = static_cast<unsigned long>(strValue.length());
                   _paramContext.lengths[i]      = strValueLen;
                   _paramContext.binds[i].buffer = (void*) strValue.data();
                   _paramContext.binds[i].length = &_paramContext.lengths[i];
-               }
                   break;
-#if 1
+               }
                case MYSQL_TYPE_TIME:
                case MYSQL_TYPE_DATE:
                case MYSQL_TYPE_DATETIME:
                case MYSQL_TYPE_TIMESTAMP:
                {
                   // we use MYSQL_TIME as datetime value source
-                  // -------------------------------------------------------
                   // convert datetime string value to MysqlTime 
                   MysqlTime mt = VariantHelper::toMysqlTime(param->value());
                   // save back MysqlTime value
@@ -313,17 +311,11 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   _paramContext.binds[i].buffer = (void*) &( std::get<MysqlTime>(param->value()) ).myTime;
                   //_paramContext.lengths[i]      = sizeof(MYSQL_TIME);
                   //_paramContext.binds[i].length = &_paramContext.lengths[i];
-               }
                   break;
-#endif
+               }
 #if 0
-               case MYSQL_TYPE_TIME:
-               case MYSQL_TYPE_DATE:
-               case MYSQL_TYPE_DATETIME:
-               case MYSQL_TYPE_TIMESTAMP:
                {
                   // Directly use string as datetime value source
-                  // -------------------------------------------------------
                   const std::string& strValue   = VariantHelper::value<std::string>(param->value(), errMsg);
                   unsigned long strValueLen     = static_cast<unsigned long>(strValue.length());
                   _paramContext.lengths[i]      = strValueLen;
@@ -331,19 +323,29 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   _paramContext.binds[i].length = &_paramContext.lengths[i];
                   // because we use string buffer as datetime value source , we must set buffer_type to MYSQL_TYPE_STRING
                   _paramContext.binds[i].buffer_type = MYSQL_TYPE_STRING;   
-               }                 
                   break;
-#endif                  
+               }
+#endif
                case MYSQL_TYPE_TINY_BLOB:
                case MYSQL_TYPE_MEDIUM_BLOB:
                case MYSQL_TYPE_LONG_BLOB:
                case MYSQL_TYPE_BLOB:
                {
                   _paramContext.lengths[i]      = static_cast<unsigned long>(param->size());
-                  _paramContext.binds[i].buffer = (void*) *(param->valueBytePtr());
+                  _paramContext.binds[i].buffer = (void*) *(param->valueBinaryPtr());
                   _paramContext.binds[i].length = &_paramContext.lengths[i];
-               }
                   break;
+               }
+               case MYSQL_TYPE_BIT:
+               {
+                  // MariaDB does not support MYSQL_TYPE_BIT in prepared-statement parameter binding
+                  _paramContext.binds[i].buffer_type = MYSQL_TYPE_VAR_STRING;
+
+                  _paramContext.lengths[i]      = static_cast<unsigned long>(param->dataSize());
+                  _paramContext.binds[i].buffer = (void*) *(param->valueBinaryPtr());
+                  _paramContext.binds[i].length = &_paramContext.lengths[i];
+                  break;
+               }
                default:
                   throw tbs::SqlException("Unsupported Mysql data type for parameter ", "MysqlCommand");
                   break;
@@ -567,7 +569,6 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
             {
                switch(resbind.buffer_type)
                {
-                  case MYSQL_TYPE_BIT:
                   case MYSQL_TYPE_TINY:
                      results[col] = _pResultContext->fieldBuffers[col];
                      break;
@@ -635,15 +636,33 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                      }
 
                      results[col] = std::move(value);
-                  }
+
                      break;
+                  }
+
+                  case MYSQL_TYPE_BIT:
+                  {
+                     VariantType value;
+                     auto bytesData = std::get_if<std::vector<uint8_t>>( &(_pResultContext->fieldBuffers[col]) );
+                     if (!bytesData)
+                        throw SqlException("Invalid bytes data pointer", "MysqlCommand");
+
+                     if (!bytesData->empty())
+                     {
+                        // MySQL BIT is returned as raw bytes; convert each byte to an 8-bit textual bit string.
+                        value = util::binaryBytesToString( (void*)bytesData->data(), realLength);
+                     }
+                     else
+                        value = std::string{};
+
+                     results[col] = std::move(value);
+                     break;
+                  }
                   case MYSQL_TYPE_TIME:
                   case MYSQL_TYPE_DATE:
                   case MYSQL_TYPE_DATETIME:
                   case MYSQL_TYPE_TIMESTAMP:
-                  {
                      results[col] = _pResultContext->fieldBuffers[col];
-                  }
                      break;
                   case MYSQL_TYPE_TINY_BLOB:
                   case MYSQL_TYPE_MEDIUM_BLOB:
@@ -687,8 +706,9 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                      }
 
                      results[col] = std::move(value);
-                  }
+
                      break;
+                  }
                   default:
                      throw tbs::SqlException("Unsupported Mysql result data type received from backend", "MysqlCommand");
                      break;
@@ -771,37 +791,46 @@ void MysqlCommand::ResultContext::initFieldBuffer(enum_field_types fieldType, in
 
    switch(fieldType)
    {
-      case MYSQL_TYPE_BIT:
       case MYSQL_TYPE_TINY:
+      {
          if (isUnsigned)
             fieldBuffers[col] = uint8_t();
          else
             fieldBuffers[col] = int8_t();
+
          break;
+      }
       case MYSQL_TYPE_YEAR:
          fieldBuffers[col] = int32_t();
          break;
       case MYSQL_TYPE_SHORT: // SMALLINT
+      {
          if (isUnsigned)
             fieldBuffers[col] = uint16_t();
          else
             fieldBuffers[col] = int16_t();
+
          break;
+      }
       case MYSQL_TYPE_INT24: // 24 BIT  
       case MYSQL_TYPE_LONG:
+      {
          if (isUnsigned)
             fieldBuffers[col] = uint32_t();
          else
             fieldBuffers[col] = int32_t();
 
          break;
+      }
       case MYSQL_TYPE_LONGLONG:
+      {
          if (isUnsigned)
             fieldBuffers[col] = uint64_t();
          else      
             fieldBuffers[col] = int64_t();
 
          break;
+      }
       case MYSQL_TYPE_FLOAT:
          fieldBuffers[col] = float();
          break;
@@ -818,8 +847,14 @@ void MysqlCommand::ResultContext::initFieldBuffer(enum_field_types fieldType, in
             fieldBuffers[col] = std::vector<uint8_t>(length); 
          else
             fieldBuffers[col] = std::vector<char>(length);
-      }
+         
          break;
+      }
+      case MYSQL_TYPE_BIT:
+      {
+         fieldBuffers[col] = std::vector<uint8_t>(length);
+         break;
+      }
       case MYSQL_TYPE_TIME:
       case MYSQL_TYPE_DATE:
       case MYSQL_TYPE_DATETIME:
@@ -836,8 +871,9 @@ void MysqlCommand::ResultContext::initFieldBuffer(enum_field_types fieldType, in
             fieldBuffers[col] = std::vector<uint8_t>(length); 
          else
             fieldBuffers[col] = std::vector<char>(length); 
-      }
+
          break;
+      }
       default:
          throw tbs::SqlException("unsupported Mysql data type received from backend", "MysqlCommand");
          break;
@@ -856,7 +892,6 @@ void* MysqlCommand::ResultContext::getFieldBufferPointer(enum_field_types fieldT
       auto& storage = fieldBuffers[col];
       switch(fieldType)
       {
-         case MYSQL_TYPE_BIT:
          case MYSQL_TYPE_TINY:
             if (isUnsigned)
                return (void*) &(VariantHelper::value<uint8_t>(storage, errMsg));
@@ -899,9 +934,15 @@ void* MysqlCommand::ResultContext::getFieldBufferPointer(enum_field_types fieldT
             {
                auto& vec = VariantHelper::value<std::vector<char>>(storage, errMsg);
                return (void*) vec.data();
-            }   
-         }
+            }
+
             break;
+         }
+         case MYSQL_TYPE_BIT:
+         {
+            auto& vec = VariantHelper::value<std::vector<uint8_t>>(storage, errMsg);
+            return (void*) vec.data();
+         }
          case MYSQL_TYPE_TIME:
          case MYSQL_TYPE_DATE:
          case MYSQL_TYPE_DATETIME:

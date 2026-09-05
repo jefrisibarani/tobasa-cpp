@@ -824,7 +824,7 @@ SQLRETURN OdbcConnection::sqlPutData(SQLHSTMT pStmt, const SqlParameterCollectio
 
       // the raw binary data pointer
       SQLLEN   lbytes = (SQLLEN) param->size();
-      uint8_t* pBlob  = *(param->valueBytePtr());
+      uint8_t* pBlob  = *(param->valueBinaryPtr());
       constexpr SQLLEN PUTDATA_BUFFER = 512;
 
       if (lbytes < PUTDATA_BUFFER) {

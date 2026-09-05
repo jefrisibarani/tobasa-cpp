@@ -272,7 +272,8 @@ void OdbcParameterCollection::prepare(const std::string& sql, const SqlParameter
                else
                {
                   SQLLEN lbytes            = (SDWORD)parameter->size();
-                  odbcParam->value         = VariantHelper<>::value<std::string>(parameter->value(), errMsg);
+                  // the actual data is supplied later by sqlPutData() from parameter->valueBytePtr()
+                  odbcParam->value         = 0;/*VariantHelper<>::value<std::string>(parameter->value(), errMsg);*/
                   odbcParam->columnSize    = (SQLULEN) parameter->size();
                   odbcParam->decimalDigits = 0;
                   // store parameter position, to be returned back in SQLParamData call

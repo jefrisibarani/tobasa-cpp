@@ -2,19 +2,63 @@ cmake_minimum_required(VERSION 3.12-3.18)
 cmake_policy(SET CMP0091 NEW)
 
 project(test_tobasasql LANGUAGES CXX)
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} simple.cpp)
+
+set(CONNECTOR_TARGET test_tobasasql_connector)
+add_executable(${CONNECTOR_TARGET} connector.cpp)
+
+set(DBSERVICE_TARGET test_tobasasql_dbsvc)
+add_executable(${DBSERVICE_TARGET} dbservice.cpp)
+
+set(POOL_TARGET test_tobasasql_pool)
+add_executable(${POOL_TARGET} pool.cpp)
+
+if(TOBASA_SQL_USE_MYSQL)
+   set(MYSQL_TARGET test_tobasasql_mysql)
+   add_executable(${MYSQL_TARGET} test_mysql.cpp)
+endif()   
 
 if(MSVC)
    set_property(TARGET ${PROJECT_NAME} PROPERTY
       MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   set_property(TARGET ${CONNECTOR_TARGET} PROPERTY
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   set_property(TARGET ${DBSERVICE_TARGET} PROPERTY
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   set_property(TARGET ${POOL_TARGET} PROPERTY
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   
+   if(TOBASA_SQL_USE_MYSQL)
+      set_property(TARGET ${MYSQL_TARGET} PROPERTY
+         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   endif()   
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE tobasa tobasasql)
+target_link_libraries(${PROJECT_NAME}     PRIVATE tobasa tobasasql)
+target_link_libraries(${CONNECTOR_TARGET} PRIVATE tobasa tobasasql)
+target_link_libraries(${DBSERVICE_TARGET} PRIVATE tobasa tobasasql)
+target_link_libraries(${POOL_TARGET}      PRIVATE tobasa tobasasql)
+
+if(TOBASA_SQL_USE_MYSQL)
+   target_link_libraries(${MYSQL_TARGET}     PRIVATE tobasa tobasasql)
+endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+   target_compile_features(${CONNECTOR_TARGET} PRIVATE cxx_std_20)
+   target_compile_features(${DBSERVICE_TARGET} PRIVATE cxx_std_20)
+   target_compile_features(${POOL_TARGET} PRIVATE cxx_std_20)
+   if(TOBASA_SQL_USE_MYSQL)
+      target_compile_features(${MYSQL_TARGET} PRIVATE cxx_std_20)
+   endif()
 else()
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+   target_compile_features(${CONNECTOR_TARGET} PRIVATE cxx_std_17)
+   target_compile_features(${DBSERVICE_TARGET} PRIVATE cxx_std_17)
+   target_compile_features(${POOL_TARGET} PRIVATE cxx_std_17)
+   if(TOBASA_SQL_USE_MYSQL)
+      target_compile_features(${MYSQL_TARGET} PRIVATE cxx_std_17)
+   endif()
 endif()
 
 

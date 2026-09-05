@@ -28,9 +28,7 @@ std::string OdbcResult::name() const
    return "Odbc Result";
 }
 
-bool OdbcResult::runQuery(
-   const std::string& sql,
-   const SqlParameterCollection& parameters)
+bool OdbcResult::runQuery(const std::string& sql, const SqlParameterCollection& parameters)
 {
    if (_pConn == nullptr)
       return false;

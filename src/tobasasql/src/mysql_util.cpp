@@ -10,7 +10,7 @@
 | MEDIUMINT        | integer   | int32_t              | int32_t              | MySQL-specific 3-byte integer, mapped to 32-bit signed. |
 | INT, INTEGER     | integer   | int32_t / uint32_t   | int32_t / uint32_t   | Common 4-byte integer.                                  |
 | BIGINT           | bigint    | int64_t / uint64_t   | int64_t / uint64_t   | Large 8-byte integer.                                   |
-| BIT              | tinyint   | int8_t / uint8_t     | int8_t / uint8_t     | Treated as boolean or bit field.                        |
+| BIT              | varbit    | std::vector<uint8_t> | std::vector<uint8_t> | Binary bytes                                            |
 | BOOL, BOOLEAN    | boolean   | bool                 | bool                 | Alias for TINYINT(1).                                   |
 | DECIMAL, NUMERIC | numeric   | std::string          | std::string          | Exact fixed-point numeric.                              |
 | FLOAT            | float4    | float                | float                | 4-byte single precision.                                |
@@ -219,8 +219,6 @@ MySqlType mysqlDataTypeFromDataType(DataType type)
    case DataType::varchar:
    case DataType::text:
       return MySqlType::MYSQL_TYPE_STRING; //MySqlType::MYSQL_TYPE_VARCHAR;
-   //case DataType::text:
-   //   return MySqlType::MYSQL_TYPE_BLOB;
    case DataType::date:
       return MySqlType::MYSQL_TYPE_DATE;
    case DataType::time:
@@ -229,6 +227,8 @@ MySqlType mysqlDataTypeFromDataType(DataType type)
       return MySqlType::MYSQL_TYPE_DATETIME;
    case DataType::varbinary:
       return MySqlType::MYSQL_TYPE_BLOB;
+   case DataType::varbit:
+      return MySqlType::MYSQL_TYPE_BIT;
    default:
       throw TypeException("Invalid DataType conversion to MySQL data type", "MysqlUtil");
    }
@@ -254,16 +254,13 @@ DataType mysqlDataTypeToDataType(MySqlType ftype)
    case MySqlType::MYSQL_TYPE_DECIMAL:
    case MySqlType::MYSQL_TYPE_NEWDECIMAL:
       return DataType::numeric;
-   /* TODO_JEFRI: 
-      By default, MySQL treats REAL as a synonym for DOUBLE
-      unless the REAL_AS_FLOAT SQL mode is enabled
-   */      
+   // TODO_JEFRI: 
+   // By default, MySQL treats REAL as a synonym for DOUBLE
+   // unless the REAL_AS_FLOAT SQL mode is enabled
    case MySqlType::MYSQL_TYPE_FLOAT:
       return DataType::float4;
    case MySqlType::MYSQL_TYPE_DOUBLE:
       return DataType::float8;
-   case MySqlType::MYSQL_TYPE_BIT:
-      return DataType::tinyint;
    case MySqlType::MYSQL_TYPE_STRING:
    case MySqlType::MYSQL_TYPE_VAR_STRING:
    case MySqlType::MYSQL_TYPE_VARCHAR:
@@ -275,6 +272,8 @@ DataType mysqlDataTypeToDataType(MySqlType ftype)
    case MySqlType::MYSQL_TYPE_LONG_BLOB:
    case MySqlType::MYSQL_TYPE_BLOB:
       return DataType::varbinary;
+   case MySqlType::MYSQL_TYPE_BIT:
+      return DataType::varbit;
    case MySqlType::MYSQL_TYPE_YEAR:
       return DataType::integer;
    case MySqlType::MYSQL_TYPE_DATE:
@@ -321,12 +320,10 @@ TypeClass typeClassFromMySqlType(const long type)
    case MySqlType::MYSQL_TYPE_MEDIUM_BLOB:
    case MySqlType::MYSQL_TYPE_LONG_BLOB:
    case MySqlType::MYSQL_TYPE_BLOB:
+   case MySqlType::MYSQL_TYPE_BIT:
    {
       return TypeClass::blob;
    }
-   case MySqlType::MYSQL_TYPE_BIT:
-      return TypeClass::boolean;
-   
    case MySqlType::MYSQL_TYPE_JSON:
    case MySqlType::MYSQL_TYPE_VARCHAR:
    case MySqlType::MYSQL_TYPE_VAR_STRING:

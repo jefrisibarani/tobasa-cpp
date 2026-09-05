@@ -23,17 +23,17 @@ namespace sql {
  */
 
 /**
- * Promote an integral value according to the SQL DataType.
+ * @brief Promote an integral value according to the SQL DataType.
  *
  * Rules:
  * - Non-integral values are returned unchanged.
  * - Signed types are returned unchanged, except:
  *   - long is treated as int32_t, throws if out of range.
  * - Unsigned types are range-checked to the signed type matching the DataType:
- *   - tinyint  → int64_t
- *   - smallint → int64_t
- *   - integer  → int64_t
- *   - bigint   → int64_t
+ *   - tinyint  -> int64_t
+ *   - smallint -> int64_t
+ *   - integer  -> int64_t
+ *   - bigint   -> int64_t
  *   Throws if the value exceeds the max of the target type.
  *
  * @tparam T Type of the input value.
@@ -72,6 +72,8 @@ constexpr auto promoteUnsignedIntegralForDataType(T value, DataType dataType)
    }
 }
 
+/// Converts the parameter value to a signed integer range that matches the target SQL type.
+/// Throws if the value does not fit the type.
 template <typename T>
 constexpr auto normalizeSignedLongForDataType(T value, DataType dataType)
 {
@@ -103,17 +105,23 @@ constexpr auto normalizeSignedLongForDataType(T value, DataType dataType)
 }
 
 /**
- * \brief Represents a SQL parameter.
- * \details 
+ * @brief Represents a SQL parameter.
+ * @details 
  * Encapsulates a single parameter used in SQL queries or stored procedures, 
  * including its name, type, value, size, direction, and precision.  
  *
+ * Binary parameters are supported in two internal forms:
+ * 1. hex-encoded std::string values
+ * 2. std::vector<uint8_t> values
+ * When a hex string is used, it is decoded into a temporary raw-byte buffer so
+ * callers can obtain a stable pointer for backend-specific binding.
+ *
  * This class is templated to allow different underlying variant/value 
  * implementations for representing parameter values. By default, it uses 
- * \c DefaultVariantType.
+ * @c DefaultVariantType.
  *
- * \tparam VariantTypeImplemented Variant type used to store the parameter value.  
- *         Defaults to \c DefaultVariantType.
+ * @tparam VariantTypeImplemented Variant type used to store the parameter value.  
+ *         Defaults to @c DefaultVariantType.
  */
 template <typename VariantTypeImplemented = DefaultVariantType >
 class Parameter
@@ -122,7 +130,7 @@ public:
    using VariantType   = VariantTypeImplemented;
    using VariantHelper = tbs::VariantHelper<VariantType>;
 
-   static const long DEFAULT_SIZE = 0;
+   static const uint64_t DEFAULT_SIZE = 0;
 
    Parameter()
    {
@@ -137,7 +145,7 @@ public:
       const std::string& name,
       DataType           type,
       VariantType        value,
-      long               size = 0,
+      uint64_t           size = 0,
       ParameterDirection direction = ParameterDirection::input,
       short              decimalDigits = 0 )
       : _name{name}
@@ -154,7 +162,7 @@ public:
       const std::string& name,
       DataType           type,
       T                  value,
-      long               size = DEFAULT_SIZE,
+      uint64_t           size = DEFAULT_SIZE,
       ParameterDirection direction = ParameterDirection::input,
       short              decimalDigits = 0)
       : _name{name}
@@ -198,7 +206,7 @@ public:
       }
       else
       {
-         // --- String-like types ---
+         // String-like types
          if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>) {
             _value = std::string(value);
          }
@@ -211,7 +219,7 @@ public:
          else if constexpr (std::is_same_v<T, std::wstring>) {
             _value = value;
          }
-         // --- Binary types ---
+         // Binary types 
          else if constexpr (std::is_same_v<T, const void*>) 
          {
             if (size <= 0) {
@@ -254,7 +262,7 @@ public:
       _value = val;
    }
 
-   long size()
+   uint64_t size()
    {
       return _size;
    }
@@ -264,6 +272,9 @@ public:
       return _decimalDigits;
    }
 
+   /// Returns a pointer to the textual form of the parameter value.
+   /// Useful for backends that accept text parameters, such as PostgreSQL.
+   /// A caller can optionally modify the generated string before using the pointer.
    std::shared_ptr<char*> valueCharPtr(std::function<void(std::string&)> modifierFn = nullptr)
    {
       _rawValData = VariantHelper::toString(_value);
@@ -272,60 +283,88 @@ public:
          modifierFn(_rawValData);
       }
 
-      _rawValDataPtr = std::make_shared<char*>( (char*) _rawValData.c_str() );
-
-      return _rawValDataPtr;
+      return std::make_shared<char*>( (char*) _rawValData.c_str() );
    }
 
-   std::shared_ptr<uint8_t*> valueBytePtr()
+   /// Returns a pointer to the raw binary payload of the parameter.
+   /// It accepts hex-encoded string values or std::vector<uint8_t>.
+   /// This is used by backends that need binary data directly.
+   std::shared_ptr<uint8_t*> valueBinaryPtr()
    {
-      if (std::holds_alternative<std::string>(_value))
+      if (_type == DataType::varbinary || _type == DataType::varbit)
       {
-         // get binary data from HEX Encoded string stored in std::string
+         // NOTE_JEFRI: varbinary or varbit param can only hold data in
+         // 1. HEX Encoded string stored in std::string
+         // 2. std::vector<uint8_t>
 
-         // note gcc warning: expected ‘template’ keyword before dependent template name [-Wmissing-template-keyword]
-         size_t hexLenOri = VariantHelper::template value<std::string>(_value).size();
-         if (hexLenOri % 2) {
-            throw SqlException("invalid binary string input", "SqlParameter");
-         }
-
-         // convert hexadecimal encoded data to a byte array
-         size_t hexLen = hexLenOri / 2;
-
-         _rawValBinary.reserve(hexLen);
-         for (size_t i = 0; i < hexLen; ++i)
+         if (std::holds_alternative<std::string>(_value))
          {
-            _rawValBinary.emplace_back(0);
+            // get binary data from HEX Encoded string stored in std::string
+
+            // note gcc warning: expected ‘template’ keyword before dependent template name [-Wmissing-template-keyword]
+            size_t hexLenOri = VariantHelper::template value<std::string>(_value).size();
+            if (hexLenOri % 2) {
+               throw SqlException("invalid binary string input", "SqlParameter");
+            }
+
+            // convert hexadecimal encoded data to a byte array
+            size_t hexLen = hexLenOri / 2;
+
+            if (hexLen != _size)
+               throw SqlException("invalid binary string data size", "SqlParameter");
+
+            _rawValBinary.reserve(hexLen);
+            for (size_t i = 0; i < hexLen; ++i)
+            {
+               _rawValBinary.emplace_back(0);
+            }
+
+            crypt::hexDecode(VariantHelper::template value<std::string>(_value), _rawValBinary.data());
+
+            return std::make_shared<uint8_t*>( _rawValBinary.data() );
          }
-
-         crypt::hexDecode(VariantHelper::template value<std::string>(_value), _rawValBinary.data());
-
-         return std::make_shared<uint8_t*>( _rawValBinary.data() );
-      }
-      else if (std::holds_alternative<std::vector<uint8_t>>(_value))
-      {
-         // get binary data stored in std::vector<uint8_t>
-         return std::make_shared<uint8_t*>( std::get_if<std::vector<uint8_t>>(&_value)->data() );
+         else if (std::holds_alternative<std::vector<uint8_t>>(_value))
+         {
+            // get binary data stored in std::vector<uint8_t>
+            return std::make_shared<uint8_t*>( std::get_if<std::vector<uint8_t>>(&_value)->data() );
+         }
+         else
+            throw SqlException("Invalid variant type for binary data parameter", "SqlParameter");
       }
       else
-         throw SqlException("Invalid variant type for binary data parameter", "SqlParameter");
+      {
+         throw SqlException("valueBinaryPtr() requires DataType::varbinary or DataType::varbit with a hex string or uint8_t vector payload", "SqlParameter");
+      }
    }
 
    bool forceUnsigned() const { return _forceUnsigned; }
+   
+   uint64_t dataSize()
+   {
+      if (std::holds_alternative<std::vector<uint8_t>>(_value))
+      {
+         size_t len = VariantHelper::template value<std::vector<uint8_t>>(_value).size(); 
+         return static_cast<uint64_t>(len);
+      }
+      else
+         return _size;
+   }
 
 protected:
 
    std::string             _name;
    DataType                _type = DataType::unknown;
    VariantType             _value;
-   long                    _size = 0;
+   uint64_t                _size = 0;
    ParameterDirection      _direction = ParameterDirection::unknown;
    short                   _decimalDigits = 0;
 
+   /// Temporary text form of _value.
+   /// Used when preparing PostgreSQL parameters.
    std::string             _rawValData;
-   std::shared_ptr<char*>  _rawValDataPtr;
 
-   // buffer to store param's binary data
+   /// Temporary raw-byte buffer for binary params stored as hex in _value.
+   /// Keeps the decoded bytes stable so caller can use a pointer without decoding again.
    std::vector<uint8_t>    _rawValBinary;
 
    bool     _forceUnsigned = false;

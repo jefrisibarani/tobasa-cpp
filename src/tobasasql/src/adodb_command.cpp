@@ -107,7 +107,7 @@ ADODB::_ParameterPtr AdoCommand::createParameter( AdoParameter& param )
       paramType = ADODB::adVarWChar;
    }
 
-   long paramSize = param.size();
+   long paramSize = static_cast<long>(param.size());
    _variant_t paramValue;
 
    // for these types, we set paramSize to -1
@@ -142,30 +142,20 @@ ADODB::_ParameterPtr AdoCommand::createParameter( AdoParameter& param )
 
          try
          {
-            using namespace tbs::crypt;
+            auto bytes = param.valueBytePtr();
+            uint8_t* pData = *bytes;
+            size_t len = param.size();
 
-            std::string hexBinaryStr = VariantHelper::toString( param.value() );
-            size_t hexLenOri = hexBinaryStr.size();
-            if (hexLenOri % 2) {
-               throw std::exception("invalid binary string input");
-            }
-
-            // convert hexadecimal encoded data to a byte array
-            size_t hexLen = hexLenOri / 2;
-            std::vector<byte_t> pasBuffer(hexLen);
-            hexDecode(hexBinaryStr, pasBuffer.data());
-
-            SAFEARRAY* ppsa;
-            // Create a safe array storing 'count' BYTEs
-            const long count = static_cast<long>(hexLen);
+            // Create a safe array storing BYTEs
+            const long count = static_cast<long>(len);
             CComSafeArray<BYTE> sa(count);
             // Fill the safe array with some data
             for (long i = 0; i < count; i++)
             {
-               sa[i] = pasBuffer.at(i);
+               sa[i] = pData[i];
             }
 
-            ppsa = sa.Detach();
+            SAFEARRAY* ppsa = sa.Detach();
             paramValue.parray = ppsa;
             paramValue.vt = 8209;
          }

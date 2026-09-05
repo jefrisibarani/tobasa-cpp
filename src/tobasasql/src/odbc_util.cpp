@@ -362,6 +362,7 @@ short odbcTypeFromDataType(DataType type)
       return SQL_TYPE_TIME;
    case DataType::timestamp:
       return SQL_TYPE_TIMESTAMP;
+   case DataType::varbit:
    case DataType::varbinary:
       return SQL_VARBINARY;
    default:

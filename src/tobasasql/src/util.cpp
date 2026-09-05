@@ -105,7 +105,10 @@ std::string getConnectionString(const sql::conf::Database& dbOption, const std::
    std::string encryptedPwd = dbOption.password;
    std::string clearPwd;
 
-   clearPwd = crypt::passwordDecrypt(encryptedPwd, securitySalt);
+   if (securitySalt.empty())
+      clearPwd = dbOption.password;
+   else
+      clearPwd = crypt::passwordDecrypt(encryptedPwd, securitySalt);
 
    using namespace sql;
    switch (dbOption.dbDriver)
@@ -135,6 +138,42 @@ std::string getConnectionString(const sql::conf::Database& dbOption, const std::
    return connString;
 }
 
+std::string binaryBytesToString(const void* data, int length)
+{
+   std::string result;
+   if (data == nullptr || length <= 0)
+      return result;
+
+   const auto* bytes = static_cast<const unsigned char*>(data);
+   result.reserve(static_cast<size_t>(length) * 8);
+
+   for (int i = 0; i < length; ++i)
+   {
+      for (int bit = 7; bit >= 0; --bit)
+         result.push_back((bytes[i] & (1u << bit)) ? '1' : '0');
+   }
+
+   return result;
+}
+
+std::string binaryBytesToHexString(const void* data, int length)
+{
+   std::string result;
+   if (data == nullptr || length <= 0)
+      return result;
+
+   const auto* bytes = static_cast<const unsigned char*>(data);
+   result.reserve(static_cast<size_t>(length) * 2);
+
+   static constexpr char hexDigits[] = "0123456789ABCDEF";
+   for (int i = 0; i < length; ++i)
+   {
+      result.push_back(hexDigits[(bytes[i] >> 4) & 0x0F]);
+      result.push_back(hexDigits[bytes[i] & 0x0F]);
+   }
+
+   return result;
+}
 
 } // namespace util
 } // namespace tbs

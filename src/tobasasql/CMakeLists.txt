@@ -12,8 +12,8 @@ endif()
 option(TOBASA_FIND_DEPS    "Use `find_package()` for including Tobasa SQL dependencies." OFF)
 
 option(TOBASA_SQL_USE_PGSQL    "Enable Tobasa PostgreSQL driver" OFF)
-option(TOBASA_SQL_USE_ADODB    "Enable Tobasa ADO driver"        OFF) # Only with MSVC compiler
-option(TOBASA_SQL_USE_ODBC     "Enable Tobasa ODBC driver"       OFF)
+option(TOBASA_SQL_USE_ADODB    "Enable Tobasa ADO driver for Microsoft SQL Server" OFF) # Only with MSVC compiler
+option(TOBASA_SQL_USE_ODBC     "Enable Tobasa ODBC driver for Microsoft SQL Server" OFF)
 option(TOBASA_SQL_USE_SQLITE   "Enable Tobasa SQLite driver"     OFF)
 option(TOBASA_SQL_USE_MYSQL    "Enable TobasaMariaDB driver"     OFF)
 

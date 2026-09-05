@@ -1,48 +1,35 @@
-# TobasaSQL Sample
+# TobasaSQL Samples
 
-A database abstraction layer example using the Tobasa framework.
+This folder contains focused examples of the TobasaSQL APIs in use. For the
+library overview, backend configuration details, and general usage patterns, see
+[`../tobasasql/doc/quick_start.md`](../tobasasql/doc/quick_start.md).
 
-## Overview
+## Sample programs
 
-This sample demonstrates how to use `tobasasql` for database operations. It shows how to connect to databases, execute queries, and manage data using the unified abstraction layer.
-
-## Features
-
-- Multi-database support (SQLite, MySQL, PostgreSQL, MSSQL)
-- Connection pooling
-- Parameterized queries
-- Transaction support
-- Entity mapping
+- `simple.cpp` - direct typed-connection smoke test. It opens a connection for
+  each enabled backend, runs a small query, and prints the backend version.
+- `connector.cpp` - configuration-driven connector example. It uses
+  `DatabaseConnector` and `ConnectorOption` to select the active database
+  configuration at runtime.
+- `dbservice.cpp` - service-oriented example. It uses `DbServiceFactory` to
+  create a typed service, add sample records, and exercise transactions.
+- `pool.cpp` - pooled-connection example. It configures a connection pool,
+  acquires a few connectors, runs work through them, and shows that released
+  connections are returned to the pool automatically.
+- `test_mysql.cpp` - MySQL-specific behavior check. It validates MySQL/MariaDB
+  type conversion, bit handling, and sample database interactions.
 
 ## Building
 
-The sample is built as part of the main build system:
-The compiled executable will be in `_output/test_tobasasql/debug/`
+The sample is built as part of the main CMake build. The resulting executable is
+written to the active output directory for the current configuration.
 
 ## Running
 
 ```bash
 ./test_tobasasql
+./test_tobasasql_connector
+./test_tobasasql_dbsvc
+./test_tobasasql_pool
+./test_mysql
 ```
-
-## Supported Databases
-
-- SQLite - File-based, zero configuration
-- MySQL/MariaDB - Popular relational database
-- PostgreSQL - Enterprise-grade database
-- MSSQL - SQL Server
-
-## Configuration
-
-Database connection is configured in `appsettings.json`:
-
-## Features
-
-- Execute SELECT, INSERT, UPDATE, DELETE queries
-- Connection pooling for performance
-- Parameter binding for security
-- Transaction management
-
-## License
-
-See LICENSE file in the root directory.

@@ -450,8 +450,8 @@ sqlite3_stmt* SqliteConnection::createStatement(const std::string& sql, const Sq
                {
                   // BLOB. The value is a blob of data, stored exactly as it was input.
                   // store the data byte array
-                  void* pBlob = *(param->valueBytePtr());
-                  bindRc = sqlite3_bind_blob(pStatement, i + 1, (const void*)pBlob, param->size(), SQLITE_TRANSIENT);
+                  void* pBlob = *(param->valueBinaryPtr());
+                  bindRc = sqlite3_bind_blob(pStatement, i + 1, (const void*)pBlob, static_cast<int>(param->size()), SQLITE_TRANSIENT);
                }
                   break;
                default:

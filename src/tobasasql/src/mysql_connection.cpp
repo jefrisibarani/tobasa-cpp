@@ -1,5 +1,6 @@
 #include "tobasasql/mysql_connection.h"
 #include "tobasasql/mysql_command.h"
+#include "tobasasql/util.h"
 
 namespace tbs {
 namespace sql {
@@ -139,7 +140,6 @@ int MysqlConnection::execute(const std::string& sql, const MysqlParameterCollect
          throwExceptionOnError();
 
       uint64_t affectedRows;
-      //unsigned int numFields;
       MYSQL_RES* result = mysql_store_result(_pMYcon);
       if (result)
       {
@@ -149,7 +149,7 @@ int MysqlConnection::execute(const std::string& sql, const MysqlParameterCollect
       }
       else
       {
-         if(mysql_field_count(_pMYcon) == 0)
+         if (mysql_field_count(_pMYcon) == 0)
          {
             // no data returned, it was not a SELECT query
             affectedRows = mysql_affected_rows(_pMYcon);
@@ -194,27 +194,55 @@ std::string MysqlConnection::executeScalar(
       if (mysql_real_query(_pMYcon, sql.c_str(), static_cast<unsigned long>(sql.length()) ) != 0)
          throwExceptionOnError();
 
-      //unsigned int numFields;
       MYSQL_RES *result = mysql_store_result(_pMYcon);
       if (result)
       {
-         // we have data
          MYSQL_ROW row = mysql_fetch_row(result);
-         if (row) 
+
+         if (row == nullptr)
          {
-            std::string value = row[0];
             mysql_free_result(result);
-            return value;
+            onNotifyTrace(logId() + "Scalar query returned no row");
+            return {};
+         }
+
+         if (row[0] == nullptr)
+         {
+            mysql_free_result(result);
+            onNotifyTrace(logId() + "Scalar query returned SQL NULL");
+            return sql::NULLSTR;  // "null"
+         }
+
+         MYSQL_FIELD* fields = mysql_fetch_fields(result);
+         const enum_field_types columnType = fields[0].type;
+         const unsigned int columnCount = mysql_num_fields(result);
+         unsigned long* lengths = mysql_fetch_lengths(result);
+
+         std::string value;
+         if (lengths && lengths[0] > 0)
+         {
+            if (columnType == MYSQL_TYPE_BIT)
+            {
+               // MySQL BIT is returned as raw bytes; convert each byte to an 8-bit textual bit string.
+               value = util::binaryBytesToString((void*)row[0],lengths[0]);
+            }
+            else {
+               value.assign(row[0], row[0] + lengths[0]);
+            }
          }
          else
          {
-            onNotifyTrace(logId() + "Scalar query returned fields but no row found");
+            onNotifyTrace(logId() + "Scalar query returned invalid or empty data length");
+            mysql_free_result(result);
             return {};
          }
+
+         mysql_free_result(result);
+         return value;
       }
       else
       {
-         if(mysql_field_count(_pMYcon) == 0)
+         if (mysql_field_count(_pMYcon) == 0)
          {
             // Scalar query returned no record
             onNotifyTrace(logId() + "Scalar query returned no record");

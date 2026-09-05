@@ -261,8 +261,17 @@ std::string AdodbConnection::executeScalar(const std::string& sql, const AdoPara
             pFldLoop = pRec->GetFields(); // get Fields pointer
             vtIndex.iVal = 0;
 
-            _bstr_t result_ = (_bstr_t) pFldLoop->GetItem(vtIndex)->Value;
-            result = util::utf8_from_bstr_t(result_);
+            _variant_t fieldValue = pFldLoop->GetItem(vtIndex)->Value;
+            if (fieldValue.vt == VT_NULL)
+            {
+               onNotifyDebug(logId() + "Scalar query returned SQL NULL");
+               result = sql::NULLSTR;
+            }
+            else
+            {
+               _bstr_t result_ = (_bstr_t) fieldValue;
+               result = util::utf8_from_bstr_t(result_);
+            }
          }
          nRows++;
          pRec->MoveNext();

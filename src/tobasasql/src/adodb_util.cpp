@@ -381,6 +381,7 @@ ADODB::DataTypeEnum adoDataTypeFromDataType(DataType type)
    case DataType::timestamp:
       return ADODB::adDBTimeStamp;
    case DataType::varbinary:
+   case DataType::varbit:
       return ADODB::adVarBinary;
    default:
       throw TypeException("Invalid DataType conversion to ADODB data type", "AdodbUtil");
