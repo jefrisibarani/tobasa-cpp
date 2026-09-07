@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include "tobasa/common.h"
 
 namespace tbs {
 
@@ -11,8 +12,6 @@ namespace crypt {
 /** @defgroup CRYPT Hashing and encryption
  * @{
  */
-
-using byte_t = unsigned char;
 
 /// SHA Types
 enum class ShaType

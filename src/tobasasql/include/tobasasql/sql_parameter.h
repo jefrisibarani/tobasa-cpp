@@ -6,9 +6,10 @@
 #include <tobasa/variant.h>
 #include <tobasa/variant_helper.h>
 #include <tobasa/self_counter.h>
-#include <tobasa/hextodec.h>
+#include <tobasa/bin_encode.h>
 #include "tobasasql/common_types.h"
 #include "tobasasql/exception.h"
+#include <tobasa/util.h>
 
 
 namespace tbs {
@@ -23,27 +24,19 @@ namespace sql {
  */
 
 /**
- * @brief Promote an integral value according to the SQL DataType.
+ * @brief Converts an unsigned integral value to the supported SQL integer range.
+ * @details
+ * The value is stored as a signed int64_t after validation. The accepted
+ * maximum is determined by the supplied SQL data type.
  *
- * Rules:
- * - Non-integral values are returned unchanged.
- * - Signed types are returned unchanged, except:
- *   - long is treated as int32_t, throws if out of range.
- * - Unsigned types are range-checked to the signed type matching the DataType:
- *   - tinyint  -> int64_t
- *   - smallint -> int64_t
- *   - integer  -> int64_t
- *   - bigint   -> int64_t
- *   Throws if the value exceeds the max of the target type.
- *
- * @tparam T Type of the input value.
- * @param value The value to promote.
- * @param dataType SQL DataType for determining the promotion.
- * @return Promoted value with type corresponding to DataType.
- * @throws std::out_of_range if the value cannot fit in the target type.
+ * @tparam T Unsigned integral type.
+ * @param value Value to validate and convert.
+ * @param dataType Target SQL integer type.
+ * @return The converted value as int64_t.
+ * @throws std::out_of_range If the value exceeds the maximum for dataType.
  */
 template <typename T>
-constexpr auto promoteUnsignedIntegralForDataType(T value, DataType dataType)
+constexpr auto normalizeUnsignedIntegralToSqlRange(T value, DataType dataType)
 {
    uint64_t uval = static_cast<uint64_t>(value);
 
@@ -72,10 +65,20 @@ constexpr auto promoteUnsignedIntegralForDataType(T value, DataType dataType)
    }
 }
 
-/// Converts the parameter value to a signed integer range that matches the target SQL type.
-/// Throws if the value does not fit the type.
+/**
+ * @brief Converts a signed integral value to the supported SQL integer range.
+ * @details
+ * The value is stored as a signed int64_t after validation. The accepted
+ * maximum is determined by the supplied SQL data type.
+ *
+ * @tparam T Signed integral type.
+ * @param value Value to validate and convert.
+ * @param dataType Target SQL integer type.
+ * @return The converted value as int64_t.
+ * @throws std::out_of_range If the value exceeds the maximum for dataType.
+ */
 template <typename T>
-constexpr auto normalizeSignedLongForDataType(T value, DataType dataType)
+constexpr auto normalizeSignedIntegralToSqlRange(T value, DataType dataType)
 {
    int64_t val = static_cast<int64_t>(value);
 
@@ -106,22 +109,20 @@ constexpr auto normalizeSignedLongForDataType(T value, DataType dataType)
 
 /**
  * @brief Represents a SQL parameter.
- * @details 
- * Encapsulates a single parameter used in SQL queries or stored procedures, 
- * including its name, type, value, size, direction, and precision.  
+ * @details Encapsulates the name, SQL type, value, size, direction, and
+ * precision of a parameter used by a query or stored procedure.
  *
- * Binary parameters are supported in two internal forms:
- * 1. hex-encoded std::string values
- * 2. std::vector<uint8_t> values
- * When a hex string is used, it is decoded into a temporary raw-byte buffer so
- * callers can obtain a stable pointer for backend-specific binding.
+ * Binary values for DataType::varbinary and DataType::varbit may be provided
+ * as an even-length hexadecimal std::string or as raw std::vector<uint8_t>
+ * data.
  *
- * This class is templated to allow different underlying variant/value 
- * implementations for representing parameter values. By default, it uses 
- * @c DefaultVariantType.
+ * Integral values are validated against the selected SQL type. Unsigned
+ * values are stored as signed int64_t and therefore cannot exceed INT64_MAX
+ * for DataType::bigint.
  *
- * @tparam VariantTypeImplemented Variant type used to store the parameter value.  
+ * @tparam VariantTypeImplemented Variant type used to store the value.
  *         Defaults to @c DefaultVariantType.
+ *
  */
 template <typename VariantTypeImplemented = DefaultVariantType >
 class Parameter
@@ -180,57 +181,55 @@ public:
                      !std::is_same_v<T,char16_t> &&
                      !std::is_same_v<T,char32_t>)
       {
-         _value = VariantType{ promoteUnsignedIntegralForDataType(std::forward<T>(value), _type) };
+         // TODO_JEFRI: create a branch to handle with unsigned value for MySQL, since MySQL support unsigned integral column
+         _value = VariantType { 
+                     normalizeUnsignedIntegralToSqlRange(std::forward<T>(value), _type) 
+                  };
       }
       else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
       {
-         if constexpr ( sizeof(long) == 8 && (std::is_same_v<T,long> || std::is_same_v<T,int64_t>) ) // on LP64 platforms. Linux/macOS (GCC/Clang)
+         // on LP64 platforms. Linux/macOS (GCC/Clang)
+         if constexpr ( sizeof(long) == 8 && (std::is_same_v<T,long> || std::is_same_v<T,int64_t>) ) 
          {
-            _value = VariantType{ normalizeSignedLongForDataType(std::forward<T>(value), _type) };
+            _value = VariantType { 
+                        normalizeSignedIntegralToSqlRange(std::forward<T>(value), _type) 
+                     };
          }
-         else if constexpr (std::is_same_v<T,long long>) {
+         else if constexpr (std::is_same_v<T,long long>)
             _value = static_cast<int64_t>(value);
-         }
          else if constexpr (std::is_same_v<T,long>)
-         {
            _value = static_cast<int32_t>(value);
-         }
-         else if constexpr (std::is_same_v<T,int>) {
+         else if constexpr (std::is_same_v<T,int>)
             _value = static_cast<int32_t>(value);
-         }
-         else if constexpr (std::is_same_v<T,short>) {
+         else if constexpr (std::is_same_v<T,short>)
             _value = static_cast<int16_t>(value);
-         }
          else
             _value = value;
       }
       else
       {
          // String-like types
-         if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>) {
+
+         if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>)
             _value = std::string(value);
-         }
-         else if constexpr (std::is_same_v<T, const wchar_t*> || std::is_same_v<T, wchar_t*>) {
+         else if constexpr (std::is_same_v<T, const wchar_t*> || std::is_same_v<T, wchar_t*>)
             _value = std::wstring(value);
-         }
-         else if constexpr (std::is_same_v<T, std::string>) {
+         else if constexpr (std::is_same_v<T, std::string>)
             _value = value;
-         }
-         else if constexpr (std::is_same_v<T, std::wstring>) {
+         else if constexpr (std::is_same_v<T, std::wstring>)
             _value = value;
-         }
+
          // Binary types 
          else if constexpr (std::is_same_v<T, const void*>) 
          {
-            if (size <= 0) {
+            if (size <= 0)
                throw std::invalid_argument("Binary parameter requires explicit size");
-            }
+
             const std::uint8_t* ptr = static_cast<const std::uint8_t*>(value);
             _value = std::vector<std::uint8_t>(ptr, ptr + size);
          }
-         else {
+         else
             _value = value;
-         }
       }
    }
 
@@ -272,23 +271,54 @@ public:
       return _decimalDigits;
    }
 
-   /// Returns a pointer to the textual form of the parameter value.
-   /// Useful for backends that accept text parameters, such as PostgreSQL.
-   /// A caller can optionally modify the generated string before using the pointer.
+   /**
+    * @brief Returns a pointer to the parameter value in textual form.
+    * @details
+    * Intended for PostgreSQL text parameter binding. Raw varbit bytes are
+    * converted to a bit string; other values use VariantHelper::toString().
+    * The optional modifier is applied before the pointer is returned.
+    *
+    * @param modifierFn Optional function that may modify the generated text.
+    * @return A pointer to the generated text buffer.
+    */
    std::shared_ptr<char*> valueCharPtr(std::function<void(std::string&)> modifierFn = nullptr)
    {
-      _rawValData = VariantHelper::toString(_value);
+      if (_type == DataType::varbit && std::holds_alternative<std::vector<uint8_t>>(_value))
+      {
+         // convert binary data into its textual bit string. e.g "1010101000000001".
+         const uint64_t byteCount = dataSize();
+         _valueBufferString = conv::binaryBytesToString( (byte_t*) std::get<std::vector<uint8_t>>(_value).data(), byteCount );
 
-      if (modifierFn) {
-         modifierFn(_rawValData);
+         if (modifierFn)
+            modifierFn(_valueBufferString);
+
+         return std::make_shared<char*>(_valueBufferString.data());
       }
+      else
+      {
+         // note: for binary data, VariantHelper::toString() will return hex string 
+         _valueBufferString = VariantHelper::toString(_value);
 
-      return std::make_shared<char*>( (char*) _rawValData.c_str() );
+         if (modifierFn) {
+            modifierFn(_valueBufferString);
+         }
+
+         return std::make_shared<char*>(_valueBufferString.data());
+      }
    }
 
-   /// Returns a pointer to the raw binary payload of the parameter.
-   /// It accepts hex-encoded string values or std::vector<uint8_t>.
-   /// This is used by backends that need binary data directly.
+   /**
+    * @brief Returns a pointer to the parameter's raw binary payload.
+    * @details
+    * Valid for DataType::varbinary and DataType::varbit with either an
+    * even-length hexadecimal std::string or a std::vector<uint8_t> value.
+    * For hexadecimal input, the parameter size must match the decoded byte
+    * count.
+    *
+    * @return A pointer to the raw binary payload.
+    * @throws SqlException If the data type, value, or hexadecimal input is
+    *         invalid.
+    */
    std::shared_ptr<uint8_t*> valueBinaryPtr()
    {
       if (_type == DataType::varbinary || _type == DataType::varbit)
@@ -313,15 +343,11 @@ public:
             if (hexLen != _size)
                throw SqlException("invalid binary string data size", "SqlParameter");
 
-            _rawValBinary.reserve(hexLen);
-            for (size_t i = 0; i < hexLen; ++i)
-            {
-               _rawValBinary.emplace_back(0);
-            }
+            _valueBufferBinary.resize(hexLen);
 
-            crypt::hexDecode(VariantHelper::template value<std::string>(_value), _rawValBinary.data());
+            conv::hexDecode(VariantHelper::template value<std::string>(_value), _valueBufferBinary.data());
 
-            return std::make_shared<uint8_t*>( _rawValBinary.data() );
+            return std::make_shared<uint8_t*>( _valueBufferBinary.data() );
          }
          else if (std::holds_alternative<std::vector<uint8_t>>(_value))
          {
@@ -337,18 +363,18 @@ public:
       }
    }
 
-   bool forceUnsigned() const { return _forceUnsigned; }
-   
    uint64_t dataSize()
    {
       if (std::holds_alternative<std::vector<uint8_t>>(_value))
       {
-         size_t len = VariantHelper::template value<std::vector<uint8_t>>(_value).size(); 
+         size_t len = std::get<std::vector<uint8_t>>(_value).size(); 
          return static_cast<uint64_t>(len);
       }
       else
          return _size;
    }
+
+   bool forceUnsigned() const { return _forceUnsigned; }
 
 protected:
 
@@ -361,13 +387,13 @@ protected:
 
    /// Temporary text form of _value.
    /// Used when preparing PostgreSQL parameters.
-   std::string             _rawValData;
+   std::string             _valueBufferString;
 
    /// Temporary raw-byte buffer for binary params stored as hex in _value.
    /// Keeps the decoded bytes stable so caller can use a pointer without decoding again.
-   std::vector<uint8_t>    _rawValBinary;
+   std::vector<uint8_t>    _valueBufferBinary;
 
-   bool     _forceUnsigned = false;
+   bool _forceUnsigned;
 };
 
 

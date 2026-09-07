@@ -13,7 +13,7 @@ namespace sql {
  * \details
  * Backend implementation using libpq (PGconn).  
  * - Connects to PostgreSQL server using connection string or individual parameters.
-  */
+ */
 class PgsqlConnection : public ConnectionCommon
 {
 public:

@@ -26,11 +26,14 @@ void runDbMigrationImpl(const sql::conf::Database* opt, const std::string& secur
          if (opt->dbDriver == sql::BackendType::adodb || opt->dbDriver == sql::BackendType::odbc) 
          {
             conn.executeVoid(
-               " CREATE TABLE IF NOT EXISTS schema_migrations ( "
+               " IF OBJECT_ID(N'schema_migrations', N'U') IS NULL "
+               " BEGIN "
+               " CREATE TABLE schema_migrations ( "
                " version VARCHAR(50) NOT NULL, "
                " module_name VARCHAR(50) NOT NULL, "
                " note VARCHAR(200), " 
                " CONSTRAINT PK_schema_migrations PRIMARY KEY (version, module_name) ) "
+               " END "
             );
          }
          else

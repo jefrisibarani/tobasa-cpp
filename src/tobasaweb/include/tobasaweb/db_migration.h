@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <string>
+#include <type_traits>
 #include <tobasasql/sql_connection.h>
 #include <tobasasql/sql_query.h>
 #include <tobasasql/sql_driver.h>
@@ -26,10 +27,17 @@ void doRunMigration(sql::SqlConnection<Driver>& conn)
    {
       Logger::logI("Running migration {} :{} :{}", Migration::version(), Migration::moduleName(), Migration::note() );
 
-      conn.executeVoid("BEGIN");
-
+      bool transactionStarted = false;
       try
       {
+
+         if constexpr (std::is_same_v<Driver, sql::AdodbDriver> ||  std::is_same_v<Driver, sql::OdbcDriver>)
+            conn.executeVoid("BEGIN TRANSACTION");
+         else
+            conn.executeVoid("BEGIN");
+
+         transactionStarted = true;
+
          Migration::up(conn);
 
          conn.executeVoid(

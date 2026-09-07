@@ -154,13 +154,13 @@ void OdbcParameterCollection::prepare(const std::string& sql, const SqlParameter
                else if (std::holds_alternative<int32_t>(parameter->value()))
                {
                   odbcParam->valueType = SQL_C_SLONG;
-                  odbcParam->value     = VariantHelper<>::value<int32_t>(parameter->value(), errMsg);
+                  odbcParam->value     = std::get<int32_t>(parameter->value());
                   odbcParam->pValue    = (SQLPOINTER) &(std::get<int32_t>(odbcParam->value));
                }
                else if (std::holds_alternative<int64_t>(parameter->value()))
                {
                   odbcParam->valueType = SQL_C_SBIGINT;
-                  odbcParam->value     = VariantHelper<>::value<int64_t>(parameter->value(), errMsg);
+                  odbcParam->value     = std::get<int64_t>(parameter->value());
                   odbcParam->pValue    = (SQLPOINTER) &(std::get<int64_t>(odbcParam->value));
                }
                else 

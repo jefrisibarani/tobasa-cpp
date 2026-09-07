@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include "tobasa/common.h"
 
 namespace tbs {
 namespace base64 {
@@ -10,7 +11,6 @@ namespace base64 {
  * @{
  */
 
-typedef unsigned char BYTE;
 
 /**
  * \brief Encodes a byte buffer to a Base64 string.
@@ -18,14 +18,14 @@ typedef unsigned char BYTE;
  * \param bufLen Length of the byte buffer.
  * \return A Base64-encoded string.
  */
-std::string encodeFromBytes(BYTE const* buf, unsigned int bufLen);
+std::string encodeFromBytes(byte_t const* buf, unsigned int bufLen);
 
 /**
  * \brief Decodes a Base64-encoded string to a byte buffer.
  * \param str Base64-encoded string to decode.
  * \return A vector of bytes.
  */
-std::vector<BYTE> decodeIntoBytes(std::string const&);
+std::vector<byte_t> decodeIntoBytes(std::string const&);
 
 
 /** 
@@ -33,7 +33,7 @@ std::vector<BYTE> decodeIntoBytes(std::string const&);
  * @param data       The data to encode
  * @return           Base64 encoded string
  */
-std::string encode(const std::vector<BYTE>& data);
+std::string encode(const std::vector<byte_t>& data);
 
 /** 
  * @brief Base64 encode

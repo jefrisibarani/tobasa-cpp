@@ -4,6 +4,7 @@
 #include "tobasasql/mysql_util.h"
 #include "tobasasql/mysql_command.h"
 #include "tobasasql/util.h"
+#include <tobasa/bin_encode.h>
 
 namespace tbs {
 namespace sql {
@@ -69,10 +70,9 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
             _paramContext.binds[i].buffer_type = parameterType;
             _paramContext.binds[i].is_null     = &_paramContext.isNulls[i];
             
-            if (param->forceUnsigned())
-            {
-               _paramContext.binds[i].is_unsigned = 1;
-            }
+            //if (param->forceUnsigned()) {
+            //   _paramContext.binds[i].is_unsigned = 1;
+            //}
 
             switch (parameterType)
             {
@@ -86,25 +86,23 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                }
                case MYSQL_TYPE_TINY:
                {
-                  if (param->forceUnsigned())
-                  {
-                     if (std::holds_alternative<bool>(param->value()))
-                     {
-                        // get and reset value for boolean parameter
-                        bool value = std::get<bool>(param->value());
-                        uint8_t realVal = value ? (uint8_t)1 : (uint8_t)0;
-                        param->value(realVal);
+                  // if (param->forceUnsigned())
+                  // {
+                  //    if (std::holds_alternative<bool>(param->value()))
+                  //    {
+                  //       // get and reset value for boolean parameter
+                  //       bool value = std::get<bool>(param->value());
+                  //       uint8_t realVal = value ? (uint8_t)1 : (uint8_t)0;
+                  //       param->value(realVal);
 
-                        _paramContext.binds[i].buffer = (void*) &(std::get<uint8_t>(param->value()));
-                     }
-                     else if (std::holds_alternative<uint8_t>(param->value()))
-                     {
-                        _paramContext.binds[i].buffer = (void*) &( std::get<uint8_t>(param->value()) );
-                     }
-                     else
-                        throw SqlException(errMsg, "MysqlCommand");
-                  }
-                  else 
+                  //       _paramContext.binds[i].buffer = (void*) &(std::get<uint8_t>(param->value()));
+                  //    }
+                  //    else if (std::holds_alternative<uint8_t>(param->value()))
+                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint8_t>(param->value()) );
+                  //    else
+                  //       throw SqlException(errMsg, "MysqlCommand");
+                  // }
+                  // else 
                   {
                      if (std::holds_alternative<bool>(param->value()))
                      {
@@ -144,16 +142,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                }
                case MYSQL_TYPE_SHORT: // SMALLINT
                {
-                  if (param->forceUnsigned())
-                  {
-                      if (std::holds_alternative<uint16_t>(param->value()))
-                     {
-                        _paramContext.binds[i].buffer = (void*) &( std::get<uint16_t>(param->value()) );
-                     }
-                     else
-                        throw SqlException(errMsg, "MysqlCommand");
-                  }
-                  else 
+                  // if (param->forceUnsigned())
+                  // {
+                  //     if (std::holds_alternative<uint16_t>(param->value()))
+                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint16_t>(param->value()) );
+                  //    else
+                  //       throw SqlException(errMsg, "MysqlCommand");
+                  // }
+                  // else 
                   {
                      if (std::holds_alternative<int8_t>(param->value())) 
                      {
@@ -187,16 +183,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_INT24: // 3 bytes (24 bits)
                case MYSQL_TYPE_LONG:  // 32 bits
                {
-                  if (param->forceUnsigned())
-                  {
-                      if (std::holds_alternative<uint32_t>(param->value()))
-                     {
-                        _paramContext.binds[i].buffer = (void*) &( std::get<uint32_t>(param->value()) );
-                     }
-                     else
-                        throw SqlException(errMsg, "MysqlCommand");
-                  }
-                  else 
+                  // if (param->forceUnsigned())
+                  // {
+                  //     if (std::holds_alternative<uint32_t>(param->value()))
+                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint32_t>(param->value()) );
+                  //    else
+                  //       throw SqlException(errMsg, "MysqlCommand");
+                  // }
+                  // else 
                   {
                      if (std::holds_alternative<int8_t>(param->value())) 
                      {
@@ -239,16 +233,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                }
                case MYSQL_TYPE_LONGLONG:
                {
-                  if (param->forceUnsigned())
-                  {
-                      if (std::holds_alternative<uint64_t>(param->value()))
-                     {
-                        _paramContext.binds[i].buffer = (void*) &( std::get<uint64_t>(param->value()) );
-                     }
-                     else
-                        throw SqlException(errMsg, "MysqlCommand");
-                  }
-                  else
+                  // if (param->forceUnsigned())
+                  // {
+                  //     if (std::holds_alternative<uint64_t>(param->value()))
+                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint64_t>(param->value()) );
+                  //    else
+                  //       throw SqlException(errMsg, "MysqlCommand");
+                  // }
+                  // else
                   {
                      if (std::holds_alternative<int8_t>(param->value())) 
                      {
@@ -502,15 +494,15 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
             _pResultContext->initFieldBuffer(field->type, i, field->length, field->flags);
             _pResultContext->binds[i].buffer = _pResultContext->getFieldBufferPointer(field->type, i, field->flags);
             _pResultContext->binds[i].buffer_length = field->length;
-         }
             break;
+         }
          default:
          {
             _pResultContext->initFieldBuffer(field->type, i, field->length, field->flags);
             _pResultContext->binds[i].buffer = _pResultContext->getFieldBufferPointer(field->type, i, field->flags);
             _pResultContext->binds[i].buffer_length = field->length;
-         }
             break;
+         }
       }
    }
 
@@ -614,7 +606,7 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                         if (!blobdata->empty())
                         {
                            std::string result;
-                           crypt::hexEncode((crypt::byte_t*)blobdata->data(), realLength, result);
+                           conv::hexEncode((tbs::byte_t*)blobdata->data(), realLength, result);
                            value = std::move(result);
                         }
                         else 
@@ -650,7 +642,7 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                      if (!bytesData->empty())
                      {
                         // MySQL BIT is returned as raw bytes; convert each byte to an 8-bit textual bit string.
-                        value = util::binaryBytesToString( (void*)bytesData->data(), realLength);
+                        value = conv::binaryBytesToString( (tbs::byte_t*)bytesData->data(), realLength);
                      }
                      else
                         value = std::string{};
@@ -683,7 +675,7 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                         if (!blobdata->empty())
                         {
                            std::string result;
-                           crypt::hexEncode((crypt::byte_t*)blobdata->data(), realLength, result);
+                           conv::hexEncode((byte_t*)blobdata->data(), realLength, result);
                            value = std::move(result);
                         }
                         else 

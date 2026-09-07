@@ -20,7 +20,7 @@ std::string SqlParameterRewriter::rewrite(const std::string& sql)
 
       if (state == Normal) 
       {
-         // --- comments ---
+         // comments
          if (c == '-' && i + 1 < sql.size() && sql[i+1] == '-') {
             state = LineComment; result += c; continue;
          }
@@ -28,11 +28,11 @@ std::string SqlParameterRewriter::rewrite(const std::string& sql)
             state = BlockComment; result += c; continue;
          }
 
-         // --- strings/identifiers ---
+         // strings/identifiers
          if (c == '\'') { state = SingleQuote; result += c; continue; }
          if (c == '"')  { state = DoubleQuote; result += c; continue; }
 
-         // --- dollar-quote start ($tag$...$tag$) ---
+         // dollar-quote start ($tag$...$tag$)
          if (c == '$') 
          {
             size_t j = i + 1;
@@ -47,7 +47,7 @@ std::string SqlParameterRewriter::rewrite(const std::string& sql)
             }
          }
 
-         // --- param detection ---
+         // param detection
          if (c == ':' && !(i + 1 < sql.size() && sql[i+1] == ':')) 
          {
             size_t j = i + 1;

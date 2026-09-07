@@ -309,7 +309,7 @@ public:
    {
       auto res = _resultImpl.getStringValue(columnIndex);
       
-      if (res == tbs::NULLSTR)
+      if (res == sql::NULLSTR)
          return valueIfNull;
       else
          return res;

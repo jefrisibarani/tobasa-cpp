@@ -202,7 +202,7 @@ public:
             order.patientId = sqlResult->getLongValue("patient_id");
             order.total     = sqlResult->getLongValue("total");
 
-            if (order.code != tbs::NULLSTR || order.code.length() > 0 )
+            if (order.code != sql::NULLSTR || order.code.length() > 0 )
             {
                // mark get only the last inserted order_code
                for (auto it = allOrder.begin(); it < allOrder.end(); ++it)
@@ -242,7 +242,7 @@ public:
             order.patientId = sqlResult->getLongValue("patient_id");
             order.total     = sqlResult->getLongValue("total");
 
-            if (order.code != tbs::NULLSTR || order.code.length() > 0 )
+            if (order.code != sql::NULLSTR || order.code.length() > 0 )
             {
                // mark get only the last inserted order_code
                for (auto it = allOrder.begin(); it < allOrder.end(); ++it)

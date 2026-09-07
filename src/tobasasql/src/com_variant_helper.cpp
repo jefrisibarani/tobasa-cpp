@@ -4,7 +4,7 @@
 #include <tobasa/logger.h>
 #include <tobasa/datetime.h>
 #include <tobasa/exception.h>
-#include <tobasa/hextodec.h>
+#include <tobasa/bin_encode.h>
 #include <atlsafe.h>
 #include "tobasasql/adodb_util.h"
 #include "tobasasql/com_variant_helper.h"
@@ -194,7 +194,7 @@ void ComVariantHelper::nativeVariantToString(const _variant_t& vSource, std::str
                for(ULONG i = 0; i < saData.GetCount(); ++i)
                {
                   BYTE b = saData.GetAt(i);
-                  outStr += tbs::crypt::decToHex(b);
+                  outStr += conv::decToHex(b);
                }
                // Release
                saData.Detach();

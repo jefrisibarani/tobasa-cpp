@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <iterator>
-#include "tobasa/hextodec.h"
+#include "tobasa/bin_encode.h"
 #include "tobasa/crypt/md5.h"
 #include "tobasa/crypt/rijndael.h"
 #include "tobasa/crypt/hmac_sha2.h"
@@ -52,7 +52,7 @@ std::string passwordEncrypt(
                   outBuffer.data());               //
 
    if (outLen >= 0)
-      outStr = hexEncode(outBuffer.data(), outLen);
+      outStr = conv::hexEncode(outBuffer.data(), outLen);
    else
       throw CryptException("Error occured on AES encrypt");
 
@@ -74,7 +74,7 @@ std::string passwordDecrypt(
    // convert hexadecimal encoded encryptedPassword to a byte array
    size_t pwdLen = pwdLenOri / 2;
    std::vector<byte_t> pasBuffer(pwdLen);
-   hexDecode(encryptedPassword, pasBuffer.data());
+   conv::hexDecode(encryptedPassword, pasBuffer.data());
 
    // generate SHA2-256 (32 bytes) of salt
    // keyHash will also be used as Rijndael's initialization vector (IV)
@@ -114,7 +114,7 @@ std::string hashMD5(const std::string& message)
    auto msgLength = static_cast<unsigned long>(message.length());
    md5_get_digest((byte_t*)message.c_str(), msgLength , hashBuffer);
 
-   std::string outStr = hexEncode(hashBuffer, MD5_LENGTH);
+   std::string outStr = conv::hexEncode(hashBuffer, MD5_LENGTH);
 
    return outStr;
 }
@@ -134,7 +134,7 @@ std::string hashSHA1(const std::string& message)
 {
    byte_t messageHash[SHA1_DIGEST_SIZE];
    hashSHA1(message, messageHash);
-   return hexEncode(messageHash, SHA1_DIGEST_SIZE);
+   return conv::hexEncode(messageHash, SHA1_DIGEST_SIZE);
 }
 
 
@@ -186,28 +186,28 @@ std::string hashSHA(ShaType shaType, const std::string& message)
          byte_t messageHash[SHA224_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha224((uint8*)message.data(), message.length(), messageHash);
-         return hexEncode(messageHash, SHA224_DIGEST_SIZE);
+         return conv::hexEncode(messageHash, SHA224_DIGEST_SIZE);
       }
       case ShaType::SHA256:
       {
          byte_t messageHash[SHA256_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha256((uint8*)message.data(), message.length(), messageHash);
-         return hexEncode(messageHash, SHA256_DIGEST_SIZE);
+         return conv::hexEncode(messageHash, SHA256_DIGEST_SIZE);
       }
       case ShaType::SHA384:
       {
          byte_t messageHash[SHA384_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha384((uint8*)message.data(), message.length(), messageHash);
-         return hexEncode(messageHash, SHA384_DIGEST_SIZE);
+         return conv::hexEncode(messageHash, SHA384_DIGEST_SIZE);
       }
       case ShaType::SHA512:
       {
          byte_t messageHash[SHA512_DIGEST_SIZE];
          hashSHA(shaType, message, messageHash);
          //sha512((uint8*)message.data(), message.length(), messageHash);
-         return hexEncode(messageHash, SHA512_DIGEST_SIZE);
+         return conv::hexEncode(messageHash, SHA512_DIGEST_SIZE);
       }
       default:
          throw CryptException("Invalid SHA-2 type");
@@ -282,28 +282,28 @@ std::string hmacSHA(
          byte_t hashMacOut[SHA224_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA224_DIGEST_SIZE) ? macSize : SHA224_DIGEST_SIZE;
          hmac_sha224(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
-         return hexEncode(hashMacOut, hmacSize);
+         return conv::hexEncode(hashMacOut, hmacSize);
       }
       case ShaType::SHA256:
       {
          byte_t hashMacOut[SHA256_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA256_DIGEST_SIZE) ? macSize : SHA256_DIGEST_SIZE;
          hmac_sha256(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
-         return hexEncode(hashMacOut, hmacSize);
+         return conv::hexEncode(hashMacOut, hmacSize);
       }
       case ShaType::SHA384:
       {
          byte_t hashMacOut[SHA384_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA384_DIGEST_SIZE) ? macSize : SHA384_DIGEST_SIZE;
          hmac_sha384(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
-         return hexEncode(hashMacOut, hmacSize);
+         return conv::hexEncode(hashMacOut, hmacSize);
       }
       case ShaType::SHA512:
       {
          byte_t hashMacOut[SHA512_DIGEST_SIZE];
          hmacSize = (macSize > 0 && macSize <= SHA512_DIGEST_SIZE) ? macSize : SHA512_DIGEST_SIZE;
          hmac_sha512(keyIn.data(), keySize, (uint8*)message.data(), msgLength, hashMacOut, hmacSize);
-         return hexEncode(hashMacOut, hmacSize);
+         return conv::hexEncode(hashMacOut, hmacSize);
       }
       default:
          throw CryptException("Invalid HMAC SHA-2 type");
@@ -330,7 +330,7 @@ std::string hmacSHA(
 
       keyLength = keyIn.size() / 2;
       keyHashBuffer.resize(keyLength);
-      hexDecode(keyIn, keyHashBuffer.data());
+      conv::hexDecode(keyIn, keyHashBuffer.data());
    }
    else
    {
@@ -368,7 +368,7 @@ std::vector<byte_t> hmacSHABytes(
 
       keyLength = keyIn.size() / 2;
       keyHashBuffer.resize(keyLength);
-      hexDecode(keyIn, keyHashBuffer.data());
+      conv::hexDecode(keyIn, keyHashBuffer.data());
    }
    else
    {

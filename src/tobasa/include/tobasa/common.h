@@ -8,6 +8,8 @@ namespace tbs {
  * @{
  */
 
+using byte_t = unsigned char;
+
 static constexpr long NOT_FOUND = -1;
 
 const std::string NULLSTR = "null";

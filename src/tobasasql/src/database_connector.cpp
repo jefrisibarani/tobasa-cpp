@@ -207,7 +207,7 @@ bool DatabaseConnector::beginTransaction()
          {
             if (conn->backendType() == _dbOption.dbDriver) 
             {
-               auto ok = conn->executeVoid("BEGIN");
+               auto ok = conn->executeVoid("BEGIN TRANSACTION");
                return ok;
             }
          }

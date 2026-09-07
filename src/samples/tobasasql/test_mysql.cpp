@@ -56,6 +56,7 @@ namespace testmysql {
             vint        INT                   NULL, -- MYSQL_TYPE_LONG (3)
             vinteger    INTEGER               NULL, -- MYSQL_TYPE_LONG (3)
             vbigint     BIGINT                NULL, -- MYSQL_TYPE_LONGLONG (8)
+            vubigint    BIGINT UNSIGNED       NULL, -- MYSQL_TYPE_LONGLONG (8) -- unsigned long long
             vfloat      FLOAT(9,3)            NULL, -- MYSQL_TYPE_FLOAT (4)
             vfloat24    FLOAT(24)             NULL, -- MYSQL_TYPE_FLOAT (4)
             vfloat53    FLOAT(53)             NULL, -- MYSQL_TYPE_DOUBLE (5)
@@ -202,15 +203,13 @@ int main()
 
       bool runTest1  = false;
       bool runTest2  = false;
-      bool runTest3  = true;
-      bool runTest4  = false;
+      bool runTest3  = false;
+      bool runTest4  = true;
       bool runTest5  = false;
       bool runTest6  = false;
       bool runTest7  = false;
       bool runTest8  = false;
       bool runTest9  = false;
-      bool runTest10 = false;
-
 
       // ---------------------------------------------------------
       if (runTest1)
@@ -238,9 +237,9 @@ int main()
       {
          using VariantHelper = MysqlVariantHelper;
 
-         SqlParameterCollection par;
-         par.push_back( std::make_shared<SqlParameter>("id",  DataType::bigint, (int32_t)1) );
-         auto res0 = conn.executeScalar("SELECT * FROM sampledatatypes WHERE id = ?", par);
+         SqlParameterCollection param;
+         param.push_back( std::make_shared<SqlParameter>("id",  DataType::bigint, (int32_t)1) );
+         auto res0 = conn.executeScalar("SELECT * FROM sampledatatypes WHERE id = ?", param);
          auto res1 = conn.executeScalar("SELECT * FROM sampledatatypes");
          auto res2 = conn.execute("SELECT vchar, vvarchar FROM sampledatatypes");
 
@@ -260,6 +259,7 @@ int main()
             auto vtime         = sqlResult.getVariantValue("vtime");
             auto vyear         = sqlResult.getVariantValue("vyear");
             auto vbit          = sqlResult.getVariantValue("vbit");
+            auto vubigint      = sqlResult.getVariantValue("vubigint");
 
             auto vdateStr      = VariantHelper::toString(vdate);
             auto vdatetimeStr  = VariantHelper::toString(vdatetime);
@@ -267,6 +267,7 @@ int main()
             auto vtimeStr      = VariantHelper::toString(vtime);
             auto vyearStr      = VariantHelper::toString(vyear);
             auto vbitStr       = VariantHelper::toString(vbit);
+            auto vubigintStr   = VariantHelper::toString(vubigint);
             
             auto vdateS        = sqlResult.getStringValue("vdate");
             auto vdatetimeS    = sqlResult.getStringValue("vdatetime");
@@ -274,32 +275,36 @@ int main()
             auto vtimeS        = sqlResult.getStringValue("vtime");
             auto vyearS        = sqlResult.getStringValue("vyear");
             auto vbitS         = sqlResult.getStringValue("vbit");
+            auto vubigintS     = sqlResult.getStringValue("vubigint");
          }
       }
-
-      // bool foo = "WEWEWEWEWE";  // In C++, the conversion from a string literal (like "WEWEWEWEWE") to a boolean value is allowed. 
-
-      SqlParameterCollection param0;
-      param0.push_back(std::make_shared<SqlParameter>("vchar",      DataType::character, std::string("WEWEWEWEWE")));
-      param0.push_back(std::make_shared<SqlParameter>("vvarchar",   DataType::varchar,   std::string("HHHHHHHHHHHHHHHHHHHH") ));
-
-      // For MySQL BIT columns, in bound parameters, we should send the raw bit bytes
-      //param0.push_back(std::make_shared<SqlParameter>("vbit",       DataType::varbit,    ToMysqlBytes(12) ));
-      param0.push_back(std::make_shared<SqlParameter>("vbit",       DataType::varbit,    ToMysqlBitBytesFromLiteral("b'00011100'") ));
-
-      param0.push_back(std::make_shared<SqlParameter>("vbigint",    DataType::bigint,    8767676767676));
-      // Use HEX encoded string as blob data source
-      param0.push_back(std::make_shared<SqlParameter>("vblob",      DataType::varbinary, std::string("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"), 24));
-      // Use std::vector<uint8_t> as blob data source
-      std::vector<uint8_t> blobdata(24);
-      crypt::hexDecode(std::string("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"), blobdata.data());
-      param0.push_back(std::make_shared<SqlParameter>("vmediumblob", DataType::varbinary, std::move(blobdata), 24));
-
 
       // ---------------------------------------------------------
       if (runTest3)
       {
-         auto affectedRows = conn.execute("INSERT INTO sampledatatypes (vchar,vvarchar,vbit,vbigint,vblob,vmediumblob) values (?, ? , ?, ?, ?, ? )", param0);
+         // bool foo = "WEWEWEWEWE";  // In C++, the conversion from a string literal (like "WEWEWEWEWE") to a boolean value is allowed. 
+
+         SqlParameterCollection param;
+         param.push_back(std::make_shared<SqlParameter>("vchar",      DataType::character, std::string("WEWEWEWEWE")));
+         param.push_back(std::make_shared<SqlParameter>("vvarchar",   DataType::varchar,   std::string("HHHHHHHHHHHHHHHHHHHH") ));
+
+         // For MySQL BIT columns, in bound parameters, we should send the raw bit bytes
+         //param.push_back(std::make_shared<SqlParameter>("vbit",       DataType::varbit,    ToMysqlBytes(12) ));
+         param.push_back(std::make_shared<SqlParameter>("vbit",       DataType::varbit,    ToMysqlBitBytesFromLiteral("b'00011100'") ));
+
+         param.push_back(std::make_shared<SqlParameter>("vbigint",    DataType::bigint,    9223372036854775807));
+
+         param.push_back(std::make_shared<SqlParameter>("vubigint",   DataType::bigint,    18446744073709551615));
+
+         // Use HEX encoded string as blob data source
+         param.push_back(std::make_shared<SqlParameter>("vblob",      DataType::varbinary, std::string("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"), 24));
+         // Use std::vector<uint8_t> as blob data source
+         std::vector<uint8_t> blobdata(24);
+         conv::hexDecode(std::string("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"), blobdata.data());
+         param.push_back(std::make_shared<SqlParameter>("vmediumblob", DataType::varbinary, std::move(blobdata), 24));
+
+
+         auto affectedRows = conn.execute("INSERT INTO sampledatatypes (vchar,vvarchar,vbit,vbigint,vubigint,vblob,vmediumblob) values (?, ? , ?, ?, ?, ?, ? )", param);
          if (affectedRows>0)
          {
             auto lastId = conn.lastInsertRowid();
@@ -319,16 +324,24 @@ int main()
       // ---------------------------------------------------------
       if (runTest4)
       {
-         int64_t lastId = -1;
-         std::string newId = conn.executeScalar("INSERT INTO sampledatatypes (vchar,vvarchar,vbit,vbigint) values (?, ? , ?, ? ) RETURNING id;", param0);
-         if (util::isNumber(newId))
+         std::string sql("INSERT INTO sampledatatypes (vbigint,vubigint) values (?, ?)");
+         SqlQuery<MysqlDriver> query(conn, sql, ParameterStyle::native);
+         // send the maximum uint64_t value to normal BIGINT column, throwing exception
+         //query.addParam("vbigint",    DataType::bigint,    18446744073709551615);
+         query.addParam("vbigint",    DataType::bigint,     -9223372036854775807);
+
+         // send the maximum uint64_t value to an unsigned BIGINT column - OK
+         query.addParam("vubigint",   DataType::bigint,    9223372036854775807/*18446744073709551615*/);
+
+         auto affectedRows = query.execute();
+         if (affectedRows>0)
          {
-            lastId = std::stoll(newId);
+            int64_t lastId = conn.lastInsertRowid();
             if (lastId>0)
             {
-               SqlParameterCollection par;
-               par.push_back(std::make_shared<SqlParameter>("id",  DataType::bigint, lastId));
-               auto res = conn.executeScalar("SELECT vvarchar FROM sampledatatypes WHERE id = ?", par);
+               SqlParameterCollection param;
+               param.push_back(std::make_shared<SqlParameter>("id",  DataType::bigint, lastId));
+               auto res = conn.executeScalar("SELECT vubigint FROM sampledatatypes WHERE id = ?", param);
                auto x=1;
             }
          }
@@ -361,15 +374,15 @@ int main()
       // ---------------------------------------------------------
       if (runTest6)
       {
-         SqlParameterCollection params;
-         params.push_back(std::make_shared<SqlParameter>("id",       DataType::integer, (long)3));
-         params.push_back(std::make_shared<SqlParameter>("vbigint",  DataType::bigint, (int64_t)9223372036854775806));
+         SqlParameterCollection param;
+         param.push_back(std::make_shared<SqlParameter>("id",       DataType::integer, (long)3));
+         param.push_back(std::make_shared<SqlParameter>("vbigint",  DataType::bigint, (int64_t)9223372036854775806));
 
-         auto res0 = conn.execute("SELECT vdatetime FROM sampledatatypes WHERE id = ? AND vbigint = ?", params);
-         auto res1 = conn.execute("UPDATE sampledatatypes SET val_date='2002-04-03' WHERE id = ? AND vbigint = ?", params);
+         auto res0 = conn.execute("SELECT vdatetime FROM sampledatatypes WHERE id = ? AND vbigint = ?", param);
+         auto res1 = conn.execute("UPDATE sampledatatypes SET val_date='2002-04-03' WHERE id = ? AND vbigint = ?", param);
 
-         auto res2 = conn.executeScalar("SELECT vdatetime FROM sampledatatypes WHERE id = ? AND vbigint = ?", params);
-         auto res3 = conn.executeScalar("UPDATE sampledatatypes SET val_date='2002-04-27' WHERE id = ? AND vbigint = ?", params);
+         auto res2 = conn.executeScalar("SELECT vdatetime FROM sampledatatypes WHERE id = ? AND vbigint = ?", param);
+         auto res3 = conn.executeScalar("UPDATE sampledatatypes SET val_date='2002-04-27' WHERE id = ? AND vbigint = ?", param);
          auto x=1;
       }
 
@@ -459,27 +472,6 @@ int main()
             table.setValue("vchar",       std::monostate{} );
             table.saveTable();
          }
-      }
-
-
-      // ---------------------------------------------------------
-      if (runTest10)
-      {
-         std::string sql = R"-(
-               SELECT u.id FROM base_users u WHERE
-               u.id=? AND u.id IN
-                  (SELECT ur.user_id FROM base_user_role ur
-                  JOIN base_roles r ON ur.role_id = r.id
-                  WHERE r.name=? AND r.sysrole=? AND r.enabled=?) )-";
-
-         SqlQuery<MysqlDriver> query(conn, sql, ParameterStyle::native);
-         query.addParam("id",      sql::DataType::integer, 1L);
-         query.addParam("name",    sql::DataType::varchar, std::string("Admin"));
-         query.addParam("sysrole", sql::DataType::boolean, true);
-         query.addParam("enabled", sql::DataType::boolean, true);
-
-         std::string result = query.executeScalar();
-         auto x=1;
       }
 
 

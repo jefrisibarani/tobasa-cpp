@@ -13,16 +13,16 @@ static const std::string base64_chars =
    "abcdefghijklmnopqrstuvwxyz"
    "0123456789+/";
 
-static inline bool is_base64(BYTE c) {
+static inline bool is_base64(byte_t c) {
    return (isalnum(c) || (c == '+') || (c == '/'));
 }
 
-std::string encodeFromBytes(BYTE const* buf, unsigned int bufLen) {
+std::string encodeFromBytes(byte_t const* buf, unsigned int bufLen) {
    std::string ret;
    int i = 0;
    int j = 0;
-   BYTE char_array_3[3];
-   BYTE char_array_4[4];
+   byte_t char_array_3[3];
+   byte_t char_array_4[4];
 
    while (bufLen--) {
       char_array_3[i++] = *(buf++);
@@ -58,19 +58,19 @@ std::string encodeFromBytes(BYTE const* buf, unsigned int bufLen) {
    return ret;
 }
 
-std::vector<BYTE> decodeIntoBytes(std::string const& encoded_string) {
+std::vector<byte_t> decodeIntoBytes(std::string const& encoded_string) {
    int in_len = static_cast<int>(encoded_string.size());
    int i = 0;
    int j = 0;
    int in_ = 0;
-   BYTE char_array_4[4], char_array_3[3];
-   std::vector<BYTE> ret;
+   byte_t char_array_4[4], char_array_3[3];
+   std::vector<byte_t> ret;
 
    while (in_len-- && ( encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
       char_array_4[i++] = encoded_string[in_]; in_++;
       if (i ==4) {
          for (i = 0; i <4; i++)
-            char_array_4[i] = base64_chars.find(char_array_4[i]);
+            char_array_4[i] = static_cast<byte_t>( base64_chars.find(char_array_4[i]) );
 
          char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
          char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
@@ -87,7 +87,7 @@ std::vector<BYTE> decodeIntoBytes(std::string const& encoded_string) {
          char_array_4[j] = 0;
 
       for (j = 0; j <4; j++)
-         char_array_4[j] = base64_chars.find(char_array_4[j]);
+         char_array_4[j] = static_cast<byte_t>( base64_chars.find(char_array_4[j]) );
 
       char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
       char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
@@ -100,7 +100,7 @@ std::vector<BYTE> decodeIntoBytes(std::string const& encoded_string) {
 }
 
 
-std::string encode(const std::vector<BYTE>& data)
+std::string encode(const std::vector<byte_t>& data)
 {
    return encodeFromBytes(reinterpret_cast<const unsigned char*>(data.data()), (unsigned int)data.size());
 }

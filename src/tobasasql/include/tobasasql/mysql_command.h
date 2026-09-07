@@ -33,17 +33,16 @@ public:
    bool init(const std::string& sql, const MysqlParameterCollection& parameters);
 
    /**
-    * Execute the query
-    * return affected rows
-    * SELECT query affected rows is 0
-    * INSERT,UPDATE,DELETE affected is >= 0
+    * @brief Executes the prepared query.
+    * @return The number of affected rows for INSERT, UPDATE, or DELETE;
+    *         zero for SELECT and other queries that do not affect rows.
     */
    int execute();
 
    /**
-    * Execute the query
-    * For INSERT,UPDATE,DELETE query return nullptr
-    * For SELECT query return std::shared_ptr<DataSet>
+    * @brief Executes the prepared query and returns its result set.
+    * @return A shared dataset for row-producing queries such as SELECT;
+    *         an empty shared pointer for INSERT, UPDATE, or DELETE.
     */
    std::shared_ptr<DataSet<MysqlVariantType>> executeResult();
 

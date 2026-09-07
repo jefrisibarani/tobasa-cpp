@@ -6,7 +6,7 @@
 #include "tobasa/util_string.h"
 #include "tobasa/util_utf.h"
 #include "tobasa/exception.h"
-#include "tobasa/hextodec.h"
+#include "tobasa/bin_encode.h"
 
 namespace tbs {
 
@@ -163,7 +163,7 @@ public:
          {
             auto val = std::get<double>(variantValue);
             return std::to_string(val);
-         }         
+         }
          else if (std::holds_alternative<std::string>(variantValue))
          {
             return std::get<std::string>(variantValue);
@@ -175,7 +175,7 @@ public:
          else if (std::holds_alternative<std::vector<uint8_t>>(variantValue))
          {
             auto& val = std::get<std::vector<uint8_t>>(variantValue);
-            return crypt::hexEncode((crypt::byte_t*)val.data(), val.size());
+            return conv::hexEncode((tbs::byte_t*)val.data(), val.size());
          }
          else if (std::holds_alternative<std::vector<char>>(variantValue))
          {

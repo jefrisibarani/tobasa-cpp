@@ -412,6 +412,11 @@ PGresult* PgsqlConnection::executeParams(const std::string& sql, const SqlParame
                {
                   if (param->type() == DataType::varbinary)
                      value = "\\x" + value;
+                  if (param->type() == DataType::varbit)
+                  {
+                     // nothing to do here. data already in bit-string format. e.g 00001100
+                     auto x=1;
+                  }
                }
             ));
          }

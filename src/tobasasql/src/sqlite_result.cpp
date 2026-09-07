@@ -109,12 +109,12 @@ bool SqliteResult::runQuery(const std::string& sql, const SqlParameterCollection
                   // BLOB. The value is a blob of data, stored exactly as it was input.
                   // SQLite store blob as binary data, so we need to convert first to hex string
                   int blobSize = sqlite3_column_bytes(_pStatement, i);
-                  crypt::byte_t* raw = (crypt::byte_t*)sqlite3_column_blob(_pStatement, i);
+                  tbs::byte_t* raw = (tbs::byte_t*)sqlite3_column_blob(_pStatement, i);
                   std::string result;
                   for (int i = 0; i < blobSize; ++i)
                   {
-                     crypt::byte_t b = raw[i];
-                     result += crypt::decToHex(b);
+                     tbs::byte_t b = raw[i];
+                     result += conv::decToHex(b);
                   }
                   recordVariant.emplace_back(result);
                   break;

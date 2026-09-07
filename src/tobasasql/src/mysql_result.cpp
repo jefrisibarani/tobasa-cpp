@@ -6,8 +6,13 @@ namespace sql {
 
 bool isStringOrBlobField(MySqlType type)
 {
-   return (type == MYSQL_TYPE_TINY_BLOB || type == MYSQL_TYPE_MEDIUM_BLOB || type == MYSQL_TYPE_LONG_BLOB || type == MYSQL_TYPE_BLOB ||
-      type == MYSQL_TYPE_VARCHAR || type == MYSQL_TYPE_VAR_STRING || type == MYSQL_TYPE_STRING );
+   return (type == MYSQL_TYPE_TINY_BLOB   || 
+           type == MYSQL_TYPE_MEDIUM_BLOB || 
+           type == MYSQL_TYPE_LONG_BLOB   || 
+           type == MYSQL_TYPE_BLOB        ||
+           type == MYSQL_TYPE_VARCHAR     || 
+           type == MYSQL_TYPE_VAR_STRING  || 
+           type == MYSQL_TYPE_STRING );
 }
 
 MysqlResult::MysqlResult(MysqlConnection* pconn)

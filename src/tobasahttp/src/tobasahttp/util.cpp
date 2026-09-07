@@ -1,6 +1,6 @@
 #include <cstring>
 #include <string_view>
-#include <tobasa/hextodec.h>
+#include <tobasa/bin_encode.h>
 #include <tobasa/common.h>
 #include <tobasa/util.h>
 #include "tobasahttp/util.h"
@@ -19,8 +19,8 @@ bool percentDecode(const std::string& data, std::string& out)
       {
          if (i + 2 < data.size())
          {
-            int hi = crypt::hexToDec(data[i + 1]);
-            int lo = crypt::hexToDec(data[i + 2]);
+            int hi = conv::hexToDec(data[i + 1]);
+            int lo = conv::hexToDec(data[i + 2]);
             if (hi >= 0 && lo >= 0)
             {
                out += static_cast<char>((hi << 4) | lo);

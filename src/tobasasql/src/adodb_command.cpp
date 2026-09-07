@@ -142,7 +142,7 @@ ADODB::_ParameterPtr AdoCommand::createParameter( AdoParameter& param )
 
          try
          {
-            auto bytes = param.valueBytePtr();
+            auto bytes = param.valueBinaryPtr();
             uint8_t* pData = *bytes;
             size_t len = param.size();
 

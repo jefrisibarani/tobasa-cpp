@@ -1,9 +1,9 @@
 #include <cassert>
 #include <stdexcept>
-#include "tobasa/hextodec.h"
+#include "tobasa/bin_encode.h"
 
 namespace tbs {
-namespace crypt {
+namespace conv {
 
 /// Array used in DecToHex conversion routine.
 static const char hexArray[] = "0123456789ABCDEF";
@@ -96,18 +96,14 @@ std::string hexEncode(byte_t buffer[], size_t bufferLength)
    if (! buffer )
       throw std::runtime_error("Invalid argument for hexEncode");
 
-   std::string outStr;
+   std::string output;
    for (size_t i = 0; i < bufferLength; i++)
    {
-      char hex[3];
-      hex[0] = hexArray[buffer[i] >> 4];
-      hex[1] = hexArray[buffer[i] & 0x0F];
-      hex[2] = 0;
-
-      outStr.append(hex);
+      output.push_back(hexArray[(buffer[i] >> 4) & 0x0F]);
+      output.push_back(hexArray[buffer[i] & 0x0F]);
    }
 
-   return outStr;
+   return output;
 }
 
 void hexEncode(byte_t buffer[], size_t bufferLength, std::string& output)
@@ -117,14 +113,29 @@ void hexEncode(byte_t buffer[], size_t bufferLength, std::string& output)
 
    for (size_t i = 0; i < bufferLength; i++)
    {
-      char hex[3];
-      hex[0] = hexArray[buffer[i] >> 4];
-      hex[1] = hexArray[buffer[i] & 0x0F];
-      hex[2] = 0;
-
-      output.append(hex);
+      output.push_back(hexArray[(buffer[i] >> 4) & 0x0F]);
+      output.push_back(hexArray[buffer[i] & 0x0F]);
    }
 }
 
-} // namespace crypt
+std::string binaryBytesToString(const byte_t* data, size_t length)
+{
+   std::string result;
+   if (data == nullptr || length <= 0)
+      return result;
+
+   const auto* bytes = static_cast<const unsigned char*>(data);
+   result.reserve(static_cast<size_t>(length) * 8);
+
+   for (size_t i = 0; i < length; ++i)
+   {
+      for (int bit = 7; bit >= 0; --bit)
+         result.push_back((bytes[i] & (1u << bit)) ? '1' : '0');
+   }
+
+   return result;
+}
+
+
+} // namespace conv
 } // namespace tbs

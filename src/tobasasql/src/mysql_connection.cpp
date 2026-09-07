@@ -1,6 +1,7 @@
 #include "tobasasql/mysql_connection.h"
 #include "tobasasql/mysql_command.h"
 #include "tobasasql/util.h"
+#include <tobasa/bin_encode.h>
 
 namespace tbs {
 namespace sql {
@@ -178,9 +179,7 @@ int MysqlConnection::execute(const std::string& sql, const MysqlParameterCollect
    return -1;
 }
 
-std::string MysqlConnection::executeScalar(
-   const std::string& sql,
-   const MysqlParameterCollection& parameters)
+std::string MysqlConnection::executeScalar(const std::string& sql, const MysqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
       throw tbs::SqlException("Invalid connection status", "MysqlConnection");
@@ -224,7 +223,7 @@ std::string MysqlConnection::executeScalar(
             if (columnType == MYSQL_TYPE_BIT)
             {
                // MySQL BIT is returned as raw bytes; convert each byte to an 8-bit textual bit string.
-               value = util::binaryBytesToString((void*)row[0],lengths[0]);
+               value = conv::binaryBytesToString((byte_t*)row[0],lengths[0]);
             }
             else {
                value.assign(row[0], row[0] + lengths[0]);

@@ -1,5 +1,5 @@
 #include <tobasa/crypt.h>
-#include <tobasa/hextodec.h>
+#include <tobasa/bin_encode.h>
 #include "tobasasql/exception.h"
 #include "tobasasql/sql_dataset.h"
 #include "tobasasql/sqlite_util.h"

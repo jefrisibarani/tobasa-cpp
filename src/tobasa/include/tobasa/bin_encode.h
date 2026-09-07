@@ -1,15 +1,14 @@
 #pragma once
 
 #include <string>
+#include "tobasa/common.h"
 
 namespace tbs {
-namespace crypt {
+namespace conv {
 
-/** @addtogroup CRYPT
+/** @addtogroup CONV Data Conversion
  * @{
  */
-
-using byte_t = unsigned char;
 
 /**
  * @brief Converts a single-digit hex character to its decimal equivalent.
@@ -68,6 +67,9 @@ void hexDecode(const std::string& hexString, byte_t* outBuffer);
  * @param buffer Pointer to the byte array to be encoded.
  * @param bufferLength The length of the byte array.
  * @return hexadecimal encoded string
+ * 
+ * @example
+ * A byte array containing {0xAA, 0x01} returns "AA01".
  */
 std::string hexEncode(byte_t buffer[], size_t bufferLength);
 
@@ -80,8 +82,22 @@ std::string hexEncode(byte_t buffer[], size_t bufferLength);
  */
 void hexEncode(byte_t buffer[], size_t bufferLength, std::string& output);
 
+/**
+ * @brief Converts a byte array into a printable bit-sequence string.
+ *
+ * Each byte is represented by eight bits, from most significant to least
+ * significant bit.
+ *
+ * @param data Pointer to the binary data.
+ * @param length Number of bytes in the data.
+ * @return Bit-sequence string.
+ *
+ * @example
+ * A byte array containing {0xAA, 0x01} returns "1010101000000001".
+ */
+std::string binaryBytesToString(const byte_t* data, size_t length);
 
 /** @}*/
 
-} // namespace crypt
+} // namespace conv
 } // namespace tbs
