@@ -298,23 +298,41 @@ public:
     * \c std::shared_ptr. Parameters can represent input, output, or 
     * input/output values for a SQL command or stored procedure.
     *
-    * \param name           Logical parameter name (used for named parameters).
-    * \param type           SQL data type of the parameter.
-    * \param value          Initial parameter value.
-    * \param size           Maximum size of the parameter (for strings/binary). Default is 0.
-    * \param direction      Parameter direction (input, output, input/output). Default is input.
-    * \param decimalDigits  Number of decimal digits (for numeric/decimal types). Default is 0.
+    * \param name Parameter name.
+    * \param type SQL data type.
+    * \param value Already-typed parameter value.
+    * \param size Optional size for binary or text parameters.
+    * \param decimalDigits Optional number of decimal digits.
+    * \param isUnsigned Whether the SQL integer type is unsigned.
+    * \param direction Parameter direction.
+    * 
     * \return A shared pointer to the created \c SqlParameter instance.
     */
    std::shared_ptr<SqlParameter> createParameter(
-         const std::string&  name,
-         DataType            type,
-         VariantType         value,
-         long                size = 0,
-         ParameterDirection  direction = ParameterDirection::input,
-         short               decimalDigits = 0)
+      const std::string& name,
+      DataType           type,
+      VariantType        value,
+      uint64_t           size = 0,
+      short              decimalDigits = 0,
+      bool               isUnsigned = false,
+      ParameterDirection direction = ParameterDirection::input)
    {
-      return std::make_shared<SqlParameter>(name, type, value, size, direction, decimalDigits);
+      return std::make_shared<SqlParameter>(name, type, value, size, decimalDigits, isUnsigned, direction);
+   }
+
+   // Add parameter in the order they appear in the query
+   template <typename T>
+   std::shared_ptr<SqlParameter> createParameter(
+      const std::string& name,
+      DataType           type,
+      T                  value,
+      uint64_t           size = 0,
+      short              decimalDigits = 0,
+      bool               isUnsigned = false,
+      ParameterDirection direction = ParameterDirection::input)
+   {
+      return std::make_shared<SqlParameter>(
+         name, type, std::forward<T>(value), size, decimalDigits, isUnsigned, direction);
    }
 
    /** 

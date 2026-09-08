@@ -84,26 +84,27 @@ public:
       const std::string& name,
       DataType           type,
       VariantType        value,
-      long               size = 0,
-      ParameterDirection direction = ParameterDirection::input,
-      short              decimalDigits = 0)
+      uint64_t           size = 0,
+      short              decimalDigits = 0,
+      bool               isUnsigned = false,
+      ParameterDirection direction = ParameterDirection::input)
    {
-      _parameters.push_back(std::make_shared<SqlParameter>(name, type, value, size, direction, decimalDigits));
+      _parameters.push_back(std::make_shared<SqlParameter>(name, type, value, size, decimalDigits, isUnsigned, direction));
    }
 
-   // template <typename T,
-   //          typename = std::enable_if_t<std::is_constructible_v<VariantType, T>>>
+   // Add parameter in the order they appear in the query
    template <typename T>
    void addParam(
       const std::string& name,
       DataType           type,
-      T&&                value,
-      long               size = 0,
-      ParameterDirection direction = ParameterDirection::input,
-      short              decimalDigits = 0)
+      T                  value,
+      uint64_t           size = 0,
+      short              decimalDigits = 0,
+      bool               isUnsigned = false,
+      ParameterDirection direction = ParameterDirection::input)
    {
       _parameters.push_back(std::make_shared<SqlParameter>(
-         name, type, std::forward<T>(value), size, direction, decimalDigits));
+         name, type, std::forward<T>(value), size, decimalDigits, isUnsigned, direction));
    }
 
 

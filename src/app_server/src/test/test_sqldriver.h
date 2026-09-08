@@ -445,11 +445,11 @@ public:
 
          query.addParam("bigint",  sql::DataType::bigint,     test.insertQueryB.paramBigInt);
          query.addParam("char",    sql::DataType::character,  test.insertQueryB.paramChar);
-         query.addParam("bool",    sql::DataType::boolean,    test.insertQueryB.paramBool       /*, sizeof(bool)*/);
-         query.addParam("float",   sql::DataType::float4,     test.insertQueryB.paramFloat      /*, sizeof(float)*/);
-         query.addParam("double",  sql::DataType::float8,     test.insertQueryB.paramDouble     /*, sizeof(double)*/);
+         query.addParam("bool",    sql::DataType::boolean,    test.insertQueryB.paramBool);
+         query.addParam("float",   sql::DataType::float4,     test.insertQueryB.paramFloat);
+         query.addParam("double",  sql::DataType::float8,     test.insertQueryB.paramDouble);
          // use std::string for sql's numeric type, no need to include size,direction and decimal digit
-         query.addParam("numeric", sql::DataType::numeric,    test.insertQueryB.paramNumeric/*, 14, sql::ParameterDirection::input, 2*/);
+         query.addParam("numeric", sql::DataType::numeric,    test.insertQueryB.paramNumeric);
          // use std::string for sql's date,  format is yyyy-mm-dd
          query.addParam("date",    sql::DataType::date,       test.insertQueryB.paramDate);
          // use std::string for sql's time,  format is hh:mm:ss

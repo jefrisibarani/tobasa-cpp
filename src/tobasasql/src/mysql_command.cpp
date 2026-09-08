@@ -69,10 +69,7 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
             std::string errMsg = "Invalid variant storage for parameter value type " + dataTypeToString(param->type());
             _paramContext.binds[i].buffer_type = parameterType;
             _paramContext.binds[i].is_null     = &_paramContext.isNulls[i];
-            
-            //if (param->forceUnsigned()) {
-            //   _paramContext.binds[i].is_unsigned = 1;
-            //}
+            _paramContext.binds[i].is_unsigned = param->isUnsigned() ? 1 : 0;
 
             switch (parameterType)
             {
@@ -86,23 +83,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                }
                case MYSQL_TYPE_TINY:
                {
-                  // if (param->forceUnsigned())
-                  // {
-                  //    if (std::holds_alternative<bool>(param->value()))
-                  //    {
-                  //       // get and reset value for boolean parameter
-                  //       bool value = std::get<bool>(param->value());
-                  //       uint8_t realVal = value ? (uint8_t)1 : (uint8_t)0;
-                  //       param->value(realVal);
+                  if (param->isUnsigned())
+                  {
+                     if (!std::holds_alternative<uint8_t>(param->value()))
+                        throw SqlException(errMsg, "MysqlCommand");
 
-                  //       _paramContext.binds[i].buffer = (void*) &(std::get<uint8_t>(param->value()));
-                  //    }
-                  //    else if (std::holds_alternative<uint8_t>(param->value()))
-                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint8_t>(param->value()) );
-                  //    else
-                  //       throw SqlException(errMsg, "MysqlCommand");
-                  // }
-                  // else 
+                     _paramContext.binds[i].buffer = (void*) &(std::get<uint8_t>(param->value()));
+                  }
+                  else
                   {
                      if (std::holds_alternative<bool>(param->value()))
                      {
@@ -142,14 +130,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                }
                case MYSQL_TYPE_SHORT: // SMALLINT
                {
-                  // if (param->forceUnsigned())
-                  // {
-                  //     if (std::holds_alternative<uint16_t>(param->value()))
-                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint16_t>(param->value()) );
-                  //    else
-                  //       throw SqlException(errMsg, "MysqlCommand");
-                  // }
-                  // else 
+                  if (param->isUnsigned())
+                  {
+                     if (!std::holds_alternative<uint16_t>(param->value()))
+                        throw SqlException(errMsg, "MysqlCommand");
+
+                     _paramContext.binds[i].buffer = (void*) &(std::get<uint16_t>(param->value()));
+                  }
+                  else
                   {
                      if (std::holds_alternative<int8_t>(param->value())) 
                      {
@@ -183,14 +171,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_INT24: // 3 bytes (24 bits)
                case MYSQL_TYPE_LONG:  // 32 bits
                {
-                  // if (param->forceUnsigned())
-                  // {
-                  //     if (std::holds_alternative<uint32_t>(param->value()))
-                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint32_t>(param->value()) );
-                  //    else
-                  //       throw SqlException(errMsg, "MysqlCommand");
-                  // }
-                  // else 
+                  if (param->isUnsigned())
+                  {
+                     if (!std::holds_alternative<uint32_t>(param->value()))
+                        throw SqlException(errMsg, "MysqlCommand");
+
+                     _paramContext.binds[i].buffer = (void*) &(std::get<uint32_t>(param->value()));
+                  }
+                  else
                   {
                      if (std::holds_alternative<int8_t>(param->value())) 
                      {
@@ -233,14 +221,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                }
                case MYSQL_TYPE_LONGLONG:
                {
-                  // if (param->forceUnsigned())
-                  // {
-                  //     if (std::holds_alternative<uint64_t>(param->value()))
-                  //       _paramContext.binds[i].buffer = (void*) &( std::get<uint64_t>(param->value()) );
-                  //    else
-                  //       throw SqlException(errMsg, "MysqlCommand");
-                  // }
-                  // else
+                  if (param->isUnsigned())
+                  {
+                     if (!std::holds_alternative<uint64_t>(param->value()))
+                        throw SqlException(errMsg, "MysqlCommand");
+
+                     _paramContext.binds[i].buffer = (void*) &(std::get<uint64_t>(param->value()));
+                  }
+                  else
                   {
                      if (std::holds_alternative<int8_t>(param->value())) 
                      {

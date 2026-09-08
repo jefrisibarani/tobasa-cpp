@@ -33,6 +33,7 @@
 #if defined(TOBASA_SQL_USE_MYSQL)
    #include "tobasasql/mysql_helper.h"
    #include "tobasasql/mysql_table_helper.h"
+   #include "tobasasql/mysql_common.h"
 #endif
 
 namespace tbs {
@@ -110,7 +111,10 @@ struct SqlDriver
       : public SqlDriver<MysqlConnection, MysqlResult, MysqlHelper, MysqlTableHelper, log::TobasaLogger, MysqlVariantType>
    {
    public:
-      using VariantHelper = MysqlVariantHelper;
+      using SqlParameter              = MysqlParameter;
+      using SqlParameterCollection    = MysqlParameterCollection;
+      using SqlParameterCollectionPtr = MysqlParameterCollectionPtr;
+      using VariantHelper             = MysqlVariantHelper;
    };
 
 #endif

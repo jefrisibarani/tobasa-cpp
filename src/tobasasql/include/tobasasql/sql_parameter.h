@@ -24,187 +24,436 @@ namespace sql {
  */
 
 /**
- * @brief Converts an unsigned integral value to the supported SQL integer range.
- * @details
- * The value is stored as a signed int64_t after validation. The accepted
- * maximum is determined by the supplied SQL data type.
+ * @brief Checks whether an unsigned integral value fits the SQL signed integer range.
  *
  * @tparam T Unsigned integral type.
- * @param value Value to validate and convert.
+ * @param value Value to validate.
  * @param dataType Target SQL integer type.
- * @return The converted value as int64_t.
- * @throws std::out_of_range If the value exceeds the maximum for dataType.
+ * @return true if the value is within the range for dataType.
  */
 template <typename T>
-constexpr auto normalizeUnsignedIntegralToSqlRange(T value, DataType dataType)
+constexpr bool unsignedFitsSqlSigned(T value, DataType dataType)
 {
+   static_assert(std::is_integral_v<T> && std::is_unsigned_v<T>);
    uint64_t uval = static_cast<uint64_t>(value);
-
    switch (dataType)
    {
       case DataType::tinyint:
-         if (uval <= static_cast<uint64_t>(std::numeric_limits<int8_t>::max()))
-            return static_cast<int64_t>(uval);
-         throw std::out_of_range("Unsigned value too large for SQL DataType tinyint");
-
+         return  (uval <= static_cast<uint64_t>(std::numeric_limits<int8_t>::max()));
       case DataType::smallint:
-         if (uval <= static_cast<uint64_t>(std::numeric_limits<int16_t>::max()))
-            return static_cast<int64_t>(uval);
-         throw std::out_of_range("Unsigned value too large for SQL DataType smallint");
-
+         return  (uval <= static_cast<uint64_t>(std::numeric_limits<int16_t>::max()));
       case DataType::integer:
-         if (uval <= static_cast<uint64_t>(std::numeric_limits<int32_t>::max()))
-            return static_cast<int64_t>(uval);
-         throw std::out_of_range("Unsigned value too large for SQL DataType integer");
-
+         return  (uval <= static_cast<uint64_t>(std::numeric_limits<int32_t>::max()));
       case DataType::bigint:
       default:
-         if (uval <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
-            return static_cast<int64_t>(uval);
-         throw std::out_of_range("Unsigned value too large for SQL DataType bigint");
+         return (uval <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
    }
 }
 
+
 /**
- * @brief Converts a signed integral value to the supported SQL integer range.
- * @details
- * The value is stored as a signed int64_t after validation. The accepted
- * maximum is determined by the supplied SQL data type.
+ * @brief Checks whether an unsigned integral value fits the SQL unsigned integer range.
+ *
+ * @tparam T Unsigned integral type.
+ * @param value Value to validate.
+ * @param dataType Target SQL integer type.
+ * @return true if the value is within the range for dataType.
+ */
+template <typename T>
+constexpr bool unsignedFitsSqlUnsigned(T value, DataType dataType)
+{
+   static_assert(std::is_integral_v<T> && std::is_unsigned_v<T>);
+   const uint64_t uval = static_cast<uint64_t>(value);
+   switch (dataType)
+   {
+      case DataType::tinyint:
+         return uval <= static_cast<uint64_t>(std::numeric_limits<uint8_t>::max());
+      case DataType::smallint:
+         return uval <= static_cast<uint64_t>(std::numeric_limits<uint16_t>::max());
+      case DataType::integer:
+         return uval <= static_cast<uint64_t>(std::numeric_limits<uint32_t>::max());
+      case DataType::bigint:
+      default:
+         return uval <= static_cast<uint64_t>(std::numeric_limits<uint64_t>::max());
+   }
+}
+
+
+/**
+ * @brief Checks whether a signed integral value fits the SQL signed integer range.
  *
  * @tparam T Signed integral type.
- * @param value Value to validate and convert.
+ * @param value Value to validate.
  * @param dataType Target SQL integer type.
- * @return The converted value as int64_t.
- * @throws std::out_of_range If the value exceeds the maximum for dataType.
+ * @return true if the value is within the range for dataType.
  */
 template <typename T>
-constexpr auto normalizeSignedIntegralToSqlRange(T value, DataType dataType)
+constexpr bool signedFitsSqlSigned(T value, DataType dataType)
 {
-   int64_t val = static_cast<int64_t>(value);
+   static_assert(std::is_integral_v<T> && std::is_signed_v<T>);
+   const int64_t val = static_cast<int64_t>(value);
+   switch (dataType)
+   {
+      case DataType::tinyint:
+         return val >= std::numeric_limits<int8_t>::min() && val <= std::numeric_limits<int8_t>::max();
+      case DataType::smallint:
+         return val >= std::numeric_limits<int16_t>::min() && val <= std::numeric_limits<int16_t>::max();
+      case DataType::integer:
+         return val >= std::numeric_limits<int32_t>::min() && val <= std::numeric_limits<int32_t>::max();
+      case DataType::bigint:
+      default:
+         return val >= std::numeric_limits<int64_t>::min() && val <= std::numeric_limits<int64_t>::max();
+   }
+}
+
+
+/**
+ * @brief Checks whether a signed integral value fits the SQL unsigned integer range.
+ *
+ * @tparam T Signed integral type.
+ * @param value Value to validate.
+ * @param dataType Target SQL integer type.
+ * @return true if the value is within the range for dataType.
+ */
+template <typename T>
+constexpr bool signedFitsSqlUnsigned(T value, DataType dataType)
+{
+   static_assert(std::is_integral_v<T> && std::is_signed_v<T>);
+
+   if (value < 0)
+      return false;
+
+   const uint64_t uval = static_cast<uint64_t>(value);
 
    switch (dataType)
    {
       case DataType::tinyint:
-         if (val <= static_cast<int64_t>(std::numeric_limits<int8_t>::max()))
-            return static_cast<int64_t>(val);
-         throw std::out_of_range("Signed value too large for SQL DataType tinyint");
-
+         return uval <= std::numeric_limits<uint8_t>::max();
       case DataType::smallint:
-         if (val <= static_cast<int64_t>(std::numeric_limits<int16_t>::max()))
-            return static_cast<int64_t>(val);
-         throw std::out_of_range("Signed value too large for SQL DataType smallint");
-
+         return uval <= std::numeric_limits<uint16_t>::max();
       case DataType::integer:
-         if (val <= static_cast<int64_t>(std::numeric_limits<int32_t>::max()))
-            return static_cast<int64_t>(val);
-         throw std::out_of_range("Signed value too large for SQL DataType integer");
-
+         return uval <= std::numeric_limits<uint32_t>::max();
       case DataType::bigint:
       default:
-         if (val <= static_cast<int64_t>(std::numeric_limits<int64_t>::max()))
-            return static_cast<int64_t>(val);
-         throw std::out_of_range("Signed value too large for SQL DataType bigint");
+         return true; // Any non-negative standard signed integer fits uint64_t.
+   }
+}
+
+
+/**
+ * @brief Store an unsigned integer into SQL signed type
+ *
+ * @tparam VariantType Storage type.
+ * @tparam T Unsigned integral type.
+ * @param storage Destination storage.
+ * @param value Value to store.
+ * @param dataType Target SQL integer type.
+ * @throws std::out_of_range If the value is outside dataType.
+ */
+template <typename VariantType, typename T>
+void storeUnsignedForSqlSigned(VariantType& storage, T value, DataType dataType)
+{
+   const uint64_t uval = static_cast<uint64_t>(value);
+
+   if (!unsignedFitsSqlSigned(uval, dataType))
+   {
+      switch (dataType)
+      {
+         case DataType::tinyint:
+            throw std::out_of_range("Unsigned value out of range for SQL DataType tinyint");
+         case DataType::smallint:
+            throw std::out_of_range("Unsigned value out of range for SQL DataType smallint");
+         case DataType::integer:
+            throw std::out_of_range("Unsigned value out of range for SQL DataType integer");
+         case DataType::bigint:
+         default:
+            throw std::out_of_range("Unsigned value out of range for SQL DataType bigint");
+      }
+   }
+
+   switch (dataType)
+   {
+      case DataType::tinyint:
+         storage = static_cast<int8_t>(uval);
+         break;
+      case DataType::smallint:
+         storage = static_cast<int16_t>(uval);
+         break;
+      case DataType::integer:
+         storage = static_cast<int32_t>(uval);
+         break;
+      case DataType::bigint:
+      default:
+         storage = static_cast<int64_t>(uval);
+         break;
+   }
+}
+
+
+/**
+ * @brief Stores a signed integer into SQL signed type
+ *
+ * @tparam VariantType Storage type.
+ * @tparam T Signed integral type.
+ * @param storage Destination storage.
+ * @param value Value to store.
+ * @param dataType Target SQL integer type.
+ * @throws std::out_of_range If the value is outside dataType.
+ */
+template <typename VariantType, typename T>
+void storeSignedForSqlSigned(VariantType& storage, T value, DataType dataType)
+{
+   const int64_t sval = static_cast<int64_t>(value);
+
+   if (!signedFitsSqlSigned(sval, dataType))
+   {
+      switch (dataType)
+      {
+         case DataType::tinyint:
+            throw std::out_of_range("Signed value out of range for SQL DataType tinyint");
+         case DataType::smallint:
+            throw std::out_of_range("Signed value out of range for SQL DataType smallint");
+         case DataType::integer:
+            throw std::out_of_range("Signed value out of range for SQL DataType integer");
+         case DataType::bigint:
+         default:
+            throw std::out_of_range("Signed value out of range for SQL DataType bigint");
+      }
+   }
+
+   switch (dataType)
+   {
+      case DataType::tinyint:
+         storage = static_cast<int8_t>(sval);
+         break;
+      case DataType::smallint:
+         storage = static_cast<int16_t>(sval);
+         break;
+      case DataType::integer:
+         storage = static_cast<int32_t>(sval);
+         break;
+      case DataType::bigint:
+      default:
+         storage = static_cast<int64_t>(sval);
+         break;
    }
 }
 
 /**
- * @brief Represents a SQL parameter.
- * @details Encapsulates the name, SQL type, value, size, direction, and
- * precision of a parameter used by a query or stored procedure.
+ * @brief Stores an unsigned integer into SQL unsigned type
  *
- * Binary values for DataType::varbinary and DataType::varbit may be provided
- * as an even-length hexadecimal std::string or as raw std::vector<uint8_t>
- * data.
- *
- * Integral values are validated against the selected SQL type. Unsigned
- * values are stored as signed int64_t and therefore cannot exceed INT64_MAX
- * for DataType::bigint.
- *
- * @tparam VariantTypeImplemented Variant type used to store the value.
- *         Defaults to @c DefaultVariantType.
- *
+ * @tparam VariantType Storage type.
+ * @tparam T Unsigned integral type.
+ * @param storage Destination storage.
+ * @param value Value to store.
+ * @param dataType Target SQL integer type.
+ * @throws std::out_of_range If the value is outside dataType.
  */
-template <typename VariantTypeImplemented = DefaultVariantType >
+template <typename VariantType, typename T>
+void storeUnsignedForSqlUnsigned(VariantType& storage, T value, DataType dataType)
+{
+   const uint64_t uval = static_cast<uint64_t>(value);
+
+   if (!unsignedFitsSqlUnsigned(uval, dataType))
+   {
+      switch (dataType)
+      {
+         case DataType::tinyint:
+            throw std::out_of_range("Unsigned value too large for SQL DataType tinyint");
+         case DataType::smallint:
+            throw std::out_of_range("Unsigned value too large for SQL DataType smallint");
+         case DataType::integer:
+            throw std::out_of_range("Unsigned value too large for SQL DataType integer");
+         case DataType::bigint:
+         default:
+            throw std::out_of_range("Unsigned value too large for SQL DataType bigint");
+      }
+   }
+
+   switch (dataType)
+   {
+      case DataType::tinyint:
+         storage = static_cast<uint8_t>(uval);
+         break;
+      case DataType::smallint:
+         storage = static_cast<uint16_t>(uval);
+         break;
+      case DataType::integer:
+         storage = static_cast<uint32_t>(uval);
+         break;
+      case DataType::bigint:
+      default:
+         storage = static_cast<uint64_t>(uval);
+         break;
+   }
+}
+
+/**
+ * @brief Stores a signed integer into SQL unsigned type
+ *
+ * @tparam VariantType Storage type.
+ * @tparam T Signed integral type.
+ * @param storage Destination storage.
+ * @param value Value to store.
+ * @param dataType Target SQL integer type.
+ * @throws std::out_of_range If the value is outside dataType.
+ */
+template <typename VariantType, typename T>
+void storeSignedForSqlUnsigned(VariantType& storage, T value, DataType dataType)
+{
+   static_assert(std::is_integral_v<T> && std::is_signed_v<T>);
+
+   if (!signedFitsSqlUnsigned(value, dataType))
+   {
+      switch (dataType)
+      {
+         case DataType::tinyint:
+            throw std::out_of_range("Signed value too large for SQL DataType unsigned tinyint");
+         case DataType::smallint:
+            throw std::out_of_range("Signed value too large for SQL DataType unsigned smallint");
+         case DataType::integer:
+            throw std::out_of_range("Signed value too large for SQL DataType unsigned integer");
+         case DataType::bigint:
+         default:
+            throw std::out_of_range("Signed value too large for SQL DataType unsigned bigint");
+      }
+   }
+
+   const uint64_t uval = static_cast<uint64_t>(value);
+
+   switch (dataType)
+   {
+      case DataType::tinyint:
+         storage = static_cast<uint8_t>(uval);
+         break;
+      case DataType::smallint:
+         storage = static_cast<uint16_t>(uval);
+         break;
+      case DataType::integer:
+         storage = static_cast<uint32_t>(uval);
+         break;
+      case DataType::bigint:
+      default:
+         storage = static_cast<uint64_t>(uval);
+         break;
+   }
+}
+
+/**
+ * @brief Stores a SQL parameter value and its binding metadata.
+ *
+ * Stores a parameter name, SQL data type, value, size, direction, decimal
+ * precision, and integer signedness. Integral values are checked against the
+ * range of the selected SQL integer type and stored using the corresponding
+ * signed or unsigned representation.
+ *
+ * Text values are stored as strings. Binary values for
+ * @c DataType::varbinary and @c DataType::varbit may be supplied as an
+ * even-length hexadecimal string or as a byte vector.
+ *
+ * @tparam VariantTypeImplemented Variant type used to store the parameter
+ *         value. Defaults to @c DefaultVariantType.
+ */
+template <
+   typename VariantTypeImplemented = DefaultVariantType>
 class Parameter
 {
 public:
    using VariantType   = VariantTypeImplemented;
    using VariantHelper = tbs::VariantHelper<VariantType>;
 
-   static const uint64_t DEFAULT_SIZE = 0;
-
-   Parameter()
-   {
-      _name          = "";
-      _type          = DataType::unknown;
-      _size          = DEFAULT_SIZE;
-      _direction     = ParameterDirection::unknown;
-      _decimalDigits = 0;
-   }
-
+   /**
+    * @brief Constructs a parameter from an already-typed variant value.
+    *
+    * The value is stored without conversion or range checking. The caller
+    * provides the SQL type and whether the parameter represents an unsigned
+    * integer column.
+    *
+    * @param name Parameter name.
+    * @param type SQL data type.
+    * @param value Already-typed parameter value.
+    * @param size Optional size for binary or text parameters.
+    * @param decimalDigits Optional number of decimal digits.
+    * @param isUnsigned Whether the SQL integer type is unsigned.
+    * @param direction Parameter direction.
+    */
    Parameter(
       const std::string& name,
       DataType           type,
       VariantType        value,
       uint64_t           size = 0,
-      ParameterDirection direction = ParameterDirection::input,
-      short              decimalDigits = 0 )
+      short              decimalDigits = 0,
+      bool               isUnsigned = false,
+      ParameterDirection direction = ParameterDirection::input)
       : _name{name}
       , _type{type}
       , _value{value}
       , _size{size}
+      , _decimalDigits{decimalDigits}
+      , _isUnsigned{isUnsigned}
       , _direction{direction}
-      , _decimalDigits{decimalDigits} {}
+      {}
 
 
-   // Generic constructor: normalize integral types
+   /**
+    * @brief Constructs a parameter from a value and its SQL type.
+    *
+    * Integral values are range-checked against the selected SQL integer type
+    * and stored using the corresponding signed or unsigned representation.
+    * String and binary values are stored in their supported parameter form.
+    *
+    * @tparam T Input value type.
+    *
+    * @param name Parameter name.
+    * @param type SQL data type.
+    * @param value Already-typed parameter value.
+    * @param size Optional size for binary or text parameters.
+    * @param decimalDigits Optional number of decimal digits.
+    * @param isUnsigned Whether the SQL integer type is unsigned.
+    * @param direction Parameter direction.
+    *
+    * @throws std::out_of_range If an integral value does not fit the selected
+    *         SQL integer type.
+    * @throws std::invalid_argument If a binary pointer is provided without a
+    *         positive size.
+    */
    template<typename T>
    Parameter(
       const std::string& name,
       DataType           type,
       T                  value,
-      uint64_t           size = DEFAULT_SIZE,
-      ParameterDirection direction = ParameterDirection::input,
-      short              decimalDigits = 0)
+      uint64_t           size = 0,
+      short              decimalDigits = 0,
+      bool               isUnsigned = false,
+      ParameterDirection direction = ParameterDirection::input)
       : _name{name}
       , _type{type}
+      , _value{value}
       , _size{size}
-      , _direction{direction}
       , _decimalDigits{decimalDigits}
+      , _isUnsigned{isUnsigned}
+      , _direction{direction}
    {
 
       if constexpr (  std::is_integral_v<T> && std::is_unsigned_v<T> &&
                      !std::is_same_v<T,bool> &&
                      !std::is_same_v<T,char> &&
                      !std::is_same_v<T,wchar_t> &&
-                     !std::is_same_v<T,char8_t> &&
+                     (!std::is_same_v<T,char8_t> || std::is_same_v<T,uint8_t>) &&
                      !std::is_same_v<T,char16_t> &&
                      !std::is_same_v<T,char32_t>)
       {
-         // TODO_JEFRI: create a branch to handle with unsigned value for MySQL, since MySQL support unsigned integral column
-         _value = VariantType { 
-                     normalizeUnsignedIntegralToSqlRange(std::forward<T>(value), _type) 
-                  };
+         if (_isUnsigned)
+            storeUnsignedForSqlUnsigned(_value, value, _type);
+         else
+            storeUnsignedForSqlSigned(_value, value, _type);
       }
       else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
       {
-         // on LP64 platforms. Linux/macOS (GCC/Clang)
-         if constexpr ( sizeof(long) == 8 && (std::is_same_v<T,long> || std::is_same_v<T,int64_t>) ) 
-         {
-            _value = VariantType { 
-                        normalizeSignedIntegralToSqlRange(std::forward<T>(value), _type) 
-                     };
-         }
-         else if constexpr (std::is_same_v<T,long long>)
-            _value = static_cast<int64_t>(value);
-         else if constexpr (std::is_same_v<T,long>)
-           _value = static_cast<int32_t>(value);
-         else if constexpr (std::is_same_v<T,int>)
-            _value = static_cast<int32_t>(value);
-         else if constexpr (std::is_same_v<T,short>)
-            _value = static_cast<int16_t>(value);
+         if (isUnsigned)
+            storeSignedForSqlUnsigned(_value, value, _type);
          else
-            _value = value;
+            storeSignedForSqlSigned(_value, value, _type);
       }
       else
       {
@@ -374,7 +623,7 @@ public:
          return _size;
    }
 
-   bool forceUnsigned() const { return _forceUnsigned; }
+   bool isUnsigned() const { return _isUnsigned; }
 
 protected:
 
@@ -393,7 +642,7 @@ protected:
    /// Keeps the decoded bytes stable so caller can use a pointer without decoding again.
    std::vector<uint8_t>    _valueBufferBinary;
 
-   bool _forceUnsigned;
+   bool _isUnsigned = false;
 };
 
 

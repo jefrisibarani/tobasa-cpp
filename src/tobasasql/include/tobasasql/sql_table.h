@@ -14,7 +14,7 @@ namespace tbs {
 namespace sql {
 
 // -------------------------------------------------------
-// SqlTable was based from pgAdmin III sqlTable class found in file frmEditGrid.h
+// // SqlTable was based on the pgAdmin III sqlTable class
 // -------------------------------------------------------
 // pgAdmin III - PostgreSQL Tools
 // RCS-ID:      $ Id: frmEditGrid.h 6930 2008-01-02 00:10:01Z dpage $
@@ -521,7 +521,7 @@ private:
                      rawValue = boolVal=="true" ? 1 : 0;
                   }
 
-                  auto parameter = std::make_shared<SqlParameter>(columnName, dataType, rawValue, size, sql::ParameterDirection::input, decimalDigit);
+                  auto parameter = std::make_shared<SqlParameter>(columnName, dataType, rawValue, size, decimalDigit, false, sql::ParameterDirection::input );
                   updateParameters.push_back(parameter);
                }
             }
@@ -622,7 +622,7 @@ private:
                }
 
                auto parameter = std::make_shared<SqlParameter>(
-                  columnName, dataType, rawValue, size, sql::ParameterDirection::input, decimalDigit);
+                  columnName, dataType, rawValue, size, decimalDigit, false, sql::ParameterDirection::input);
 
                parameters.push_back(parameter);
             }
@@ -1734,7 +1734,7 @@ public:
             size_t paramPosition = parameters.size();
             conditionClause += util::quoteIdent(columnName) + " = :param" + std::to_string(static_cast<int>(paramPosition)+1);
 
-            auto parameter = std::make_shared<SqlParameter>(columnName, dataType, rawValue, size, sql::ParameterDirection::input);
+            auto parameter = std::make_shared<SqlParameter>(columnName, dataType, rawValue, size, 0, false, sql::ParameterDirection::input);
             parameters.push_back(parameter);
          }
       }
