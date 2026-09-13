@@ -282,30 +282,38 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_DATETIME:
                case MYSQL_TYPE_TIMESTAMP:
                {
-                  // we use MYSQL_TIME as datetime value source
-                  // convert datetime string value to MysqlTime 
-                  MysqlTime mt = VariantHelper::toMysqlTime(param->value());
-                  // save back MysqlTime value
-                  param->value( mt );
-                  // use the MYSQL_TIME pointer as bind's buffer source
-                  _paramContext.binds[i].buffer = (void*) &( std::get<MysqlTime>(param->value()) ).myTime;
-                  //_paramContext.lengths[i]      = sizeof(MYSQL_TIME);
-                  //_paramContext.binds[i].length = &_paramContext.lengths[i];
+                  if (std::holds_alternative<std::string>(param->value()) )
+                  {
+                     // we use MYSQL_TIME as datetime value source
+                     // convert datetime string value to MysqlTime 
+                     MysqlTime mt = VariantHelper::toMysqlTime(param->value());
+                     // save back MysqlTime value
+                     param->value( mt );
+                     // use the MYSQL_TIME pointer as bind's buffer source
+                     _paramContext.binds[i].buffer = (void*) &( std::get<MysqlTime>(param->value()) ).myTime;
+                     //_paramContext.lengths[i]      = sizeof(MYSQL_TIME);
+                     //_paramContext.binds[i].length = &_paramContext.lengths[i];
+                  }
+                  // else if (std::holds_alternative<std::string>(param->value()) )
+                  // {
+                  //    // Directly use string as datetime value source
+                  //    const std::string& strValue   = VariantHelper::value<std::string>(param->value(), errMsg);
+                  //    unsigned long strValueLen     = static_cast<unsigned long>(strValue.length());
+                  //    _paramContext.lengths[i]      = strValueLen;
+                  //    _paramContext.binds[i].buffer = (char*)strValue.data();
+                  //    _paramContext.binds[i].length = &_paramContext.lengths[i];
+                  //    // because we use string buffer as datetime value source , we must set buffer_type to MYSQL_TYPE_STRING
+                  //    _paramContext.binds[i].buffer_type = MYSQL_TYPE_STRING;   
+                  // }
+                  else if (std::holds_alternative<MysqlTime>(param->value()) )
+                  {
+                     _paramContext.binds[i].buffer = (void*) &( std::get<MysqlTime>(param->value()) ).myTime;
+                  }
+                  else 
+                     throw tbs::SqlException(errMsg, "MysqlCommand");
+                  
                   break;
                }
-#if 0
-               {
-                  // Directly use string as datetime value source
-                  const std::string& strValue   = VariantHelper::value<std::string>(param->value(), errMsg);
-                  unsigned long strValueLen     = static_cast<unsigned long>(strValue.length());
-                  _paramContext.lengths[i]      = strValueLen;
-                  _paramContext.binds[i].buffer = (char*)strValue.data();
-                  _paramContext.binds[i].length = &_paramContext.lengths[i];
-                  // because we use string buffer as datetime value source , we must set buffer_type to MYSQL_TYPE_STRING
-                  _paramContext.binds[i].buffer_type = MYSQL_TYPE_STRING;   
-                  break;
-               }
-#endif
                case MYSQL_TYPE_TINY_BLOB:
                case MYSQL_TYPE_MEDIUM_BLOB:
                case MYSQL_TYPE_LONG_BLOB:

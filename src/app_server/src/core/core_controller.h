@@ -1,5 +1,6 @@
 #pragma once
 
+#include <tobasahttp/websocket.h>
 #include <tobasaweb/controller_base.h>
 #include <tobasaweb/router.h>
 #include "../database_service_factory_app.h"
@@ -10,6 +11,7 @@ namespace web { class Session; }
 
 namespace app {
 
+class EventEngine;
 class CoreController
    : public web::ControllerBase
 {
@@ -17,7 +19,8 @@ public :
    CoreController( const CoreController & ) = delete;
    CoreController( CoreController && ) = delete;
 
-   explicit CoreController(app::DbServicePtr dbService);
+   explicit CoreController(app::DbServicePtr dbService
+      , std::shared_ptr<app::EventEngine> eventEngine)
 
    ~CoreController() {}
 
@@ -57,6 +60,10 @@ public :
    //! Handle GET request to /user_profile/{profileId}
    http::ResultPtr onUserProfile(const web::RouteArgument& arg);   
 
+   //! Handle GET request to /app_socket
+   /// App Websocket Entry Point
+   http::ResultPtr onAppSocket(const web::RouteArgument& arg);
+
 protected:
    void bindHandler();
 
@@ -68,8 +75,11 @@ protected:
 
    http::ResultPtr redirectOnLoggedIn(std::shared_ptr<web::Session> session);
 
+   void initWebSocketContext();
+
    app::DbServicePtr _dbService {nullptr};
 
+   std::shared_ptr<app::EventEngine> _eventEngine = nullptr;
 };
 
 } // namespace app

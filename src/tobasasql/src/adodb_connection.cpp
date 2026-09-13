@@ -32,7 +32,15 @@ bool AdodbConnection::connect(const std::string& connString)
       return true;
 
    if (_pConn == nullptr)
-      _pConn.CreateInstance(__uuidof(ADODB::Connection));
+   {
+      HRESULT hr = _pConn.CreateInstance(__uuidof(ADODB::Connection));
+
+      if (FAILED(hr) || _pConn == nullptr)
+      {
+         _connStatus = ConnectionStatus::bad;
+         _com_issue_error(FAILED(hr) ? hr : E_FAIL);
+      }
+   }
 
    if (connString.empty())
    {

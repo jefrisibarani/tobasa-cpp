@@ -187,6 +187,7 @@ const std::string t_base_app_task( R"-(
       result_status  varchar(256)   NOT NULL DEFAULT '',
       result_message varchar(256)   NOT NULL DEFAULT '',
       result_code    integer        NOT NULL,
+      result_data    varchar(256)   NOT NULL DEFAULT '',
       start_time     varchar(100)   NOT NULL DEFAULT '',
       end_time       varchar(100)   NOT NULL DEFAULT '',
       duration       varchar(100)   NOT NULL DEFAULT '',

@@ -45,6 +45,7 @@ bool PgsqlTableHelper::setupColumnInfo(PgsqlResult& tableResult, ColumnInfo* col
       hasPrimaryKey    = true;
    }
 
+   #if 0
    std::string sqlCmd =
       "  SELECT n.nspname AS nspname, relname, t.typname AS type, format_type(t.oid,NULL) AS typname, format_type(t.oid, att.atttypmod) AS displaytypname, "
       "   nt.nspname AS typnspname, attname, attnum, COALESCE(b.oid, t.oid) AS basetype, atthasdef, adsrc,\n"
@@ -60,6 +61,33 @@ bool PgsqlTableHelper::setupColumnInfo(PgsqlResult& tableResult, ColumnInfo* col
       "  WHERE attnum > 0 AND NOT attisdropped AND attrelid=" + relid + "::oid\n"
       //"WHERE attnum > 0 AND NOT attisdropped AND c.relname = " + tbs::sql::util::quote("") + "::name\n"
       " ORDER BY attnum";
+   #endif
+
+   // adsrc was removed in PostgreSQL 12.
+   // replaced with: pg_get_expr(def.adbin, def.adrelid) AS adsrc
+   std::string sqlCmd =
+      "  SELECT n.nspname AS nspname, c.relname AS relname, "
+      "         t.typname AS type, "
+      "         format_type(t.oid, NULL) AS typname, "
+      "         format_type(t.oid, att.atttypmod) AS displaytypname, "
+      "         nt.nspname AS typnspname, "
+      "         att.attname AS attname, "
+      "         att.attnum AS attnum, "
+      "         COALESCE(b.oid, t.oid) AS basetype, "
+      "         att.atthasdef AS atthasdef, "
+      "         pg_get_expr(def.adbin, def.adrelid) AS adsrc,\n"
+      "         CASE WHEN t.typbasetype = 0 THEN att.atttypmod ELSE t.typtypmod END AS typmod,\n"
+      "         CASE WHEN t.typbasetype = 0 THEN att.attlen ELSE t.typlen END AS typlen\n"
+      "  FROM pg_attribute AS att\n"
+      "  JOIN pg_type AS t ON t.oid = att.atttypid\n"
+      "  JOIN pg_namespace AS nt ON nt.oid = t.typnamespace\n"
+      "  JOIN pg_class AS c ON c.oid = att.attrelid\n"
+      "  JOIN pg_namespace AS n ON n.oid = c.relnamespace\n"
+      "  LEFT JOIN pg_type AS b ON b.oid = t.typbasetype\n"
+      "  LEFT JOIN pg_attrdef AS def ON def.adrelid = att.attrelid AND def.adnum = att.attnum\n"
+      "  WHERE att.attnum > 0 AND NOT att.attisdropped AND att.attrelid = " + relid + "::oid\n"
+      "  ORDER BY att.attnum";
+
 
    PgsqlResult colSet(tableResult.connection());
    colSet.runQuery(sqlCmd);

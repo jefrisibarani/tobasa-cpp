@@ -15,6 +15,7 @@
 #include "../page.h"
 #include "../app_common.h"
 #include "../app_util.h"
+#include "../event_engine.h"
 
 namespace tbs {
 namespace app {
@@ -28,8 +29,10 @@ std::string extensionToMimeType(const std::string& ext)
 }
 
 CoreController::CoreController(app::DbServicePtr dbService)
+      , std::shared_ptr<app::EventEngine> eventEngine
    : web::ControllerBase()
    , _dbService {dbService} {}
+   , _eventEngine {eventEngine}
 
 void CoreController::bindHandler()
 {
@@ -103,6 +106,10 @@ void CoreController::bindHandler()
    //! Handle GET request to /keep_alive
    router()->httpGet("/keep_alive",
       std::bind(&CoreController::onKeepAlive, self, _1),    AuthScheme::COOKIE);
+
+   //! Handle GET request to /app_socket from ws://server/app_socket
+   router()->httpGet("/app_socket",
+      std::bind(&CoreController::onAppSocket, self, _1), AuthScheme::COOKIE);
 
    //! Server as Router default handler
    router()->defaultHandler(
@@ -726,5 +733,80 @@ http::ResultPtr CoreController::onRegister(const web::RouteArgument& arg)
    }
 }
 
+
+//! Handle GET request to /app_socket
+http::ResultPtr CoreController::onAppSocket(const web::RouteArgument& arg)
+{
+   auto httpContext = arg.httpContext();
+/*
+   auto& requestHeaders = httpContext->request()->headers();
+   auto userAgent = requestHeaders.value("User-agent");
+
+   std::string projectId, clientAppId, webserviceVersion, deviceToken, chatProtocolVersion;
+
+   // request came from mobile app, check custom headers
+   if ( util::contains(userAgent, "TBSMOBILEAPP_TOBASA") )
+   {
+      projectId           = requestHeaders.value("X-Project-Id");
+      clientAppId         = requestHeaders.value("X-Client-App-Id");
+      webserviceVersion   = requestHeaders.value("X-WebService-Version");
+      deviceToken         = requestHeaders.value("X-Device-Token");
+      chatProtocolVersion = requestHeaders.value("X-ChatProto-Version");
+   }
+   else
+   {
+      // request might come from web browsers,
+      // eg:  new WebSocket("wss://server/chat_app_socket?X-Project-Id=123&X-Client-App-Id=456&X-WebService-Version=1.0.0&X-Device-Token=abc&X-ChatProto-Version=1.0.0");
+      // and browsers do not allow custom headers for security reasons (to prevent header spoofing, CSRF issues, etc.).
+
+      // Find custom data in query string
+      // when found, modify request headers to include custom headers
+      // because later on, ChatEngine will use request headers to identify the client
+      auto query = httpContext->request()->query();
+      if ( !query->empty())
+      {
+         std::string data = query->value("X-Project-Id");
+         if (data.length() > 0) {
+            projectId = data;
+            requestHeaders.set("X-Project-Id", projectId);
+         }
+
+         data = query->value("X-Client-App-Id");
+         if (data.length() > 0) {
+            clientAppId = data;
+            requestHeaders.set("X-Client-App-Id", clientAppId);
+         }
+
+         data = query->value("X-WebService-Version");
+         if (data.length() > 0) {
+            webserviceVersion = data;
+            requestHeaders.set("x-X-WebService-Version", webserviceVersion);
+         }
+
+         data = query->value("X-Device-Token");
+         if (data.length() > 0) {
+            deviceToken = data;
+            requestHeaders.set("X-Device-Token", deviceToken);
+         }
+
+         data = query->value("X-ChatProto-Version");
+         if (data.length() > 0) {
+            chatProtocolVersion = data;
+            requestHeaders.set("X-ChatProto-Version", chatProtocolVersion);
+         }
+      }
+   }
+
+   if (! chat::isValidChatProtocolVersion(chatProtocolVersion)) {
+      std::string err = tbsfmt::format("Invalid chat protocol version valid minimal version is 1.0.0, your version: {}", chatProtocolVersion);
+      return web::badRequest(err);
+   }
+*/
+   // set a context and establish websocket connection.
+   httpContext->webSocketContext(_eventEngine->appSocketContext());
+
+   // Here, we only need to give Http status 200
+   return http::makeResult();
+}
 } // namespace app
 } // namespace tbs

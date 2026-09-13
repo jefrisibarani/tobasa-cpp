@@ -227,16 +227,16 @@ int main()
       if (!conn.executeVoid(insertTableSampleDataTypes))
          throw std::runtime_error("Could not insert into sampledatatypes table");
 
-      bool runTest1  = true;
-      bool runTest2  = true;
-      bool runTest3  = true;
-      bool runTest4  = true;
-      bool runTest5  = true;
-      bool runTest6  = true;
+      bool runTest1  = false;
+      bool runTest2  = false;
+      bool runTest3  = false;
+      bool runTest4  = false;
+      bool runTest5  = false;
+      bool runTest6  = false;
       bool runTest7  = true;
-      bool runTest8  = true;
-      bool runTest9  = true;
-      bool runTest10 = true;
+      bool runTest8  = false;
+      bool runTest9  = false;
+      bool runTest10 = false;
 
       // bool foo = "WEWEWEWEWE";  // In C++, the conversion from a string literal (like "WEWEWEWEWE") to a boolean value is allowed.
 

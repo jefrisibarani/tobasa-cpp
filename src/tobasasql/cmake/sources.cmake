@@ -76,6 +76,7 @@ if(TOBASA_SQL_USE_ADODB AND MSVC)
       ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/adodb*.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/com_variant_helper.h
       ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/com_variant.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/com_initializer.h
    )
 endif()
 

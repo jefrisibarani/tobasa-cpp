@@ -37,6 +37,7 @@
     <!-- Alerts/Flashdata in toast -->
     <div id="alertsInToast" class="alert_container"></div>
     <div id="session_counter" class="bg-info text-danger"></div>
+    <div id="notification_icon" class="notification_icon"></div>
     <!-- Ajax running indicator -->
     <div id="modal_loader"></div>	
     <!-- Javascripts -->
@@ -45,6 +46,7 @@
     {% include "common/page_js_alert.tpl" %}
     {% include "common/page_js_site.tpl" %}
     {% include "common/page_js_sess_expired.tpl" %}
+    {% include "common/page_js_websocket.tpl" %}
     
     {% block pageJS %}{% endblock %}
   </body>

@@ -3,6 +3,7 @@
 #include <tobasa/json.h>
 #include <tobasaweb/settings_webapp.h>
 #include <tobasasql/exception.h>
+#include <tobasasql/com_initializer.h>
 #include <tobasaweb/json_result.h>
 #include "test_sqldriver.h"
 #include "test_controller.h"
@@ -14,44 +15,21 @@ using namespace http;
 
 TestController::~TestController()
 {
-   auto appOption = Config::getOption<web::conf::Webapp>("webapp");
-   auto dbOption = appOption.dbConnection.production;
-   if (appOption.dbConnection.environment == "development") {
-      dbOption = appOption.dbConnection.development;
-   }
-
-#if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-   // Uninitialize COM
-   // only do this if Webapp main database driver is not adodb
-   if (dbOption.dbDriver != sql::BackendType::adodb)
-   {
-      Logger::logI("[test] TestController: Uninitializing COM library");
-      ::CoUninitialize();
-   }
-#endif // defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
+   // auto appOption = Config::getOption<web::conf::Webapp>("webapp");
+   // auto dbOption = appOption.dbConnection.production;
+   // if (appOption.dbConnection.environment == "development") {
+   //    dbOption = appOption.dbConnection.development;
+   // }
 }
 
 
 void TestController::onInit()
 {
-   auto appOption = Config::getOption<web::conf::Webapp>("webapp");
-   auto dbOption  = appOption.dbConnection.production;
-   if (appOption.dbConnection.environment == "development") {
-      dbOption = appOption.dbConnection.development;
-   }
-
-#if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-   // Initialize COM
-   // only do this if Webapp main database driver is adodb
-   if (dbOption.dbDriver == sql::BackendType::adodb)
-   {
-      if ( FAILED(::CoInitializeEx(NULL, COINIT_MULTITHREADED)) )
-         Logger::logI("[test] TestController: Initializing COM library has failed");
-      else
-         Logger::logI("[test] TestController: COM library initialized");
-   }
-#endif // defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-
+   // auto appOption = Config::getOption<web::conf::Webapp>("webapp");
+   // auto dbOption  = appOption.dbConnection.production;
+   // if (appOption.dbConnection.environment == "development") {
+   //    dbOption = appOption.dbConnection.development;
+   // }
 }
 
 
@@ -124,11 +102,14 @@ http::ResultPtr TestController::onSql(const web::RouteArgument& arg)
       if( request->path() == "/test/adosql")
       {
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
+         // Initialize COM, even if Webapp main database driver is adodb
+         ComInitializer comInit(true);
+         Logger::logI("[test] TestController: COM library initialized");
+
          TestSqlDriver<sql::AdodbDriver> testSql(request->content());
          testSql.jsonResult()["versionStringMain"] = versionStringMain;
          testSql.start();
          return jsonResult(testSql.jsonResult());
-
 #else
          return jsonResult(StatusCode::NOT_IMPLEMENTED);
 #endif 
@@ -148,7 +129,7 @@ http::ResultPtr TestController::onSql(const web::RouteArgument& arg)
 
       if( request->path() == "/test/odbc_mssql")
       {
-#if defined(TOBASA_SQL_USE_ODBC)         
+#if defined(TOBASA_SQL_USE_ODBC)
          TestSqlDriver<sql::OdbcDriver> testSql(request->content());
          testSql.jsonResult()["versionStringMain"] = versionStringMain;
          testSql.start();

@@ -461,7 +461,11 @@ public:
          // use Hexadecimal encoded binary string for sql's varbinary, and specify raw data's size
          query.addParam("binary1", sql::DataType::varbinary,  test.insertQueryB.paramBinary1, static_cast<long>(test.insertQueryB.paramBinary1.length()/2) );
 
+         // data,time and dttime param internal value is std::string
+         // after query.execute() data,time and dttime param internal value is MysqlTime
          int rowsAffected = query.execute();
+         // execute with executeResult().
+         // Note: query will use the same parameter object, which already modified by previous query.execute()
          auto sqlResult   = query.executeResult();
 
          std::string status = (rowsAffected == 1 && sqlResult->affectedRows() == 1) ? "PASSED" : "FAILED";

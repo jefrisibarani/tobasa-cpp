@@ -46,10 +46,11 @@ public:
 template < typename SqlDriverType >
 bool AppDbRepo<SqlDriverType>::saveTaskData(const TaskMetadataDto& data)
 {
+   std::string jsonDataStr = data.resultData.dump();
    std::string sql = R"-(
       INSERT INTO base_app_task (task_id, name, info, status, result_status, 
-               result_message, result_code, start_time, end_time, duration, user_id, app_module)
-      VALUES (:task_id, :name, :info, :status, :rstatus, :rmessage, :rcode, :start_time, :end_time, :duration, :user_id, :app_module) )-";
+               result_message, result_code, result_data, start_time, end_time, duration, user_id, app_module)
+      VALUES (:task_id, :name, :info, :status, :rstatus, :rmessage, :rcode, :rdata, :start_time, :end_time, :duration,
       
    SqlQuery query(_sqlConn, sql);
    query.addParam("task_id",    sql::DataType::integer, data.taskId);
@@ -59,6 +60,7 @@ bool AppDbRepo<SqlDriverType>::saveTaskData(const TaskMetadataDto& data)
    query.addParam("rstatus",    sql::DataType::varchar, data.resultStatus);
    query.addParam("rmessage",   sql::DataType::varchar, data.resultMessage);
    query.addParam("rcode",      sql::DataType::integer, data.resultCode);
+      query.addParam("rdata",      sql::DataType::varchar, jsonDataStr);
    query.addParam("start_time", sql::DataType::varchar, data.startTime);
    query.addParam("end_time",   sql::DataType::varchar, data.endTime);
    query.addParam("duration",   sql::DataType::varchar, data.duration);

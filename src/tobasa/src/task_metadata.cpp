@@ -20,6 +20,7 @@ TaskMetadataDto TaskMetadataDto::fromTaskMetadata(TaskMetadataPtr data)
    dto.resultMessage  = data->result.message;
    dto.resultStatus   = data->result.status;
    dto.resultCode     = data->result.code;
+   dto.resultData     = data->result.container;
 
    if (data->startTime.has_value() && data->endTime.has_value())
    {

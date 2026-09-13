@@ -1,5 +1,6 @@
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
+#include <algorithm>
 #include <functional>
 #include <tobasa/logger.h>
 #include <tobasa/datetime.h>
@@ -181,7 +182,10 @@ void ComVariantHelper::nativeVariantToString(const _variant_t& vSource, std::str
          case VT_NULL:     // SQL style null
             outStr = sql::NULLSTR;
             break;
-         case 8209:        // _variant_t vt 8209 sql server binary data type
+         // 8209 _variant_t vt 8209 sql server binary data type
+         // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
+         // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+         case VT_ARRAY | VT_UI1:
          {
             //#include <atlsafe.h>
             try
@@ -330,7 +334,33 @@ ComVariantHelper::NativeVariant ComVariantHelper::toNativeVariant(const VariantT
          auto& wstrVal = std::get<std::wstring>(variantVal);
          _bstr_t bstr = wstrVal.c_str();
          nativeVariant = bstr;
-      }      
+      }
+      else if (std::holds_alternative<std::vector<uint8_t>>(variantVal))
+      {
+         const auto& byteVector = std::get<std::vector<uint8_t>>(variantVal);
+         if (byteVector.size() > static_cast<size_t>(LONG_MAX))
+            throw AppException("Binary data is too large for SAFEARRAY");
+         
+         // Create a safe array storing BYTEs
+         const LONG count = static_cast<LONG>(byteVector.size());
+         CComSafeArray<BYTE> sa(count);
+
+         for (LONG i=0; i<count; ++i)
+         {
+            sa[i] = byteVector[static_cast<size_t>(i)];
+         }
+
+         nativeVariant.parray = sa.Detach();;
+
+         // 8209 _variant_t vt 8209 sql server binary data type
+         // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
+         // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+         nativeVariant.vt = VT_ARRAY | VT_UI1;
+      }
+      else if (std::holds_alternative<std::vector<char>>(variantVal))
+      {
+         throw AppException("ComVariantHelper: toNativeVariant, variant type holds unknown alternative");
+      }
       else if (std::holds_alternative<_variant_t>(variantVal))
       {
          nativeVariant = std::get<_variant_t>(variantVal);
@@ -409,7 +439,48 @@ ComVariantHelper::VariantType ComVariantHelper::fromNativeVariant(const _variant
          return std::string("");
       case VT_NULL:           // SQL style null
          return std::monostate{};
-      case 8209:              // _variant_t vt 8209 sql server binary data type
+      // 8209 _variant_t vt 8209 sql server binary data type
+      // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
+      // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+      case VT_ARRAY | VT_UI1:
+      {
+         SAFEARRAY* safeArray = vSource.parray;
+         if (safeArray == nullptr || SafeArrayGetDim(safeArray) != 1)
+            throw AppException("Invalid COM byte array");
+
+         LONG lowerBound = 0;
+         LONG upperBound = -1;
+
+         if (FAILED(SafeArrayGetLBound(safeArray, 1, &lowerBound)) ||
+            FAILED(SafeArrayGetUBound(safeArray, 1, &upperBound)))
+         {
+            throw AppException("Could not determine COM byte array bounds");
+         }
+
+         const size_t count = static_cast<size_t>(upperBound - lowerBound + 1);
+         
+         //std::vector<uint8_t> resultVector(count);
+         std::string resultString;
+         if (count > 0)
+         {
+            BYTE* data = nullptr;
+            if (FAILED(SafeArrayAccessData(safeArray, reinterpret_cast<void**>(&data)))) {
+               throw AppException("Could not access COM byte array");
+            }
+
+            //std::copy(data, data + count, resultVector.begin());
+            for (size_t i = 0; i < count; ++i)
+            {
+               tbs::byte_t b = data[i];
+               resultString += conv::decToHex(b);
+            }
+
+            SafeArrayUnaccessData(safeArray);
+         }
+
+         //return resultVector;
+         return resultString;
+      }
       default:
          throw AppException("Unsupported COM variant type");
       }

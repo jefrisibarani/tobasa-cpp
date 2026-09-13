@@ -144,20 +144,27 @@ ADODB::_ParameterPtr AdoCommand::createParameter( AdoParameter& param )
          {
             auto bytes = param.valueBinaryPtr();
             uint8_t* pData = *bytes;
-            size_t len = param.size();
+            size_t len = param.dataSize();
+
+            if (len > static_cast<size_t>(LONG_MAX))
+               throw std::length_error("Binary parameter is too large for SAFEARRAY");
 
             // Create a safe array storing BYTEs
-            const long count = static_cast<long>(len);
+            const LONG count = static_cast<LONG>(len);
             CComSafeArray<BYTE> sa(count);
+
             // Fill the safe array with some data
-            for (long i = 0; i < count; i++)
+            for (LONG i=0; i<count; i++)
             {
-               sa[i] = pData[i];
+               sa[i] = pData[static_cast<size_t>(i)];
             }
 
-            SAFEARRAY* ppsa = sa.Detach();
-            paramValue.parray = ppsa;
-            paramValue.vt = 8209;
+            paramValue.parray = sa.Detach();
+
+            // 8209 _variant_t vt 8209 sql server binary data type
+            // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
+            // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+            paramValue.vt = VT_ARRAY | VT_UI1;
          }
          catch (const CAtlException& e)
          {

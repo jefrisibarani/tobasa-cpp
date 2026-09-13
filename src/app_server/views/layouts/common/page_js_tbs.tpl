@@ -16,6 +16,8 @@
         // these values must stay in memory
         accessToken: null,
 
+        wsConnIdentity: null,
+
         PROJECT_ID: '',
         CLIENT_APP_ID: '',
         WEBSERVICE_VERSION: '',

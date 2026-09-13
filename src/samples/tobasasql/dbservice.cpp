@@ -8,41 +8,9 @@
 #include <tobasasql/sql_driver.h>
 #include <tobasasql/sql_query.h>
 #include <tobasasql/sql_service_base.h>
-
-#if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-#include <objbase.h>
-#endif
+#include <tobasasql/com_initializer.h>
 
 namespace sample {
-
-#if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-class ComInitialization
-{
-private:
-   bool _initialized = false;
-
-public:
-   explicit ComInitialization(bool required)
-   {
-      if (required)
-      {
-         HRESULT result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-         if (FAILED(result))
-            throw std::runtime_error("Could not initialize COM for ADO");
-
-         _initialized = true;
-      }
-   }
-
-   ~ComInitialization()
-   {
-      if (_initialized)
-         CoUninitialize();
-   }
-};
-#endif
-
-
 
 class UserServiceBase : public tbs::sql::SqlServiceBase
 {
@@ -153,8 +121,7 @@ int main()
    try
    {
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-      sample::ComInitialization comInitialization(
-         connectorOption.production.dbDriver == BackendType::adodb);
+      tbs::ComInitializer comInit(connectorOption.production.dbDriver == BackendType::adodb);
 #endif
 
       DbServiceFactory factory;

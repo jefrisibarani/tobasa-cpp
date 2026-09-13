@@ -24,6 +24,10 @@
         }
       } 
 
+      TBS.urlWebsocketEndpoint = function() {
+        return `${TBS.baseUrl}/app_socket`;
+      }
+
       TBS.urlChatEndpoint = function() {
         return `${TBS.baseUrl}/chat_app_socket`;
       }

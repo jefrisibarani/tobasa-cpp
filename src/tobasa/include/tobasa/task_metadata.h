@@ -55,12 +55,13 @@ struct TaskMetadataDto
    std::string resultStatus;
    std::string resultMessage;
    int         resultCode;
+   Json        resultData;
    
    /// Convert TaskMetadata to TaskMetadataDto
    static TaskMetadataDto fromTaskMetadata(TaskMetadataPtr data);
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TaskMetadataDto, id, taskId, name, status, info, startTime, endTime,
-   duration, userId, appModule, resultStatus, resultMessage, resultCode)
+   duration, userId, appModule, resultStatus, resultMessage, resultCode, resultData)
 
 
 /** @}*/

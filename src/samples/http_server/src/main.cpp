@@ -75,7 +75,7 @@ void WebSocketCtxWrapper::createWebSocketContext()
       };
 
    wsContext->onMessage = 
-      [wsContext=wsContext->shared_from_this()]
+      [this]
       (http::WebSocketPtr conn, const std::string& message)
       {
          std::cout << tbsfmt::format("[websocket:{}] received data: {}", conn->id(), message) << std::endl;
