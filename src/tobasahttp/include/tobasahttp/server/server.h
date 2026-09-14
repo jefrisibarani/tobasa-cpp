@@ -19,9 +19,11 @@ namespace http {
  * @{
  */
 
-/** 
- * HTTP Server
- * \tparam Traits
+/**
+ * \brief Runs the HTTP server.
+ * Starts the listener, accepts incoming client connections,
+ * and manages the active connection pool.
+ * \tparam Traits Server configuration and behavior.
  */
 template <class Traits>
 class Server : private NonCopyable

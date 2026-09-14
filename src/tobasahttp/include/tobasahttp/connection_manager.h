@@ -47,7 +47,7 @@ private:
 };
 
 /**
- * \brief Http Connection manager.
+ * @brief Manages active HTTP connections.
  */
 template <class Traits>
 class ConnectionMgr : private NonCopyable
@@ -82,7 +82,9 @@ public:
       , _logger(logger)
       , _instanceType(instanceType)
    {
+#if !defined(NDEBUG)
       _logger.trace("[{}] ConnectionMgr initialized", logHttpType());
+#endif
    }
 
    ~ConnectionMgr()
@@ -96,8 +98,9 @@ public:
       } catch(...) {
          // swallow in destructor
       }
-
+#if !defined(NDEBUG)
       _logger.trace("[{}] ConnectionMgr destroyed", logHttpType());
+#endif
    }
 
    /// Add the specified connection to the manager and start it.

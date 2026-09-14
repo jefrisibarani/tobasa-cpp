@@ -28,11 +28,12 @@ std::string extensionToMimeType(const std::string& ext)
    return mimetypes::fromExtension(ext);
 }
 
-CoreController::CoreController(app::DbServicePtr dbService)
-      , std::shared_ptr<app::EventEngine> eventEngine
+CoreController::CoreController(app::DbServicePtr dbService
+   , std::shared_ptr<app::EventEngine> eventEngine)
    : web::ControllerBase()
-   , _dbService {dbService} {}
+   , _dbService {dbService}
    , _eventEngine {eventEngine}
+{}
 
 void CoreController::bindHandler()
 {

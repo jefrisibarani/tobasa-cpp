@@ -312,6 +312,21 @@ BackendType MysqlConnection::backendType() const { return BackendType::mysql; }
 
 std::string MysqlConnection::dbmsName() { return name(); }
 
+bool MysqlConnection::startTransaction()
+{
+   return execute("START TRANSACTION") >= 0;
+}
+
+bool MysqlConnection::commitTransaction()
+{
+   return execute("COMMIT") >= 0;
+}
+
+bool MysqlConnection::rollbackTransaction()
+{
+   return execute("ROLLBACK") >= 0;
+}
+
 int64_t MysqlConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

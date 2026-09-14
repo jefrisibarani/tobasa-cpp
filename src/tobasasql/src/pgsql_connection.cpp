@@ -344,6 +344,21 @@ BackendType PgsqlConnection::backendType() const { return BackendType::pgsql; }
 
 std::string PgsqlConnection::dbmsName() { return name(); }
 
+bool PgsqlConnection::startTransaction()
+{
+   return execute("BEGIN") >= 0;
+}
+
+bool PgsqlConnection::commitTransaction()
+{
+   return execute("COMMIT") >= 0;
+}
+
+bool PgsqlConnection::rollbackTransaction()
+{
+   return execute("ROLLBACK") >= 0;
+}
+
 int64_t PgsqlConnection::lastInsertRowid()
 {
    throw SqlException("PgsqlConnection does not support lastInsertRowid()", "PgsqlConnection");

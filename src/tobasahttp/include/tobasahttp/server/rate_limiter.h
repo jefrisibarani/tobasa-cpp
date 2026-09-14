@@ -16,47 +16,39 @@ namespace http {
 using namespace std::chrono;
 
 /**
- * @class RateLimiter
- * @brief A class that limits the rate of incoming requests from different IP addresses.
+ * \brief Limits request frequency per client IP.
  *
- * The RateLimiter enforces a limit on the number of requests an IP can make within a specified
- * time window. If an IP exceeds the allowed number of requests, it can be temporarily or 
- * permanently blocked based on the violation history.
+ * Tracks the number of requests from each IP within a time window.
+ * If an IP exceeds the allowed limit, it may be temporarily blocked
+ * or permanently blacklisted after repeated violations.
  */
 class RateLimiter 
 {
 public:
    /**
-    * @brief Constructs a RateLimiter with the specified rate-limiting parameters.
-    * 
-    * @param maxRequests Maximum allowed requests per time window.
-    * @param windowDuration The time window during which requests are counted.
-    * @param blockDuration The duration for which an IP is temporarily blocked after exceeding the limit.
-    * @param maxViolations The number of violations allowed before permanently blacklisting an IP.
+    * @brief Creates a rate limiter.
+    * @param maxRequests Maximum requests allowed in the time window.
+    * @param windowDuration Time window used to count requests.
+    * @param blockDuration How long an IP stays temporarily blocked.
+    * @param maxViolations Number of violations before permanent blacklist.
     */
    RateLimiter(int maxRequests, milliseconds windowDuration, milliseconds blockDuration, int maxViolations);
 
    /**
-    * @brief Checks if a request from the given IP is allowed.
-    *
-    * This method checks if the IP is allowed to make a request based on the rate limit
-    * and whether the IP is temporarily or permanently blocked.
-    *
-    * @param ip The IP address making the request.
-    * @return true if the request is allowed, false if the IP is blocked or has exceeded the rate limit.
+    * @brief Returns true if the request from the given IP is allowed.
+    * @param ip Client IP address.
+    * @return true if the IP is within the limit and not blocked; otherwise false.
     */
    bool allowRequest(const std::string &ip);
+
+   void logHttpType(const std::string& logType) {_logHttpType=logType;}
 
 private:
 
    /**
-    * @brief Handles an IP's violation of the request limit.
-    *
-    * This method is called when an IP exceeds the allowed number of requests within the time window.
-    * It either temporarily blocks the IP or permanently blacklists it if the number of violations exceeds the maximum allowed.
-    *
-    * @param ip The IP address that violated the request limit.
-    * @param now The current time, used to track when the violation occurred.
+    * @brief Applies the rate-limit violation for an IP.
+    * @param ip Client IP address.
+    * @param now Current time.
     */
    void handleViolation(const std::string &ip, const steady_clock::time_point &now);
 
@@ -69,6 +61,8 @@ private:
    std::unordered_map<std::string, steady_clock::time_point> _temporaryBlocklist;
    std::unordered_map<std::string, int> _violationCount;
    std::set<std::string> _blacklist;
+
+   std::string _logHttpType;
 };
 
 /** @}*/

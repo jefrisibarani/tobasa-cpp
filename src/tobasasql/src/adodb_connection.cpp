@@ -378,10 +378,25 @@ std::string AdodbConnection::dbmsName()
    return name(); 
 }
 
+bool AdodbConnection::startTransaction()
+{
+   return execute("BEGIN TRANSACTION") >= 0;
+}
+
+bool AdodbConnection::commitTransaction()
+{
+   return execute("COMMIT TRANSACTION") >= 0;
+}
+
+bool AdodbConnection::rollbackTransaction()
+{
+   return execute("ROLLBACK TRANSACTION") >= 0;
+}
+
 int64_t AdodbConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)
-      throw tbs::SqlException("Invalid connection status", "MysqlConnection");
+      throw tbs::SqlException("Invalid connection status", "AdodbConnection");
          
    SqlApplyLogInternal applyLogRule(this);
 

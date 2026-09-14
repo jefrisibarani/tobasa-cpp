@@ -313,6 +313,21 @@ BackendType OdbcConnection::backendType() const { return BackendType::odbc; }
 
 std::string OdbcConnection::dbmsName() { return _dbmsName; }
 
+bool OdbcConnection::startTransaction()
+{
+   return execute("BEGIN TRANSACTION") >= 0;
+}
+
+bool OdbcConnection::commitTransaction()
+{
+   return execute("COMMIT TRANSACTION") >= 0;
+}
+
+bool OdbcConnection::rollbackTransaction()
+{
+   return execute("ROLLBACK TRANSACTION") >= 0;
+}
+
 int64_t OdbcConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

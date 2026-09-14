@@ -14,8 +14,10 @@ namespace http {
  */
 
 /**
- * Http server listener.
- * \tparam Traits
+ * \brief Accepts client connections.
+ * Binds to a port, waits for incoming TCP connections, and creates
+ * a connection object for each client.
+ * \tparam Traits Server behavior and settings.
  */
 template <class Traits>
 class Listener : private NonCopyable
@@ -58,7 +60,9 @@ public:
           milliseconds(_settings.rateLimiterWindowDuration()),
           milliseconds(_settings.rateLimiterBlockDuration()),
           _settings.rateLimiterMaxViolations() )
-   {}
+   {
+      _rateLimiter.logHttpType(logHttpType());
+   }
 
    virtual ~Listener() = default;
 
@@ -67,7 +71,7 @@ public:
       if (_acceptor.is_open())
       {
          const auto ep = _acceptor.local_endpoint();
-         _logger.error("[{}}] Server already started on {}", logHttpType(), toString(ep));
+         _logger.error("[{}] Server already started on {}", logHttpType(), toString(ep));
          return;
       }
 
@@ -146,19 +150,18 @@ protected:
                   asio::socket_base::receive_buffer_size rcvOpt;
                   socket.get_option(sndOpt);
                   socket.get_option(rcvOpt);
-                  if (_settings.logVerbose())
-                     _logger.trace("[{}] Current SO_SNDBUF: {} Bytes, SO_RCVBUF: {} Bytes ", logHttpType(), sndOpt.value(), rcvOpt.value() );
+                  //if (_settings.logVerbose())
+                  //   _logger.trace("[{}] Current SO_SNDBUF: {} Bytes, SO_RCVBUF: {} Bytes ", logHttpType(), sndOpt.value(), rcvOpt.value() );
                   
-                  asio::socket_base::send_buffer_size newSndOpt(_settings.sendBufferSize());
-                  asio::socket_base::receive_buffer_size newRcvOpt(_settings.readBufferSize());
+                  asio::socket_base::send_buffer_size newSndOpt( static_cast<int>(_settings.sendBufferSize()) );
+                  asio::socket_base::receive_buffer_size newRcvOpt(  static_cast<int>(_settings.readBufferSize()) );
                   socket.set_option(newSndOpt);
                   socket.set_option(newRcvOpt);
 
                   socket.get_option(sndOpt);
                   socket.get_option(rcvOpt);
-                  if (_settings.logVerbose())
-                     _logger.trace("[{}] Updated SO_SNDBUF: {} Bytes, SO_RCVBUF: {} Bytes ", logHttpType(), sndOpt.value(), rcvOpt.value() );
-
+                  //if (_settings.logVerbose())
+                  //   _logger.trace("[{}] Updated SO_SNDBUF: {} Bytes, SO_RCVBUF: {} Bytes ", logHttpType(), sndOpt.value(), rcvOpt.value() );
 
                   if (_settings.useRateLimiter())
                   {
@@ -195,7 +198,6 @@ protected:
          });
    }
 
-private:
 private:
    std::string logHttpType() const
    {

@@ -20,8 +20,8 @@ class ConnectionPool;
  */
 class PooledConnection 
 {
-    std::shared_ptr<ConnectionPool> _pool;
-    std::shared_ptr<DatabaseConnector> _conn;
+   std::shared_ptr<ConnectionPool> _pool;
+   std::shared_ptr<DatabaseConnector> _conn;
 
 public:
 

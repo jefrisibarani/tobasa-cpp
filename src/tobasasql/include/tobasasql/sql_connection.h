@@ -245,9 +245,27 @@ public:
    }
 
    /// Get last inserted row id.
+   /// Note: This is backend-specific and not portable across all drivers.
+   /// PostgreSQL does not provide a direct equivalent to MySQL/SQLite's last_insert_id() API.
+   /// Prefer using INSERT ... RETURNING id or SELECT lastval() in the same session.
    int64_t lastInsertRowid()
    {
       return _connImpl.lastInsertRowid();
+   }
+
+   bool startTransaction()
+   {
+      return _connImpl.startTransaction();
+   }
+
+   bool commitTransaction()
+   {
+      return _connImpl.commitTransaction();
+   }
+
+   bool rollbackTransaction()
+   {
+      return _connImpl.rollbackTransaction();
    }
 
    void setLogSqlQuery(bool enable=true)

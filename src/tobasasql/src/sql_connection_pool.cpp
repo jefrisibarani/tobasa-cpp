@@ -4,16 +4,20 @@ namespace tbs {
 namespace sql {
 
 PooledConnection::~PooledConnection() 
-{   
+{
    release();
+#if !defined(NDEBUG)
    Logger::logT("[sql] PooledConnection destructed");
+#endif
 }
 
  void PooledConnection::release()
 {
    if (_pool && _conn)
    {
+#if !defined(NDEBUG)
       Logger::logT("[sql] PooledConnection releasing connector {}", _conn->name());
+#endif
 
       auto tmp = std::move(_conn);
       _pool->release(std::move(tmp)); // hand ownership to pool
@@ -44,7 +48,9 @@ PooledConnection ConnectionPool::acquire()
    _currentConnections++;
    lock.unlock();
 
-   Logger::logD("[sql] Creating new pooled db connection for pool {}", _name);
+#if !defined(NDEBUG)
+   Logger::logT("[sql] Creating new pooled db connection for pool {}", _name);
+#endif
 
    auto conn = std::make_shared<DatabaseConnector>(_option, _name);
    conn->initSqlDriver();
@@ -65,16 +71,18 @@ void ConnectionPool::release(std::shared_ptr<DatabaseConnector> conn)
 
 
 std::shared_ptr<ConnectionPool> ConnectionPoolManager::getOrCreatePool(
-    const std::string& name,
-    const conf::ConnectorOption& option,
-    size_t maxConnections)
+   const std::string& name,
+   const conf::ConnectorOption& option,
+   size_t maxConnections)
 {
    std::lock_guard lock(_mutex);
    auto it = _pools.find(name);
    if (it != _pools.end())
       return it->second;
 
-   Logger::logD("[sql] Creating new connection pool: {}", name);
+#if !defined(NDEBUG)
+   Logger::logT("[sql] Creating new connection pool: {}", name);
+#endif
    auto pool = std::make_shared<ConnectionPool>(name, option, maxConnections);
    _pools[name] = pool;
    return pool;

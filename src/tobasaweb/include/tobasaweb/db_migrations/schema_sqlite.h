@@ -340,39 +340,39 @@ const std::string insert_base_sites( R"-(
 
 const std::string insert_base_roles( R"-(
    INSERT INTO base_roles (id, name, alias, enabled, sysrole) VALUES
-      (1, 'role_admin', 'Admin',    true, true),
-      (2, 'role_user',  'User',     true, true),
-      (3, 'role_app',   'App User', true, true);
+      (1, 'role_admin', 'Admin',    1, 1),
+      (2, 'role_user',  'User',     1, 1),
+      (3, 'role_app',   'App User', 1, 1);
 )-");
 
 // First Admin user. Password is AdmBaru9
 const std::string insert_first_admin_user( R"-(
    INSERT INTO base_users (id, uuid, user_name, first_name, last_name, email, image, enabled, password_salt, password_hash,
                            allow_login, expired, unique_code, birth_date, phone, gender, address, nik )
-      VALUES ( 1, '-CldWkC8-Gje4O9TKbhd', 'admin', 'Administrator', 'Administrator', 'admin@mangapul.net', '', true,
-               '8420B2E991C17F6C102E4061F77B9DB914E9069C119B9CB159304C9BEAFFBE41',
-               '2632E5FBEE65C30D045C4A4FD9FDC971424A2B93A521D99E28DF855BD63687EA4293B3679E67E61D9E24C58475E4C6400AF01136C895D125767474734971D2A5',
-               true, DATETIME(CURRENT_TIMESTAMP, '+1 years'), '121211', '2000-01-01', '121212121211', 'M', 'JAKARTA', '1212121212121211' );
+      VALUES ( 1, '-CldWkC8-Gje4O9TKbhd', 'admin', 'Administrator', 'Administrator', 'admin@mangapul.net', '', 1,
+               x'8420B2E991C17F6C102E4061F77B9DB914E9069C119B9CB159304C9BEAFFBE41',
+               x'2632E5FBEE65C30D045C4A4FD9FDC971424A2B93A521D99E28DF855BD63687EA4293B3679E67E61D9E24C58475E4C6400AF01136C895D125767474734971D2A5',
+               1, DATETIME(CURRENT_TIMESTAMP, '+1 years'), '121211', '2000-01-01', '121212121211', 'M', 'JAKARTA', '1212121212121211' );
 )-");
 
 // First Sys user. Password is AdmUser9
 const std::string insert_first_sys_user( R"-(
    INSERT INTO base_users (id, uuid, user_name, first_name, last_name, email, image, enabled, password_salt, password_hash,
                            allow_login, expired, unique_code, birth_date, phone, gender, address, nik )
-      VALUES ( 3, '-DgT2vS8FYI1sENOkAlY', 'user1', 'User', 'User', 'user@mangapul.net', '', true,
-               '247C5E834C87510639C78AD0999882EFD17EC8F7E04EC228AE1EF3AA9F450B91',
-               '154E408F4B4C7A1F6201561BD37877ABF7DB5FD2B7C3D3ABF1256C1321AE1335BD5723D990FFD06CE5473F51C49BC760DB4D6D694F77581F3ACAD44A37889CAD',
-               true, DATETIME(CURRENT_TIMESTAMP, '+1 years'), '121213', '2000-01-01', '121212121213', 'M', 'JAKARTA', '1212121212121213' );
+      VALUES ( 3, '-DgT2vS8FYI1sENOkAlY', 'user1', 'User', 'User', 'user@mangapul.net', '', 1,
+               x'247C5E834C87510639C78AD0999882EFD17EC8F7E04EC228AE1EF3AA9F450B91',
+               x'154E408F4B4C7A1F6201561BD37877ABF7DB5FD2B7C3D3ABF1256C1321AE1335BD5723D990FFD06CE5473F51C49BC760DB4D6D694F77581F3ACAD44A37889CAD',
+               1, DATETIME(CURRENT_TIMESTAMP, '+1 years'), '121213', '2000-01-01', '121212121213', 'M', 'JAKARTA', '1212121212121213' );
 )-");
 
 const std::string insert_base_user_role( R"-(
    INSERT INTO base_user_role (id, user_id, role_id, is_primary) 
-   VALUES (1, 1, 1, true),  (3, 3, 2, true);
+   VALUES (1, 1, 1, 1),  (3, 3, 2, 1);
 )-");
 
 const std::string insert_base_user_site( R"-(
    INSERT INTO base_user_site (id, user_id, site_id, allow_login, is_admin) 
-   VALUES (1, 1, 1, true, true),  (3, 3, 1, true, false);
+   VALUES (1, 1, 1, 1, 1),  (3, 3, 1, 1, 0);
 )-");
 
 inline std::vector<std::string> getQueries()

@@ -28,6 +28,7 @@
 #include "page.h"
 #include "main_helper.h"
 #include "app_resource.h"
+#include "event_engine.h"
 
 #ifdef TOBASA_USE_TESTS_MODULE
    #include "test/test_controller.h"
@@ -119,6 +120,7 @@ int main(int argc, char* argv[])
       dbService->addConnectorOption("MainAppDbOption", webappOpt.dbConnection);
       webapp.useDbService(dbService);
 
+      auto eventEngine = std::make_shared<app::EventEngine>(dbService);
       // setup homepage
       auto homePage  = webappOpt.webService.homePage;
       homePage = homePage.empty() ? "/dashboard" : homePage;
@@ -224,7 +226,7 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       // Controllers
       // -------------------------------------------------------
-      webapp.addController( web::makeController<app::CoreController>(dbService) );
+      webapp.addController( web::makeController<app::CoreController>(dbService, eventEngine) );
       webapp.addController( web::makeController<app::ApiUsersController>(dbService) );
       webapp.addController( web::makeController<app::AdminController>(dbService) );
       webapp.addController( web::makeController<app::ApiCoreController>(dbService, webapp.agent()) );

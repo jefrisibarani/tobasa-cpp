@@ -23,13 +23,6 @@ http::RequestStatus databaseCheckMiddleware(
    bool connectionBad = false;
    if (!app.dbConnected())
    {
-      /*
-      // pass new DbServiceFactoryApp instance to replace current App's db service
-      auto db = std::make_shared<app::DbServiceFactoryApp>(webappOpt.dbConnection);
-      if (app.reconnectDb(db))
-         return next(context);
-      */
-
       // calling reconnectDb() without passing new DbServiceFactoryApp instance, will only
       // reconnect db service
       Logger::logI("No connection to database, reconnecting...");

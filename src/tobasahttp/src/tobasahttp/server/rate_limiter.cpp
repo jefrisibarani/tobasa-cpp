@@ -1,4 +1,5 @@
 #include <iostream>
+#include <tobasa/logger.h>
 #include "tobasahttp/server/rate_limiter.h"
 
 
@@ -17,7 +18,7 @@ bool RateLimiter::allowRequest(const std::string &ip)
 
    if (_blacklist.find(ip) != _blacklist.end()) 
    {
-      std::cout << "IP " << ip << " is permanently blacklisted." << std::endl;
+      Logger::logW("[{}] IP {} is permanently blacklisted.", _logHttpType, ip);
       return false;
    }
 
@@ -25,7 +26,7 @@ bool RateLimiter::allowRequest(const std::string &ip)
    {
       if (now < _temporaryBlocklist[ip]) 
       {
-         std::cout << "IP " << ip << " is temporarily blocked." << std::endl;
+         Logger::logW("[{}] IP {} is temporarily blocked.", _logHttpType, ip);
          return false;
       } 
       else 
@@ -53,19 +54,18 @@ bool RateLimiter::allowRequest(const std::string &ip)
 
 void RateLimiter::handleViolation(const std::string &ip, const steady_clock::time_point &now)
 {
-   std::cout << "IP " << ip << " exceeded the rate limit." << std::endl;
+   Logger::logW("[{}] IP {} is exceeded the rate limit.", _logHttpType, ip);
 
    _violationCount[ip]++;
    if (_violationCount[ip] >= _maxViolations ) 
    {
       _blacklist.insert(ip);
-      std::cout << "IP " << ip << " is permanently blacklisted." << std::endl;
+      Logger::logW("[{}] IP {} is permanently blacklisted.", _logHttpType, ip);
    } 
    else 
    {
       _temporaryBlocklist[ip] = now + _blockDuration;
-      std::cout << "IP " << ip << " is temporarily blocked for "
-                << duration_cast<seconds>(_blockDuration).count() << " seconds." << std::endl;
+      Logger::logW("[{}] IP {} is temporarily blocked for {} seconds.", _logHttpType, ip, duration_cast<seconds>(_blockDuration).count());
    }
 }
 

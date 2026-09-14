@@ -8,10 +8,10 @@
 namespace tbs {
 namespace http {
 
-// Lookup function
+/// Lookup function
 SSL_CTX* lookupSslCtx(const std::string& hostname);
 
-// SNI callback
+/// SNI callback
 int sniCallback(SSL* ssl, int* ad, void* arg);
 
 void setupCertificateforSNI(

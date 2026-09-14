@@ -250,6 +250,21 @@ BackendType SqliteConnection::backendType() const { return BackendType::sqlite; 
 
 std::string SqliteConnection::dbmsName() { return name(); }
 
+bool SqliteConnection::startTransaction()
+{
+   return execute("BEGIN TRANSACTION") >= 0;
+}
+
+bool SqliteConnection::commitTransaction()
+{
+   return execute("COMMIT") >= 0;
+}
+
+bool SqliteConnection::rollbackTransaction()
+{
+   return execute("ROLLBACK") >= 0;
+}
+
 int64_t SqliteConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

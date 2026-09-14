@@ -63,7 +63,12 @@ public:
 
    std::string dbmsName();
 
-   /// EXPERIMENTAL. DO NOT USE THIS!
+   bool startTransaction();
+   bool commitTransaction();
+   bool rollbackTransaction();
+
+   // PostgreSQL does not support a portable lastInsertRowid() equivalent.
+   // Prefer INSERT ... RETURNING id or SELECT lastval() for the current session.
    int64_t lastInsertRowid();
 
    // -------------------------------------------------------

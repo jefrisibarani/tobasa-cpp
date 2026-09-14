@@ -20,7 +20,8 @@ public :
    CoreController( CoreController && ) = delete;
 
    explicit CoreController(app::DbServicePtr dbService
-      , std::shared_ptr<app::EventEngine> eventEngine)
+      , std::shared_ptr<app::EventEngine> eventEngine
+   );
 
    ~CoreController() {}
 

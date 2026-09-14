@@ -59,14 +59,17 @@ public:
       , _instanceType { InstanceType::http_server }
    {
       _handshakeType = asio::ssl::stream_base::server;
+#if !defined(NDEBUG)
       _logger.trace("[{}] ConnectionStarterTls initialized", logHttpType());
-
+#endif
       init();
    }
 
    ~ConnectionStarterTls()
    {
+#if !defined(NDEBUG)
       _logger.trace("[{}] ConnectionStarterTls destroyed", logHttpType());
+#endif
    }
 
    /** 

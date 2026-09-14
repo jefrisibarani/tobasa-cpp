@@ -125,16 +125,19 @@ public:
    {
       if ( _closed )
       {
-         if (_settings.logVerbose())
-            _logger.trace("[{}] [conn:{}] Already closed", logHttpType(), this->id() );
-         
+
+#if !defined(NDEBUG)
+         _logger.trace("[{}] [conn:{}] Already closed", logHttpType(), this->id() );
+#endif
+
          return;
       }
       else
       {
-         if (_settings.logVerbose())
-            _logger.trace("[{}] [conn:{}] Cancelling all timer handler", logHttpType(), this->id() );
 
+#if !defined(NDEBUG)
+            _logger.trace("[{}] [conn:{}] Cancelling all timer handler", logHttpType(), this->id() );
+#endif
          _timer.cancel();
 
 
@@ -168,8 +171,10 @@ public:
       _socket.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error);
       if (error)
       {
+#if !defined(NDEBUG)
          // Note: error is : The file handle supplied is not valid
-         //_logger.trace("[{}] [conn:{}] {}", logHttpType(), this->id(), error.message() );
+         _logger.trace("[{}] [conn:{}] {}", logHttpType(), this->id(), error.message() );
+#endif
       }
    }
 
@@ -260,9 +265,11 @@ protected:
          {
             if (timer.expiry() <= Timer::clock_type::now())
             {
-               
+
+#if !defined(NDEBUG)
                _logger.trace("[{}] [conn:{}] {} Timer [{}] timed out", logHttpType(), this->id(), timerTypeToString(timerType), timerWaitId);
-               
+#endif
+
                if (_onTimeOut)
                {
                   std::string message = tbsfmt::format("{} Timer expired after {} seconds", timerTypeToString(timerType), timeoutSeconds );
@@ -304,9 +311,13 @@ protected:
           connId   = this->id(),
           timerWaitId ] (const auto & error)
          {
-            if (error == asio::error::operation_aborted) {
+            if (error == asio::error::operation_aborted) 
+            {
+
+#if !defined(NDEBUG)
                if (_settings.logVerbose())
                   _logger.trace("[{}] [conn:{}] {} Timer [{}] aborted", logHttpType(), connId, timerTypeToString(timerType), timerWaitId);
+#endif
             }
 
             if (auto tmpSelf = connWeak.lock())
@@ -320,21 +331,27 @@ protected:
          }
       );
 
+#if !defined(NDEBUG)
       if (_settings.logVerbose())
          _logger.trace("[{}] [conn:{}] {} Timer [{}] started", logHttpType(), this->id(), timerTypeToString(timerType), timerWaitId);
+#endif
    }
 
    void startTimer(Timeout timeout, std::function<void(Timer&)> handler = nullptr)
    {
+#if !defined(NDEBUG)
       if (_settings.logVerbose())
          _logger.trace("[{}] [conn:{}] Starting Timer [{}]", logHttpType(), this->id(), timeout.name);
+#endif
       startTimer(timeout.value, timeout.type, std::move(handler));
    }
 
    void cancelTimer()
    {
+#if !defined(NDEBUG)
       if (_settings.logVerbose())
          _logger.trace("[{}] [conn:{}] Cancelling timer", logHttpType(), this->id() );
+#endif
       _timer.cancel();
    }
 

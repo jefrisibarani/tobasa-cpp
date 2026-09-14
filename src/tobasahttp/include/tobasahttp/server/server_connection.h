@@ -64,7 +64,7 @@ inline std::string knownHttpMethodsCsv() {
 // which is crucial for correct name resolution in templates.
 
 /**
- * @brief Represents a single HTTP client connection.
+ * \brief Represents a single HTTP client connection.
  *
  * ServerConnection is responsible for:
  * - Reading and parsing the HTTP request using http::parser::Parser.

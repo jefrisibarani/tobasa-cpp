@@ -40,12 +40,16 @@ public:
       , _logger       { logger }
       , _instanceType { InstanceType::http_server }
    {
+#if !defined(NDEBUG)
       _logger.trace("[{}] ConnectionStarter initialized", logHttpType());
+#endif
    }
 
    ~ConnectionStarter()
    {
+#if !defined(NDEBUG)
       _logger.trace("[{}] ConnectionStarter destroyed", logHttpType());
+#endif
    }
 
    /**

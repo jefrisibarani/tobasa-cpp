@@ -190,9 +190,8 @@ bool DatabaseConnector::testConnection()
    return std::visit(
       [&](auto& conn)
       {
-         if (conn->backendType() == _dbOption.dbDriver) {
+         if (conn->backendType() == _dbOption.dbDriver)
             return conn->executeVoid("SELECT 1;");
-         }
          else
             return false;
       }, _sqlConnPtrVariant);
@@ -206,13 +205,9 @@ bool DatabaseConnector::beginTransaction()
          try
          {
             if (conn->backendType() == _dbOption.dbDriver) 
-            {
-               auto ok = conn->executeVoid("BEGIN TRANSACTION");
-               return ok;
-            }
+               return conn->startTransaction();
          }
-         catch(const std::exception& e)
-         {
+         catch(const std::exception& e) {
             Logger::logT("[sql] exec BEGIN, error: {}", e.what());
          }
          return false;
@@ -228,13 +223,9 @@ bool DatabaseConnector::commitTransaction()
          try
          {
             if (conn->backendType() == _dbOption.dbDriver) 
-            {
-               auto ok = conn->executeVoid("COMMIT");
-               return ok;
-            }
+               return conn->commitTransaction();
          }
-         catch(const std::exception& e)
-         {
+         catch(const std::exception& e) {
             Logger::logT("[sql] exec COMMIT error: {}", e.what());
          }
          return false;
@@ -250,13 +241,9 @@ bool DatabaseConnector::rollbackTransaction()
          try
          {
             if (conn->backendType() == _dbOption.dbDriver) 
-            {
-               auto ok = conn->executeVoid("ROLLBACK");
-               return ok;
-            }
+               return conn->rollbackTransaction();
          }
-         catch(const std::exception& e)
-         {
+         catch(const std::exception& e) {
             Logger::logT("[sql] exec ROLLBACK, error: {}", e.what());
          }
          return false;

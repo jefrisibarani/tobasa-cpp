@@ -68,6 +68,10 @@ public:
 
    std::string dbmsName();
 
+   bool startTransaction();
+   bool commitTransaction();
+   bool rollbackTransaction();
+
    int64_t lastInsertRowid();
 
    // -------------------------------------------------------
