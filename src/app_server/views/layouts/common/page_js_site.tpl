@@ -24,8 +24,8 @@
         }
       } 
 
-      TBS.urlWebsocketEndpoint = function() {
-        return `${TBS.baseUrl}/app_socket`;
+      TBS.urlServerEventEndpoint = function() {
+        return `${TBS.baseUrl}/server_event_socket`;
       }
 
       TBS.urlChatEndpoint = function() {

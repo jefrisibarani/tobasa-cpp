@@ -36,7 +36,7 @@
       }
     </style>
 
-    <script type="text/javascript"> <!-- JS ALERT -->
+    <script type="text/javascript">
 
       class EventMessage {
          constructor(type = '', message = '', data = {}) {
@@ -82,20 +82,6 @@
          }
       }
 
-      function handleDicomExportCompletedEvent(eventMessage)
-      {
-         const downloadId = eventMessage.data && eventMessage.data.downloadId;
-         if (downloadId) {
-            TBS.log('[EVT ] DICOM export completed: ' + downloadId);
-         }
-
-         TBS.alert.info(
-            eventMessage.message || 'DICOM files exported successfully.',
-            'Toast',
-            ''
-         );
-      }
-
       // Notification system
       let notificationsList = [];
 
@@ -122,7 +108,6 @@
          const icon = document.getElementById('notification_icon');
          
          if (!icon) {
-            TBS.log('[WARN] notification_icon element not found');
             return;
          }
          
@@ -139,10 +124,8 @@
             badge.className = 'notification_badge';
             badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
             icon.appendChild(badge);
-            TBS.log('[NOTIF] Unread count: ' + unreadCount + ', badge added to DOM');
          } else {
             icon.classList.remove('has-unread');
-            TBS.log('[NOTIF] No unread notifications, has-unread class removed');
          }
       }
 
@@ -154,16 +137,16 @@
          let content = '<div style="max-height: 500px; overflow-y: auto; padding: 10px;">';
          
          if (notificationsList.length === 0) {
-            content += '<div class="text-muted text-center py-4"><p>📭 No notifications</p></div>';
+            content += '<div class="text-muted text-center py-4"><p>No notifications</p></div>';
          } else {
             notificationsList.forEach(notif => {
                const iconMap = {
-                  'info': '📋',
-                  'warning': '⚠️',
-                  'error': '❌',
-                  'success': '✅'
+                  'info'    : 'fas fa-info-circle',
+                  'warning' : 'fas fa-exclamation',
+                  'error'   : 'fas fa-exclamation-triangle',
+                  'success' : 'fas fa-check-circle'
                };
-               const icon = iconMap[notif.type] || '📋';
+               const icon = iconMap[notif.type] || 'fas fa-info';
                const time = new Date(notif.timestamp).toLocaleString();
                
                let actionHtml = '';
@@ -174,7 +157,7 @@
                content += `
                   <div style="padding:12px; margin-bottom:10px; border-left:4px solid #ffc107; background:#f8f9fa; border-radius:4px;">
                      <div style="display:flex; align-items:start; gap:10px;">
-                        <span style="font-size:20px;">${icon}</span>
+                        <span style="font-size:20px; display:inline-flex; align-items:center; justify-content:center;"><i class="${icon}"></i></span>
                         <div style="flex:1;">
                            <h6 style="margin:0 0 5px 0; font-weight:600; color:#333;">${notif.title}</h6>
                            ${notif.content ? `<p style="margin:0 0 5px 0; font-size:13px; color:#666;">${notif.content}</p>` : ''}
@@ -190,7 +173,7 @@
          content += '</div>';
 
          bootbox.dialog({
-            title: '🔔 Notifications (' + notificationsList.length + ')',
+            title: '<i class="fas fa-info-circle"></i> Notifications (' + notificationsList.length + ')',
             message: content,
             backdrop: true,
             size: 'large',
@@ -204,7 +187,7 @@
       }
 
       let socket = null;
-      let appSocketUrl = TBS.urlWebsocketEndpoint();
+      let appSocketUrl = TBS.urlServerEventEndpoint();
       window.addEventListener('DOMContentLoaded', event => {
          try {
             // Initialize notification icon
@@ -213,16 +196,6 @@
             
             if (notificationIcon) {
                notificationIcon.addEventListener('click', showNotificationDialog);
-               
-               // Debug: Log computed styles
-               const computed = window.getComputedStyle(notificationIcon);
-               TBS.log('[NOTIF] Icon computed - display: ' + computed.display + ', visibility: ' + computed.visibility + ', position: ' + computed.position);
-               TBS.log('[NOTIF] Icon computed - top: ' + computed.top + ', right: ' + computed.right + ', zIndex: ' + computed.zIndex);
-               TBS.log('[NOTIF] Icon size - width: ' + computed.width + ', height: ' + computed.height);
-               
-               // Debug: Log bounding rect
-               const rect = notificationIcon.getBoundingClientRect();
-               TBS.log('[NOTIF] Icon rect - top: ' + rect.top + ', right: ' + rect.right + ', width: ' + rect.width + ', height: ' + rect.height);
             }
             updateNotificationBadge();
 
@@ -255,7 +228,7 @@
                      payload = JSON.parse(rawMessage);
                   } catch (parseError) {
                      // The server sends a plain-text welcome message on connect.
-                     TBS.alert.info(rawMessage, 'Toast', '');
+                     TBS.log("[EVT ] " + rawMessage);
                      return;
                   }
 
@@ -264,10 +237,7 @@
                      handleConnectedEvent(eventMessage);
                      return;
                   }
-                  if (eventMessage.type === 'dicom.export.completed') {
-                     handleDicomExportCompletedEvent(eventMessage);
-                     return;
-                  }
+
                   if (eventMessage.type === 'notification') {
                      handleNotificationEvent(eventMessage);
                      return;
@@ -305,4 +275,4 @@
                (error.message || 'An unknown error occurred.'));
          }
       });
-    </script> <!-- JS WEBSOCKET -->
+    </script>

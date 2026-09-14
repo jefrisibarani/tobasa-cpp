@@ -50,13 +50,21 @@ public :
 
    // Send message to connected client
    // Example - Send a notification:
-   //   Json notifData;
-   //   notifData["type"] = "success";
-   //   notifData["title"] = "Export Completed";
-   //   notifData["content"] = "Your DICOM export is ready for download";
-   //   notifData["timestamp"] = DateTime::now().toUnixTimeMiliSeconds();
-   //   EventMessage notification("notification", "Export completed", notifData);
-   //   eventEngine->sendMessage(notification, userIdentifier);
+
+   // Json notifAction;
+   // notifAction["actionType"] = "button";
+   // notifAction["actionLink"] = "/pacs/download/fafadfaffdfadfadsfadsf";
+
+   // Json notifData;
+   // notifData["type"]      = "success";
+   // notifData["title"]     = "Export Completed";
+   // notifData["content"]   = "Your Data File export is ready for download";
+   // notifData["timestamp"] = DateTime::now().toUnixTimeMiliSeconds();
+   // notifData["action"]    = notifAction;
+
+   // EventMessage notification("notification", "Export completed", notifData);
+   // eventEngine->sendMessage(notification, userIdentifier);
+   
    void sendMessage(const EventMessage& message, const std::string& wsConnIdentity);
 
 private:

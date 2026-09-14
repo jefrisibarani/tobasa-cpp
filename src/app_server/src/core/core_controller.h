@@ -61,9 +61,9 @@ public :
    //! Handle GET request to /user_profile/{profileId}
    http::ResultPtr onUserProfile(const web::RouteArgument& arg);   
 
-   //! Handle GET request to /app_socket
+   //! Handle GET request to /server_event_socket
    /// App Websocket Entry Point
-   http::ResultPtr onAppSocket(const web::RouteArgument& arg);
+   http::ResultPtr onServerEventSocket(const web::RouteArgument& arg);
 
 protected:
    void bindHandler();
