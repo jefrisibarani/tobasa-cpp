@@ -73,7 +73,10 @@ void SseConnection::close(const std::string& reason)
    // Use callClose() to ensure the ConnectionManager properly handles
    // the closure while the underlying connection is still available.
    if (auto connection = _connection.lock())
-      connection->callClose(reason);
+   {
+      if (connection->httpVersion() != HttpVersion::two)
+         connection->callClose(reason);
+   }
 }
 
 ConnectionId SseConnection::id() const

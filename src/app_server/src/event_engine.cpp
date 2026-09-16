@@ -21,7 +21,7 @@ EventEngine::EventEngine(app::DbServicePtr dbService)
       {
          conn->identifier(user->uuid);
 
-         Logger::logD("[webapp] [conn:{}] sse connection started for user: {}", conn->id(), user->firstName);
+         Logger::logD("[webapp] [conn:{}] SSE connection started for user: {}", conn->id(), user->firstName);
          Json data;
          data["sseConnIdentity"] = conn->identifier();
 

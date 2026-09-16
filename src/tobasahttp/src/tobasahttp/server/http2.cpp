@@ -209,11 +209,12 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
 
 int onStreamCloseCallback(nghttp2_session *session, int32_t streamId, uint32_t code, void *userData) 
 {
-   (void) code;
-
    auto httpSession = static_cast<Http2Session*>(userData);
    if (! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+   if (httpSession->option()->logVerbose)
+      Logger::logT("[{}] [conn:{}] [http2] Stream {} closed, code {}", LOGTYPE, httpSession->connId(), streamId, code);
 
    Http2StreamData* streamData = httpSession->findStream(streamId);
    if (!streamData)
@@ -245,7 +246,6 @@ int onHeaderCallback2(nghttp2_session *session, const nghttp2_frame *frame,
 
    if (streamData->headerBufferSize + namebuf.len + valuebuf.len > httpSession->option()->maxHeaderSize) 
    {
-
       Logger::logE("[{}] [conn:{}] [http2] Stream data header buffer size over maximum {} bytes", LOGTYPE, httpSession->connId(), httpSession->option()->maxHeaderSize);
       nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_INTERNAL_ERROR);
       return 0;
@@ -435,6 +435,40 @@ int onDataChunkRecvCallback(nghttp2_session *session, uint8_t flags,
    return 0;
 }
 
+// -------------------------------------------------------
+// Server-Sent Events (SSE)
+// -------------------------------------------------------
+
+nghttp2_ssize readSseData(Http2Session* httpSession, int32_t streamId,
+                          uint8_t* buffer, size_t length, uint32_t* dataFlags)
+{
+   auto sseStream = httpSession->findSseStream(streamId);
+   if (!sseStream)
+      return NGHTTP2_ERR_DEFERRED;
+
+   if (sseStream->sendQueue.empty())
+   {
+      if (sseStream->closeRequested)
+         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+      else
+         return NGHTTP2_ERR_DEFERRED;
+
+      return 0;
+   }
+
+   auto& data = sseStream->sendQueue.front();
+   auto readCount = std::min(length, data.size());
+   std::memcpy(buffer, data.data(), readCount);
+   data.erase(0, readCount);
+   if (data.empty())
+      sseStream->sendQueue.pop_front();
+
+   if (sseStream->sendQueue.empty() && sseStream->closeRequested)
+      *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+
+   return static_cast<nghttp2_ssize>(readCount);
+}
+
 #ifdef TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
 
 namespace {
@@ -519,6 +553,26 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
 
    auto response  = httpContext->response();
 
+
+   // -------------------------------------------------------
+   // Server-Sent Events (SSE)
+   // -------------------------------------------------------
+   if (httpSession->isSseStream(streamId))
+   {
+      *dataFlags &= ~NGHTTP2_DATA_FLAG_EOF;
+      std::vector<uint8_t> sseData(length);
+      auto readCount = readSseData(httpSession, streamId, sseData.data(), length, dataFlags);
+      if (readCount > 0)
+      {
+         asio::streambuf tmpBuf;
+         std::ostream stream(&tmpBuf);
+         stream.write(reinterpret_cast<const char*>(sseData.data()), readCount);
+         httpSession->fillPendingData(&tmpBuf, static_cast<size_t>(readCount));
+         *dataFlags |= NGHTTP2_DATA_FLAG_NO_COPY;
+      }
+      return readCount;
+   }
+
    // Prepare payload into session->_dataPendingVec by calling serializer into a temporary streambuf
    http::ResponseSerializer serializer(response);
    asio::streambuf tmpBuf;
@@ -602,6 +656,9 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
    if ( ! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
 
+   if (httpSession->isSseStream(streamId))
+      return readSseData(httpSession, streamId, buf, length, dataFlags);
+
    auto* httpContext = static_cast<http::Context*>(source->ptr);
    if (httpContext == nullptr || httpContext->closed()) {
       throw http::Exception("invalid http context pointer", streamId);
@@ -615,6 +672,7 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
    }
 
+   // Verbose counters and logging only; callback data and EOF state are unchanged.
    if (httpSession->option()->logVerbose)
    {
       httpSession->_dataSourceReadCbCounterBytes += readCount;
@@ -704,7 +762,16 @@ Result Http2Session::submitResponse(http::HttpContext httpContext, int streamId)
 {
    auto response = httpContext->response();
 
-   if (! response->compressionEnabled()) 
+   if (isSseStream(streamId))
+   {
+      // force content-type to text/event-stream
+      response->setHeaderContentType("text/event-stream");
+      response->streaming(true);
+      response->prepareForCompression({false, 0, {}, {}, {}});
+   }
+
+   // do not set Content-Length for SSE over HTTP/2
+   if (! response->compressionEnabled() && !response->streaming()) 
    {
       if ( response->contentSize() > 0 )
          response->setHeaderContentLength(response->contentSize());
@@ -729,7 +796,7 @@ Result Http2Session::submitResponse(http::HttpContext httpContext, int streamId)
         nva.push_back(http2::makeNv(f->nameRef(), f->valueRef(), false/*sensitive*/));
    }
 
-   nghttp2_data_provider2 dataProvider;
+   nghttp2_data_provider2 dataProvider {};
    dataProvider.source.ptr = httpContext.get(); // Pass the raw pointer as user data
    dataProvider.read_callback = cb::dataSourceReadCallback;
 
@@ -767,7 +834,7 @@ Http2Session::~Http2Session()
 {
    if (! _closed)
       this->close();
-   
+
    Logger::logT("[{}] [conn:{}] [http2] Http2Session Destroyed", LOGTYPE, this->connId());
 }
 
@@ -833,6 +900,16 @@ void Http2Session::closeStream(int32_t streamId)
    _streams.erase(streamId);
    _httpContexts.erase(streamId);
 
+   // Server-Sent Events (SSE)
+   auto sseStream = findSseStream(streamId);
+   if (sseStream)
+   {
+      if (auto context = sseStream->context.lock())
+         context->remove(sseStream->connection);
+
+      _sseStreams.erase(streamId);
+   }
+
    if (_onStreamDataClose)
       _onStreamDataClose(streamId);
 }
@@ -846,6 +923,60 @@ Http2StreamData* Http2Session::findStream(int32_t streamId)
    }
 
    return (*it).second.get();
+}
+
+// -------------------------------------------------------
+// Server-Sent Events (SSE)
+// -------------------------------------------------------
+
+void Http2Session::registerSseStream(int32_t streamId,
+   http::SseConnectionPtr connection, std::shared_ptr<http::SseContext> context)
+{
+   auto stream = std::make_unique<SseStreamData>();
+   stream->connection = std::move(connection);
+   stream->context = std::move(context);
+   _sseStreams[streamId] = std::move(stream);
+}
+
+void Http2Session::enqueueSseData(int32_t streamId, std::string data)
+{
+   auto stream = findSseStream(streamId);
+   if (!stream || stream->closeRequested)
+      return;
+
+   stream->sendQueue.emplace_back(std::move(data));
+   nghttp2_session_resume_data(_session, streamId);
+   writeData();
+}
+
+void Http2Session::closeSseStream(int32_t streamId)
+{
+   auto stream = findSseStream(streamId);
+   if (!stream || stream->closeRequested)
+      return;
+
+   stream->closeRequested = true;
+   nghttp2_session_resume_data(_session, streamId);
+   writeData();
+}
+
+bool Http2Session::isSseStream(int32_t streamId) const
+{
+   return _sseStreams.count(streamId) > 0;
+}
+
+bool Http2Session::hasSseStreams() const
+{
+   return !_sseStreams.empty();
+}
+
+Http2Session::SseStreamData* Http2Session::findSseStream(int32_t streamId)
+{
+   auto it = _sseStreams.find(streamId);
+   if (it == _sseStreams.end())
+      return nullptr;
+
+   return it->second.get();
 }
 
 void Http2Session::addHttpContext(http::HttpContext context, int32_t streamId)

@@ -949,6 +949,56 @@ protected:
          sseContext->add(_sseState->ssePtr);
    }
 
+#ifdef TOBASA_HTTP_USE_HTTP2
+
+   // -------------------------------------------------------
+   // Server-Sent Events (SSE)
+   // -------------------------------------------------------
+
+   void createSseConnection(HttpContext httpContext, SseContextPtr sseContext)
+   {
+      if (!httpContext || httpContext->httpVersion() != HttpVersion::two)
+         return;
+
+      auto response = httpContext->response();
+      response->httpStatus(StatusCode::OK);
+      response->setHeaderContentType("text/event-stream");
+      response->setHeader("Cache-Control", "no-cache");
+      response->setHeader("X-Accel-Buffering", "no");
+      response->streaming(true);
+      response->prepareForCompression({false, 0, {}, {}, {}});
+
+      auto streamId = httpContext->streamId();
+      auto weakSelf = std::weak_ptr<ServerConnection>(this->selfPtr());
+      auto connection = std::make_shared<SseConnection>(
+         [weakSelf, streamId](std::string data)
+         {
+            if (auto self = weakSelf.lock())
+               asio::post(self->executor(), [self, streamId, data = std::move(data)]() mutable
+               {
+                  if (!self->closed() && self->_http2Session)
+                     self->_http2Session->enqueueSseData(streamId, std::move(data));
+               });
+         },
+         [weakSelf, streamId]
+         {
+            if (auto self = weakSelf.lock())
+               asio::post(self->executor(), [self, streamId]
+               {
+                  if (!self->closed() && self->_http2Session)
+                     self->_http2Session->closeSseStream(streamId);
+               });
+         },
+         this->shared_from_this(),
+         httpContext->userData(),
+         httpContext->remoteEndpoint());
+
+      _http2Session->registerSseStream(streamId, connection, sseContext);
+      if (sseContext)
+         sseContext->add(connection);
+   }
+#endif
+
    void removeSseConnection()
    {
       if (!_sseState || !_sseState->ssePtr)
@@ -1870,7 +1920,8 @@ protected:
 
    void readHttp2()
    {
-      this->startTimer(this->timeoutRead());
+      if (!this->_http2Session->hasSseStreams())
+         this->startTimer(this->timeoutRead());
       this->_socket.async_read_some(
          this->getReadBuffer(),
          asio::bind_executor(
@@ -1909,7 +1960,8 @@ protected:
 
                      self->writeHttp2();
 
-                     if ( !self->_http2Session->writingData() &&  self->_http2Session->shouldStop())
+                      if ( !self->_http2Session->writingData() &&  self->_http2Session->shouldStop()
+                         && !self->_http2Session->hasSseStreams())
                      {
                         self->processCompleted(self->id(), "all HTTP/2 data processed [R]");
                         return;
@@ -1949,7 +2001,7 @@ protected:
 
       if (bytesToTransfer == 0)
       {
-         if (this->_http2Session->shouldStop())
+            if (this->_http2Session->shouldStop() && !this->_http2Session->hasSseStreams())
                this->processCompleted(this->id(), "All HTTP/2 data processed [W]");
 
          return;
@@ -2095,6 +2147,14 @@ protected:
       httpContext->onCompleteHandler(
          [func=processStatus](RequestStatus status){
             func(status);
+         }
+      );
+
+      httpContext->sseInitHandler(
+         [self = this->selfPtr(), httpContext](SseContextPtr ctx)
+         {
+            if (ctx)
+               self->createSseConnection(httpContext, ctx);
          }
       );
 

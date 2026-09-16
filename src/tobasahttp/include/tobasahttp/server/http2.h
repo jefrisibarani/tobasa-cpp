@@ -6,12 +6,14 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <mutex>
 #include <asio/streambuf.hpp>
 #include <nghttp2/nghttp2.h>
 #include "tobasahttp/type_common.h"
+#include "tobasahttp/sse.h"
 #include "tobasahttp/headers.h"
 #include "tobasahttp/server/string_ref.h"
 #include "tobasahttp/server/settings_tls.h"
@@ -153,6 +155,25 @@ public:
    Result handleRequest(int32_t streamId);
    Result submitResponse(http::HttpContext httpContext, int streamId);
 
+   // -------------------------------------------------------
+   // Server-Sent Events (SSE)
+   // -------------------------------------------------------   
+   void registerSseStream(int32_t streamId, http::SseConnectionPtr connection,
+      std::shared_ptr<http::SseContext> context);
+   void enqueueSseData(int32_t streamId, std::string data);
+   void closeSseStream(int32_t streamId);
+   bool isSseStream(int32_t streamId) const;
+   bool hasSseStreams() const;
+   struct SseStreamData
+   {
+      std::deque<std::string> sendQueue;
+      bool closeRequested { false };
+      http::SseConnectionPtr connection;
+      std::weak_ptr<http::SseContext> context;
+   };
+   SseStreamData* findSseStream(int32_t streamId);
+
+
    bool shouldStop() const;
 
    void streamDataCloseHandler(StreamDataOnCloseHandler handler)
@@ -231,6 +252,9 @@ private:
 
    std::map<int32_t, std::unique_ptr<Http2StreamData>> _streams;
    std::map<int32_t, http::HttpContext> _httpContexts;
+
+   // Server-Sent Events (SSE)
+   std::map<int32_t, std::unique_ptr<SseStreamData>>  _sseStreams;
 
    nghttp2_session*           _session                = nullptr;
    nghttp2_session_callbacks* _callbacks              = nullptr;
