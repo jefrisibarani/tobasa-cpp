@@ -135,6 +135,7 @@ bool copyFileToDisk(const std::string& destFolder, const std::string& fileName, 
    return true;
 }
 
+
 /// Create simple status response html page
 tbs::http::RequestStatus statusResult(const tbs::http::HttpContext& context, tbs::http::StatusCode statusCode)
 {
@@ -154,6 +155,7 @@ tbs::http::RequestStatus statusResult(const tbs::http::HttpContext& context, tbs
 
    return http::RequestStatus::handled;
 }
+
 
 /// Handle request to /hello
 tbs::http::RequestStatus handleHelloPage(const tbs::http::HttpContext& context)
@@ -185,6 +187,7 @@ tbs::http::RequestStatus handleHelloPage(const tbs::http::HttpContext& context)
 
    return RequestStatus::handled;
 }
+
 
 /// Handle request to /test/upload
 tbs::http::RequestStatus handleUpload(const tbs::http::HttpContext& context)
@@ -229,6 +232,7 @@ tbs::http::RequestStatus handleUpload(const tbs::http::HttpContext& context)
    return RequestStatus::handled;
 }
 
+
 /// Handle WebSocket request to /websocket_ep ( ws://server/websocket_ep )
 tbs::http::RequestStatus handleWebsocketEndpoint(const tbs::http::HttpContext& context)
 {
@@ -248,6 +252,7 @@ tbs::http::RequestStatus handleWebsocketEndpoint(const tbs::http::HttpContext& c
 
    return http::RequestStatus::handled;
 }
+
 
 /// Handle request to WebSocket HTML page /test_websocket
 tbs::http::RequestStatus handleWebsocket(const tbs::http::HttpContext& context)
@@ -279,6 +284,7 @@ tbs::http::RequestStatus handleWebsocket(const tbs::http::HttpContext& context)
 
    return http::RequestStatus::handled;
 }
+
 
 /// Handle request to index page /
 tbs::http::RequestStatus handleIndexPage(const tbs::http::HttpContext& context)
@@ -342,53 +348,6 @@ tbs::http::RequestStatus handleIndexPage(const tbs::http::HttpContext& context)
    else
    {
       response->fileContent(fullPath);
-
-#if 0 // -------------------------------------------------------
-         auto dataSource = std::make_shared<http::ResponseDataSource>(http::ResponseDataType::file);
-         dataSource->dataReader = std::make_unique<FileReader>(fullPath);
-         dataSource->filePath   = fullPath;
-         dataSource->connect(response); // Replace default datasource
-         
-         // Set writer callback to read file content
-         dataSource->writerCallback2(
-
-      #ifdef TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
-            [dataSource=std::move(dataSource)](asio::streambuf* sendBuffer, size_t length)
-      #else
-            [dataSource=std::move(dataSource)](uint8_t* buffer, size_t length, uint32_t* dataFlags)
-      #endif
-            {
-               if (! dataSource->dataReader->isOpen()) 
-               {
-                  std::cerr << "Error opening file: " << dataSource->filePath << std::endl;
-                  return (int64_t)-1;
-               }
-
-               auto readCount = std::min(length, dataSource->readLeft);
-               auto startAt   = dataSource->dataSize - dataSource->readLeft;
-
-      #ifdef TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
-               std::vector<uint8_t> buffer(readCount); // Reserve space in the buffer
-
-               std::streamsize bytesRead = dataSource->dataReader->readAt(startAt, buffer.data(), static_cast<std::streamsize>(readCount));
-               dataSource->readLeft -= readCount;
-
-               // append data to send buffer
-               std::ostream outStream(sendBuffer);
-               outStream.write(reinterpret_cast<const char*>(buffer.data()), readCount);
-      #else
-               std::streamsize bytesRead = dataSource->dataReader->readAt(startAt, buffer, static_cast<std::streamsize>(readCount));
-               dataSource->readLeft -= readCount;
-
-               if (dataSource->readLeft == 0) {
-                  *dataFlags |= 1; // same as NGHTTP2_DATA_FLAG_EOF;
-               }
-      #endif
-               std::cerr << "__ writerCallback2 readCount : " << readCount << std::endl;
-               return static_cast<int64_t>(readCount);
-            });
-#endif // -------------------------------------------------------
-
    }
 
    return http::RequestStatus::handled;

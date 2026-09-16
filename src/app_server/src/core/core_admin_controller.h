@@ -9,6 +9,8 @@
 namespace tbs {
 namespace app {
 
+class EventEngine;
+
 class AdminController
    : public web::ControllerBase
 {
@@ -16,7 +18,9 @@ public:
    AdminController(const AdminController &) = delete;
    AdminController(AdminController &&) = delete;
 
-   explicit AdminController(app::DbServicePtr dbService);
+   explicit AdminController(app::DbServicePtr dbService,
+      std::shared_ptr<app::EventEngine> eventEngine);
+      
    virtual ~AdminController() {}
 
    //! Handle GET request to /admin/users
@@ -62,6 +66,7 @@ protected:
    void bindHandler();
    web::dom::MenuGroup _menuGroup;
    app::DbServicePtr _dbService {nullptr};
+   std::shared_ptr<app::EventEngine> _eventEngine = nullptr;
 };
 
 

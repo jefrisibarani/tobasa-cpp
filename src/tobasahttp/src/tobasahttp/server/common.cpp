@@ -74,17 +74,6 @@ std::string Context::sessionId()
    return _request->sessionId();
 }
 
-void Context::webSocketContext(WebSocketContextPtr ctx)
-{
-   if (_webSockeInitHandler)
-      _webSockeInitHandler(ctx);
-}
-
-void Context::webSocketInitHandler(std::function<void(WebSocketContextPtr)> handler)
-{
-   _webSockeInitHandler = handler;
-}
-
 std::shared_ptr<MultipartBodyReader> Context::getBodyReader() 
 {  
    return _bodyReader; 
@@ -104,6 +93,28 @@ void Context::complete(RequestStatus status)
 {
    if (_onCompleteHandler) 
       _onCompleteHandler(status);
+}
+
+void Context::webSocketContext(WebSocketContextPtr ctx)
+{
+   if (_webSockeInitHandler)
+      _webSockeInitHandler(ctx);
+}
+
+void Context::webSocketInitHandler(std::function<void(WebSocketContextPtr)> handler)
+{
+   _webSockeInitHandler = handler;
+}
+
+void Context::sseContext(SseContextPtr context)
+{
+   if (_sseInitHandler)
+      _sseInitHandler(context);
+}
+
+void Context::sseInitHandler(std::function<void(SseContextPtr)> handler)
+{
+   _sseInitHandler = handler;
 }
 
 } // namespace http

@@ -228,7 +228,7 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
       webapp.addController( web::makeController<app::CoreController>(dbService, eventEngine) );
       webapp.addController( web::makeController<app::ApiUsersController>(dbService) );
-      webapp.addController( web::makeController<app::AdminController>(dbService) );
+      webapp.addController( web::makeController<app::AdminController>(dbService, eventEngine) );
       webapp.addController( web::makeController<app::ApiCoreController>(dbService, webapp.agent()) );
 
 #ifdef TOBASA_USE_TESTS_MODULE

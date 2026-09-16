@@ -75,7 +75,7 @@
          
          if (location === 'Toast')
             alertPlaceHolderId = '#alertsInToast';
-         if(location ==='Page')
+         if (location ==='Page')
             alertPlaceHolderId = '#alertsInPage';
          if (location === 'Form')
             alertPlaceHolderId = '#alertsInForm';
@@ -93,7 +93,7 @@
                fadeOut(alertElement,'');
                var bsAlert = new bootstrap.Alert(alertElement);
                bsAlert.close();
-         }, 8000);
+            }, 8000);
          }
          else {
             fadeIn(alertElement,'');

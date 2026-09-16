@@ -10,6 +10,7 @@
 #include "../api_result.h"
 #include "../app_resource.h"
 #include "../app_util.h"
+#include "../event_engine.h"
 #include "core_admin_controller.h"
 
 namespace tbs {
@@ -20,9 +21,11 @@ using namespace web;
 
 using sc = http::StatusCode;
 
-AdminController::AdminController(app::DbServicePtr dbService)
+AdminController::AdminController(app::DbServicePtr dbService
+   , std::shared_ptr<app::EventEngine> eventEngine)
    : web::ControllerBase()
    , _dbService {dbService}
+   , _eventEngine {eventEngine}
 {
    _menuGroup.icon      = "fas fa-toolbox";
    _menuGroup.groupName = "admin";
@@ -340,7 +343,26 @@ http::ResultPtr AdminController::onUsersResetPasswordPost(const web::RouteArgume
    auto userAclDbRepo = _dbService->createUserAclDbRepo();
    bool res = userAclDbRepo->resetUserPassword(targetUserId, newPassword);
    if (res)
+   {
+      EventAction action;
+      action.type = "button";
+      action.link = "/pacs/download/fafadfaffdfadfadsfadsf";
+
+      EventData data;
+      data.type      = "success";
+      data.title     = "Password changed successfully";
+      data.content   = "Your User Data File export is ready for download";
+      data.timestamp = DateTime::now().toUnixTimeMiliSeconds();
+      data.action    = action;
+
+      std::string userIdentity = authResult.identity.pUser->uuid;
+
+      EventMessage message("notification", "Password change completed", data);
+      _eventEngine->sendSseMessage(message, userIdentity);
+      _eventEngine->sendMessage(message, userIdentity);
+
       return web::okResult();
+   }
    else
       return web::failed("Reset user password failed");
 }

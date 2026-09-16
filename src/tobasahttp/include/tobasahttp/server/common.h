@@ -5,6 +5,7 @@
 #include <asio/ip/tcp.hpp>
 #include <tobasa/non_copyable.h>
 #include "tobasahttp/type_common.h"
+#include "tobasahttp/sse.h"
 
 namespace tbs {
 namespace http {
@@ -47,12 +48,14 @@ private:
    int32_t                    _streamId         {-1};
 #endif
 
-   std::function<void(WebSocketContextPtr)> _webSockeInitHandler = nullptr;
    std::shared_ptr<MultipartBodyReader> _bodyReader = nullptr;
-   
 
    // Called when request processing is done
    std::function<void(RequestStatus)> _onCompleteHandler = nullptr;
+
+   std::function<void(WebSocketContextPtr)> _webSockeInitHandler = nullptr;
+
+   std::function<void(SseContextPtr)> _sseInitHandler = nullptr;
 
 public:
    Context(
@@ -97,12 +100,6 @@ public:
 
    void keepAlive(bool value) { _keepAlive = value; }
 
-   /// Called by HTTP request handler to set WebSocket context
-   void webSocketContext(WebSocketContextPtr ctx);
-
-   /// Only called by ServerConnection
-   void webSocketInitHandler(std::function<void(WebSocketContextPtr)> handler);
-
    std::shared_ptr<MultipartBodyReader> getBodyReader();
    
    void setBodyReader(std::shared_ptr<MultipartBodyReader> reader);
@@ -111,6 +108,21 @@ public:
    void onCompleteHandler(std::function<void(RequestStatus)> handler);
 
    void complete(RequestStatus status=RequestStatus::handled);
+
+
+   /// Called by HTTP request handler to set WebSocket context
+   void webSocketContext(WebSocketContextPtr ctx);
+
+   /// Only called by ServerConnection
+   void webSocketInitHandler(std::function<void(WebSocketContextPtr)> handler);
+
+
+   /// Called by HTTP request handler to set SSE context
+   void sseContext(SseContextPtr context);
+
+   /// Only called by ServerConnection
+   void sseInitHandler(std::function<void(SseContextPtr)> handler);
+
 
 #ifdef TOBASA_HTTP_USE_HTTP2
    int32_t streamId() { return _streamId; }

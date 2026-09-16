@@ -38,9 +38,6 @@ void runHttpsServer()
 {
    using namespace tbs;
 
-   size_t ioThreads     = std::thread::hardware_concurrency();
-   if (ioThreads == 0) 
-      ioThreads = 4;
    size_t workerThreads = std::thread::hardware_concurrency();
    if (workerThreads == 0) 
       workerThreads = 4;

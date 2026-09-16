@@ -15,6 +15,7 @@ allowing you to focus on application logic.
 - HTTP/2 support (optional, with nghttp2)
 - HTTPS/TLS encryption (OpenSSL)
 - WebSocket protocol utilities
+- Server-Sent Events (SSE)
 - Chunked transfer encoding
 - Content compression (gzip, deflate)
 

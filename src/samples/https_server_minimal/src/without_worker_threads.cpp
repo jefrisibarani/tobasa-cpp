@@ -15,10 +15,14 @@ void runHttpsServer()
    log::StdoutLogger logger;
    logger.setLevel(log::Level::TraceMask);
    
+   tbs::Logger::logI("Starting Application");
    // setting for https server
    http::SettingsTls settings("0.0.0.0", 8085);
    settings.logVerbose(true);
    settings.maxRequestsPerConnection(0); // disable 
+   settings.certificateChainFile("localhost.crt");
+   settings.privateKeyFile("localhost.key");
+   settings.tmpDhFile("dh2048.pem");
 
    http::SecureServerDefault serverHttps(ioContext, std::move(settings), logger);
 

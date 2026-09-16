@@ -9,6 +9,7 @@
 #include <vector>
 #include <set>
 #include <list>
+#include <mutex>
 #include <string_view>
 #include <optional>
 #include <asio/ip/tcp.hpp>
@@ -42,7 +43,10 @@ constexpr int32_t WS_CLOSE_CODE_MANDATORY_EXTENSION   = 1010;
 constexpr int32_t WS_CLOSE_CODE_INTERNAL_ERROR        = 1011;
 constexpr int32_t WS_CLOSE_CODE_TLS_FAILURE           = 1015;
 
-// Minimal non-templated interface for sending WebSocket frames
+/**
+ * @brief Interface for sending WebSocket frames.
+ * Implemented by connection types that support WebSocket communication.
+ */
 class WebSocketSender
 {
 public:
@@ -55,6 +59,9 @@ public:
 
 namespace ws {
 
+/**
+ * @brief Represents an incoming WebSocket message.
+ */
 class InMessage: public std::istream
 {
 public:
@@ -82,8 +89,11 @@ public:
 };
 using InMessagePtr = std::shared_ptr<InMessage>;
 
-/// The buffer is not consumed during send operations.
-/// Do not alter while sending.
+/**
+ * @brief Outgoing WebSocket message buffer.
+ * The buffer is not consumed while sending. Do not modify it until sending
+ * is complete.
+ */
 class OutMessage: public std::ostream
 {
 public:
@@ -105,7 +115,9 @@ public:
    }
 };
 
-
+/**
+ * @brief Queued outgoing WebSocket frame data and its send callback.
+ */
 class OutData
 {
    public:
@@ -122,27 +134,35 @@ class OutData
       WsSendErrorHandler callback;
 };
 
-/// @brief WebSocket connection context, used internally by ServerConnection
-struct WebSocketConn
+/**
+ * @brief WebSocket transport state used internally by ServerConnection.
+ *
+ * Created when an HTTP connection is upgraded to WebSocket. Owns the
+ * WebSocket frame buffers, fragmentation state, outgoing queue, and event
+ * dispatch context. The public WebSocket handle is passed to application
+ * callbacks and stored by WebSocketContext.
+ */
+struct WebSocketState
 {
    asio::streambuf     sendStreamBuf;
-   bool                closed;
+   bool                closed { false };
    InMessagePtr        fragmentedInMessage;
    std::list<OutData>  sendQueue;
    WebSocketContextPtr wsContext;
 
+   /// Public WebSocket handle associated with this transport state.
    http::WebSocketPtr  wsPtr;
 
    void onOpen();
    void onClose(int32_t status, const std::string& reason);
    void onMessage(const std::string& message);
    void onError(const ErrorData& error);
-   void onError(const std::error_code& error, ErrorType errorTpe, const std::string& source="WebSocketConn");
+   void onError(const std::error_code& error, ErrorType errorTpe, const std::string& source="WebSocketState");
    void onPing();
    void onPong();
 };
-using WebSocketConnPtr  = std::shared_ptr<WebSocketConn>;
-using WebSocketConnUPtr = std::unique_ptr<WebSocketConn>;
+using WebSocketStatePtr  = std::shared_ptr<WebSocketState>;
+using WebSocketStateUPtr = std::unique_ptr<WebSocketState>;
 
 using OnOpenHandler     = std::function<void(http::WebSocketPtr)>;
 using OnCloseHandler    = std::function<void(http::WebSocketPtr, int32_t, const std::string&)>;
@@ -154,36 +174,45 @@ using OnErrorHandler    = std::function<void(http::WebSocketPtr, const ErrorData
 using SkipSendHandler   = std::function<bool(ConnectionId)>;
 } // namespace ws
 
-/** 
- * WebSocket, basically just a wrapper for Upgraded HttpConnection
+/**
+ * @brief Public handle for an upgraded WebSocket connection.
+ *
+ * Provides application code with access to WebSocket messaging, connection
+ * metadata, and connection control.
  */
 class WebSocket
 {
 private:
-   ConnectionPtr           _connection;  // HttpConnection
-   asio::ip::tcp::endpoint _remoteEndpoint;
-   std::any&               _userData;
-   std::string             _identifier;
-   Headers&                _requestHeaders;
+   std::weak_ptr<Connection> _connection;  // HttpConnection
+   asio::ip::tcp::endpoint   _remoteEndpoint;
+   std::any                  _userData;
+   std::string               _identifier;
+   Headers                   _requestHeaders;
 
 public:
+   WebSocket(const WebSocket&) = delete;
+   WebSocket& operator=(const WebSocket&) = delete;
    ~WebSocket() = default;
-   WebSocket(ConnectionPtr connection, std::any& userData, const asio::ip::tcp::endpoint& ep, Headers& requestHeader);
-   
+
+   WebSocket(ConnectionPtr conn, 
+      const std::any& userData, 
+      const asio::ip::tcp::endpoint& ep, 
+      Headers& requestHeader);
+
    void sendText(  const std::string& data, WsSendErrorHandler callback = nullptr);
    void sendBinary(const std::string& data, WsSendErrorHandler callback = nullptr);
-   
-   ConnectionId id();
-   std::string identifier() { return _identifier; }
-   void identifier(const std::string& id);
-   std::any& userData() { return _userData; };
-   asio::ip::tcp::endpoint& remoteEndpoint() { return _remoteEndpoint; };
-   bool closed();
 
-   Headers& requestHeaders() const { return _requestHeaders; }
-
-   /// @brief Closes internal HTTP connection
+   /// Closes internal HTTP connection
    void close(const std::string& reason="", int32_t closeCode=WS_CLOSE_CODE_NORMAL_CLOSURE);
+   
+   ConnectionId id() const;
+   std::string identifier() const;
+   asio::ip::tcp::endpoint remoteEndpoint() const;
+   bool closed() const;
+   void identifier(const std::string& id);
+
+   std::any& userData();
+   Headers& requestHeaders();
 };
 
 class Context;
@@ -228,6 +257,9 @@ class WebSocketContext : public std::enable_shared_from_this<WebSocketContext>
    friend class http::Context;
 
 private:
+   std::vector<WebSocketPtr> connectionsSnapshot() const;
+
+   mutable std::mutex     _connectionsMutex;
    std::set<WebSocketPtr> _connections;
 
 public:
@@ -268,10 +300,10 @@ public:
    
    void sendBinary(const std::string& data, ConnectionId connId=0, WsSendErrorHandler callback = nullptr);
 
-   void sendText(const std::string& data, const std::string identifier, 
+   void sendText(const std::string& data, const std::string& identifier, 
       WsSendErrorHandler callback = nullptr, ws::SkipSendHandler skipCallback = nullptr);
       
-   void sendBinary(const std::string& data, const std::string identifier, 
+   void sendBinary(const std::string& data, const std::string& identifier, 
       WsSendErrorHandler callback = nullptr, ws::SkipSendHandler skipCallback = nullptr);
 };
 

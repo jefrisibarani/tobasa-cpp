@@ -24,7 +24,11 @@
         }
       } 
 
-      TBS.urlServerEventEndpoint = function() {
+      TBS.urlServerEventSseEndpoint = function() {
+        return `${TBS.baseUrl}/server_event_sse`;
+      }
+
+      TBS.urlServerEventWebsocketEndpoint = function() {
         return `${TBS.baseUrl}/server_event_socket`;
       }
 

@@ -110,7 +110,11 @@ void CoreController::bindHandler()
 
    //! Handle GET request to /server_event_socket from ws://server/server_event_socket
    router()->httpGet("/server_event_socket",
-      std::bind(&CoreController::onServerEventSocket, self, _1), AuthScheme::COOKIE);
+      std::bind(&CoreController::onServerEventWebsocket, self, _1), AuthScheme::COOKIE);
+
+   //! Handle GET request to /server_event_sse
+   router()->httpGet("/server_event_sse",
+      std::bind(&CoreController::onServerEventSse, self, _1), AuthScheme::COOKIE);
 
    //! Server as Router default handler
    router()->defaultHandler(
@@ -736,7 +740,7 @@ http::ResultPtr CoreController::onRegister(const web::RouteArgument& arg)
 
 
 //! Handle GET request to /server_event_socket
-http::ResultPtr CoreController::onServerEventSocket(const web::RouteArgument& arg)
+http::ResultPtr CoreController::onServerEventWebsocket(const web::RouteArgument& arg)
 {
    auto httpContext = arg.httpContext();
 
@@ -746,5 +750,18 @@ http::ResultPtr CoreController::onServerEventSocket(const web::RouteArgument& ar
    // Here, we only need to give Http status 200
    return http::makeResult();
 }
+
+
+//! Handle GET request to /server_event_sse
+http::ResultPtr CoreController::onServerEventSse(const web::RouteArgument& arg)
+{
+   auto httpContext = arg.httpContext();
+
+   httpContext->sseContext(_eventEngine->appSseContext());
+
+   // Here, we only need to give Http status 200
+   return http::makeResult();
+}
+
 } // namespace app
 } // namespace tbs

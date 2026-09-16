@@ -247,6 +247,7 @@ protected:
       }
    }
 
+   /// @brief Closes the connection by calling registered OnComplete handler
    virtual void processCompleted(ConnectionId connId, const std::string& message)
    {
       if (_onComplete)

@@ -116,6 +116,7 @@ public:
       ConnectionId newId = _connIdStore.newId(conn->instanceType(), conn->isTls());
       _lastConnectionId = newId;
       conn->id( newId );
+
       conn->start();
 
       {

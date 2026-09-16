@@ -475,7 +475,11 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
    }
 
    if (dataSize <= 0)
+   {
+      if (_response->streaming())
+         return headerSize;
       return 0;
+   }
 
    if ( dataSource->dataReader == nullptr )
       throw http::Exception("invalid response data source reader pointer");

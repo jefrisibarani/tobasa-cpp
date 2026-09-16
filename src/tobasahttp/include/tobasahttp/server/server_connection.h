@@ -43,7 +43,8 @@ inline bool isKnownHttpMethod(const std::string& method)
    return knownHttpMethods().count(method) > 0;
 }
 
-inline std::string knownHttpMethodsCsv() {
+inline std::string knownHttpMethodsCsv() 
+{
    std::ostringstream oss;
    for (auto it = knownHttpMethods().begin(); it != knownHttpMethods().end(); ) 
    {
@@ -76,7 +77,7 @@ inline std::string knownHttpMethodsCsv() {
  * - Managing WebSocket upgrade requests:
  *   - Detecting the upgrade handshake in http request
  *   - Building the appropriate WebSocket response.
- *   - Creating a WebSocketConn object that wraps this connection for
+ *   - Creating a WebSocketState object that wraps this connection for
  *     further frame-based communication.
  * - Passing the HttpContext to the configured request handler
  * - Writing the final HTTP response back to the client.
@@ -85,7 +86,7 @@ inline std::string knownHttpMethodsCsv() {
  * Core parsing ensures protocol correctness and produces a clean HttpContext.
  * Middleware parsing (like MultipartMiddleware) is layered on top, using
  * BodyReader to stream and process complex bodies before resuming the pipeline.
- * For WebSocket requests, ServerConnection transitions into WebSocketConn
+ * For WebSocket requests, ServerConnection transitions into WebSocketState
  * after the upgrade, switching from HTTP message handling to frame-based I/O.
  */
 template <class Traits>
@@ -115,7 +116,11 @@ private:
    http2::Http2SessionPtr  _http2Session           { nullptr };
 #endif
 
-   ws::WebSocketConnUPtr    _wsConnection;
+   // WebSocket State
+   ws::WebSocketStateUPtr   _wsState;
+
+   //Server-Sent Events (SSE) State
+   sse::SseStateUPtr        _sseState;
 
    CompressionRule compressionRule(const std::string& acceptEncoding)
    {
@@ -216,6 +221,9 @@ public:
 
    virtual void write()
    {
+      if (_sseState)
+         return;
+
       this->_logger.trace("[{}] [conn:{}] Sending response to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
 
       if (!_httpContext->response()->preparedForCompression()) 
@@ -584,7 +592,6 @@ protected:
       _httpContext->request()->majorVersion( this->_parser.majorVersion() );
       _httpContext->request()->minorVersion( this->_parser.minorVersion() );
       _httpContext->request()->headers(      std::move( this->_parser.headers() ) );
-      //_httpContext->request()->content(      std::move( this->_parser.content() ) );
 
       _httpContext->request()->setMultipart( this->_parser.hasMultipart() );
 
@@ -624,26 +631,43 @@ protected:
             self->buildErrorResponse(StatusCode::NOT_FOUND);
             self->write();
          }
-         else if (status == RequestStatus::handled) {
-            self->write();
+         else if (status == RequestStatus::handled) 
+         {
+            if (self->_sseState)
+               self->startSseResponse();
+            else
+               self->write();
          }
          else if (status == RequestStatus::async)
          {
             // Do nothing here.
             // The middleware will call nextHandler(ctx) later,
             // and that path must eventually call write().
-            auto x=1;
          }
       };
 
       // setup http context on complete handler (for async request handler)
       _httpContext->onCompleteHandler(processStatus);
 
+      // set SSE initialization handler
+      _httpContext->sseInitHandler(
+         [self = this->selfPtr()](SseContextPtr ctx)
+         {
+            if (ctx)
+            {
+               // Start a long-lived HTTP/1 server-sent events response.
+               self->createSseConnection(ctx);
+            }
+         }
+      );
+
       // Call request handler to process the request.
       // Request handler should prepare response object
       RequestStatus status = _requestHandler(_httpContext);
       processStatus(status);
    }
+
+
 
    /**
     * Handle error from Parser, send error response and close the connection
@@ -853,14 +877,232 @@ protected:
       return std::move(reader);
    }
 
+
+   // -------------------------------------------------------
+   // Server-Sent Events (SSE)
+   // -------------------------------------------------------
+
+   void createSseConnection(SseContextPtr sseContext)
+   {
+      if (_httpContext->httpVersion() != HttpVersion::one || _sseState)
+         return;
+
+      _sseState = std::make_unique<sse::SseState>();
+      _sseState->context = sseContext;
+
+      auto response = _httpContext->response();
+      response->httpStatus(StatusCode::OK);
+      response->setHeaderContentType("text/event-stream");
+      response->setHeader("Cache-Control", "no-cache");
+      response->setHeader("Connection", "keep-alive");
+      response->setHeader("X-Accel-Buffering", "no");
+      response->useChunkedEncoding(true);
+      response->streaming(true);
+      response->prepareForCompression({false, 0, {}, {}, {}});
+
+      auto weakSelf = std::weak_ptr<ServerConnection>(this->selfPtr());
+
+      _sseState->ssePtr = std::make_shared<SseConnection>(
+         // Send Handler
+         [weakSelf](std::string data)
+         {
+            if (auto self = weakSelf.lock())
+            {
+               asio::post(self->executor(),
+                  [self, data = std::move(data)]() mutable
+                  {
+                     if (!self->closed() && self->_sseState)
+                     {
+                        self->_sseState->sendQueue.emplace_back(std::move(data));
+                        self->writeNextSseChunk();
+                     }
+                  });
+            }
+         },
+         // Close Handler
+         [weakSelf]()
+         {
+            if (auto self = weakSelf.lock())
+            {
+               if (!self->_sseState)
+                  return;
+
+               self->removeSseConnection();
+
+               asio::post(self->executor(),
+                  [self]
+                  {
+                     if (!self->closed() && self->_sseState)
+                     {
+                        self->_sseState->closeRequested = true;
+                        self->writeNextSseChunk();
+                     }
+                  });
+            }
+         },
+         this->shared_from_this(),
+         _httpContext->userData(),
+         _httpContext->remoteEndpoint()
+      );
+
+      if (sseContext)
+         sseContext->add(_sseState->ssePtr);
+   }
+
+   void removeSseConnection()
+   {
+      if (!_sseState || !_sseState->ssePtr)
+         return;
+
+      auto connection = _sseState->ssePtr;
+      if (auto context = _sseState->context.lock())
+         context->remove(connection);
+
+      _sseState->ssePtr.reset();
+   }
+
+   void startSseResponse()
+   {
+      if (!_sseState || _sseState->headersWritten || _sseState->writing || this->closed())
+         return;
+
+      this->cancelTimer();
+
+      try
+      {
+         // force content-type to text/event-stream
+         _httpContext->response()->setHeaderContentType("text/event-stream");
+
+         ResponseSerializer serializer(_httpContext->response());
+         serializer.serializeHttp1(&this->_sendBuffer, this->_settings.sendBufferSize());
+         this->startTimer(this->timeoutWrite());
+         asio::async_write(
+            this->_socket,
+            this->_sendBuffer,
+            asio::bind_executor(
+               this->executor(),
+               [self = this->selfPtr()](std::error_code error, std::size_t bytesTransferred)
+               {
+                  self->cancelTimer();
+                  if (!self->_sseState)
+                     return;
+
+                  if (error)
+                  {
+                     self->removeSseConnection();
+                     if (!self->closed())
+                        self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                     self->_sseState.reset();
+                     return;
+                  }
+
+                  self->_httpContext->response()->updateTotalTransferred(bytesTransferred);
+                  self->_sendBuffer.consume(bytesTransferred);
+                  self->_sseState->headersWritten = true;
+                  self->writeNextSseChunk();
+               })
+         );
+      }
+      catch (const std::exception& ex)
+      {
+         if (_sseState)
+         {
+            removeSseConnection();
+            _sseState.reset();
+         }
+
+         if (!this->closed())
+            this->processError(this->id(), ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, "ServerConnection");
+      }
+   }
+
+   void writeNextSseChunk()
+   {
+      if (!_sseState || !_sseState->headersWritten || _sseState->writing || this->closed())
+         return;
+
+      std::shared_ptr<std::string> output;
+      bool finalChunk = false;
+      if (!_sseState->sendQueue.empty())
+      {
+         auto payload = std::move(_sseState->sendQueue.front());
+         _sseState->sendQueue.pop_front();
+
+         std::ostringstream chunk;
+         chunk << std::hex << payload.size() << "\r\n" << payload << "\r\n";
+         output = std::make_shared<std::string>(std::move(chunk).str());
+      }
+      else if (_sseState->closeRequested)
+      {
+         output = std::make_shared<std::string>("0\r\n\r\n");
+         finalChunk = true;
+      }
+      else
+         return;
+
+      _sseState->writing = true;
+      this->startTimer(this->timeoutWrite());
+      asio::async_write(
+         this->_socket,
+         asio::buffer(*output),
+         asio::bind_executor(
+            this->executor(),
+            [self = this->selfPtr(), output, finalChunk](std::error_code error, std::size_t bytesTransferred)
+            {
+               self->cancelTimer();
+               if (!self->_sseState)
+                  return;
+
+               self->_sseState->writing = false;
+
+               if (error)
+               {
+                  self->removeSseConnection();
+                  if (!self->closed())
+                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
+                  self->_sseState.reset();
+                  return;
+               }
+
+               self->_httpContext->response()->updateTotalTransferred(bytesTransferred);
+               if (finalChunk)
+               {
+                  self->removeSseConnection();
+                  self->processCompleted(self->id(), "SSE stream completed");
+                  self->_sseState.reset();
+                  return;
+               }
+
+               self->writeNextSseChunk();
+            })
+      );
+   }
+
+
    // -------------------------------------------------------
    // Web Socket
    // -------------------------------------------------------
 
+   void createWebSocketConnection(WebSocketContextPtr context)
+   {
+      if (_wsState)
+         return;
+
+      _wsState = std::make_unique<ws::WebSocketState>();
+      _wsState->wsPtr = std::make_shared<WebSocket>(
+                                 this->shared_from_this(), 
+                                 _httpContext->userData(), 
+                                 _httpContext->remoteEndpoint(),
+                                 _httpContext->request()->headers() );
+      
+      _wsState->wsContext = context;
+   }
+
+
    /**
     * Handle WebSocket Upgrade request.
     * If request handler accept the upgrade request, it must set webSocketContext in httpContext
-    * and _wsConnection will be set here.
+    * and _wsState will be set here.
     */
    void handleUpgradeRequest(const std::string& upgradeType)
    {
@@ -880,18 +1122,11 @@ protected:
 
       // set web socket initialization handler
       _httpContext->webSocketInitHandler(
-         [this](WebSocketContextPtr ctx)
+         [self = this->selfPtr()](WebSocketContextPtr ctx)
          {
             if (ctx)
             {
-               _wsConnection = std::make_unique<ws::WebSocketConn>();
-               _wsConnection->wsPtr = std::make_shared<WebSocket>(
-                                          this->shared_from_this(), 
-                                          _httpContext->userData(), 
-                                          _httpContext->remoteEndpoint(),
-                                          _httpContext->request()->headers() );
-
-               _wsConnection->wsContext = ctx;
+              self->createWebSocketConnection(ctx);
             }
          }
       );
@@ -941,7 +1176,7 @@ protected:
                {
                   // to further process websocket upgrade request,
                   // request handler must already set webSocketContext in http context
-                  bool wsContextInitialized = (self->_wsConnection && self->_wsConnection->wsContext);
+                  bool wsContextInitialized = (self->_wsState && self->_wsState->wsContext);
                   if (!wsContextInitialized)
                   {
                      self->_logger.error("[{}] [conn:{}] Websocket context not initialized", self->logHttpType(), self->id());
@@ -1044,15 +1279,18 @@ protected:
          error.message = "Connection already closed";
          wsHandleConnError(error);
 
-         _wsConnection.reset();
+         if (_wsState && _wsState->wsContext)
+            _wsState->onError(error);
+
+         _wsState.reset();
          return;
       }
 
       this->_logger.trace("[{}] [conn:{}] Sending ws data to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
 
       std::array<asio::const_buffer, 2> buffers { 
-         _wsConnection->sendQueue.begin()->outHeader->streambuf.data(), 
-         _wsConnection->sendQueue.begin()->outMessage->streambuf.data() };
+         _wsState->sendQueue.begin()->outHeader->streambuf.data(), 
+         _wsState->sendQueue.begin()->outMessage->streambuf.data() };
 
       this->startTimer(this->timeoutWrite());
       asio::async_write(
@@ -1068,13 +1306,13 @@ protected:
                {
                   WsSendErrorHandler callback;
 
-                  auto it = self->_wsConnection->sendQueue.begin();
-                  if (it != self->_wsConnection->sendQueue.end())
+                  auto it = self->_wsState->sendQueue.begin();
+                  if (it != self->_wsState->sendQueue.end())
                   {
                      try
                      {
                         callback = std::move(it->callback);
-                        self->_wsConnection->sendQueue.erase(it); // erase the element after moving the callback
+                        self->_wsState->sendQueue.erase(it); // erase the element after moving the callback
                      }
                      catch(...)
                      {
@@ -1083,8 +1321,12 @@ protected:
 
                   }
 
-                  if (self->_wsConnection->sendQueue.size() > 0)
+                  const bool releaseState = self->_wsState->closed && self->_wsState->sendQueue.empty();
+                  if (!releaseState && self->_wsState->sendQueue.size() > 0)
                      self->wsSendFromQueue();
+
+                  if (releaseState)
+                     self->_wsState.reset();
 
                   if (callback)
                   {
@@ -1102,13 +1344,15 @@ protected:
 
                   self->_logger.error("[{}] [conn:{}] {} wsSendFromQueue: error {} code {}", self->logHttpType(), self->id(), toString(self->_remoteEndpoint), error.message(), error.value());
                   self->wsHandleConnError(err, bytesTransferred);
+                  if (self->_wsState && self->_wsState->wsContext)
+                     self->_wsState->onError(err);
                }
             })
       );
    }
 
    /// Send WebSocket Upgrade Response and start websocket communication
-   virtual void writeWebSocketUpgradeResponse()
+   void writeWebSocketUpgradeResponse()
    {
       this->_logger.debug("[{}] [conn:{}] Sending Websocket upgrade response to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
 
@@ -1134,7 +1378,7 @@ protected:
 
                   self->_isWebSocket = true;
                   // add websocket to wsContext and call onOpen handler
-                  self->_wsConnection->onOpen();
+                  self->_wsState->onOpen();
 
                   self->readWebSocket();
                }
@@ -1142,8 +1386,8 @@ protected:
                {
                   if (!self->closed())
                   {
-                     if (self->_wsConnection && self->_wsConnection->wsContext)
-                        self->_wsConnection->onError(error, ErrorType::system);
+                     if (self->_wsState && self->_wsState->wsContext)
+                        self->_wsState->onError(error, ErrorType::system);
 
                      self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                   }
@@ -1157,7 +1401,7 @@ protected:
       this->startTimer(this->timeoutRead());
       asio::async_read(
          this->_socket,
-         _wsConnection->sendStreamBuf,
+         _wsState->sendStreamBuf,
          asio::transfer_exactly(2),
          asio::bind_executor(
             this->executor(),
@@ -1173,7 +1417,7 @@ protected:
                      return;
                   }
 
-                  std::istream istream( & self->_wsConnection->sendStreamBuf );
+                  std::istream istream( & self->_wsState->sendStreamBuf );
                   std::array < unsigned char, 2 > firstBytes;
                   istream.read((char * ) & firstBytes[0], 2);
 
@@ -1184,7 +1428,7 @@ protected:
                   {
                      const std::string reason("message from client not masked");
                      self->wsSendClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
-                     self->_wsConnection->onClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
+                     self->_wsState->onClose(WS_CLOSE_CODE_PROTOCOL_ERROR, reason);
 
                      self->processCompleted(self->id(), "websocket, " + reason);
                      return;
@@ -1198,7 +1442,7 @@ protected:
                      self->startTimer(self->timeoutRead());
                      asio::async_read(
                         self->_socket,
-                        self->_wsConnection->sendStreamBuf,
+                        self->_wsState->sendStreamBuf,
                         asio::transfer_exactly(2),
                         asio::bind_executor(
                            self->executor(),
@@ -1208,7 +1452,7 @@ protected:
 
                               if (!error)
                               {
-                                 std::istream istream(&self->_wsConnection->sendStreamBuf);
+                                 std::istream istream(&self->_wsState->sendStreamBuf);
 
                                  std::array<unsigned char,2> lengthBytes;
                                  istream.read((char * ) & lengthBytes[0], 2);
@@ -1224,8 +1468,8 @@ protected:
                               {
                                  if (!self->closed())
                                  {
-                                    if (self->_wsConnection && self->_wsConnection->wsContext)
-                                       self->_wsConnection->onError(error, ErrorType::system);
+                                    if (self->_wsState && self->_wsState->wsContext)
+                                       self->_wsState->onError(error, ErrorType::system);
 
                                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                                  }
@@ -1240,7 +1484,7 @@ protected:
                      self->startTimer(self->timeoutRead());
                      asio::async_read(
                         self->_socket,
-                        self->_wsConnection->sendStreamBuf,
+                        self->_wsState->sendStreamBuf,
                         asio::transfer_exactly(8),
                         asio::bind_executor(
                            self->executor(),
@@ -1250,7 +1494,7 @@ protected:
 
                               if (!error)
                               {
-                                 std::istream istream(&self->_wsConnection->sendStreamBuf);
+                                 std::istream istream(&self->_wsState->sendStreamBuf);
 
                                  std::array<unsigned char,8> lengthBytes;
                                  istream.read((char * ) & lengthBytes[0], 8);
@@ -1268,8 +1512,8 @@ protected:
                               {
                                  if (!self->closed())
                                  {
-                                    if (self->_wsConnection && self->_wsConnection->wsContext)
-                                       self->_wsConnection->onError(error, ErrorType::system);
+                                    if (self->_wsState && self->_wsState->wsContext)
+                                       self->_wsState->onError(error, ErrorType::system);
 
                                     self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                                  }
@@ -1285,8 +1529,8 @@ protected:
                {
                   if (!self->closed())
                   {
-                     if (self->_wsConnection && self->_wsConnection->wsContext)
-                        self->_wsConnection->onError(error, ErrorType::system);
+                     if (self->_wsState && self->_wsState->wsContext)
+                        self->_wsState->onError(error, ErrorType::system);
 
                      self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                   }
@@ -1298,13 +1542,13 @@ protected:
 
    void wsReadMessageContent(std::size_t length, unsigned char finRsvOpcode)
    {
-      if (length + (_wsConnection->fragmentedInMessage ? _wsConnection->fragmentedInMessage->length : 0) > this->_settings.wsMessageMaxSize())
+      if (length + (_wsState->fragmentedInMessage ? _wsState->fragmentedInMessage->length : 0) > this->_settings.wsMessageMaxSize())
       {
          const int32_t status = WS_CLOSE_CODE_MESSAGE_TOO_BIG;
          const std::string reason = "message too big";
 
          wsSendClose(status, reason);
-         _wsConnection->onClose(status, reason);
+         _wsState->onClose(status, reason);
 
          this->processCompleted(this->id(), "websocket, " + reason);
          return;
@@ -1313,7 +1557,7 @@ protected:
       this->startTimer(this->timeoutRead());
       asio::async_read(
          this->_socket,
-         _wsConnection->sendStreamBuf,
+         _wsState->sendStreamBuf,
          asio::transfer_exactly(4 + length),
          asio::bind_executor(
             this->executor(),
@@ -1323,7 +1567,7 @@ protected:
 
                if (!error)
                {
-                  std::istream istream( & self->_wsConnection->sendStreamBuf );
+                  std::istream istream( & self->_wsState->sendStreamBuf );
 
                   // Read mask
                   std::array < unsigned char, 4> mask;
@@ -1334,15 +1578,15 @@ protected:
                   // If fragmented message
                   if ((finRsvOpcode & 0x80) == 0 || (finRsvOpcode & 0x0f) == 0)
                   {
-                     if (! self->_wsConnection->fragmentedInMessage)
+                     if (! self->_wsState->fragmentedInMessage)
                      {
-                        self->_wsConnection->fragmentedInMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
-                        self->_wsConnection->fragmentedInMessage->finRsvOpcode |= 0x80;
+                        self->_wsState->fragmentedInMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
+                        self->_wsState->fragmentedInMessage->finRsvOpcode |= 0x80;
                      }
                      else
-                        self->_wsConnection->fragmentedInMessage->length += length;
+                        self->_wsState->fragmentedInMessage->length += length;
 
-                     inMessage = self->_wsConnection->fragmentedInMessage;
+                     inMessage = self->_wsState->fragmentedInMessage;
                   }
                   else
                      inMessage = std::shared_ptr<ws::InMessage> (new ws::InMessage(finRsvOpcode, length));
@@ -1364,7 +1608,7 @@ protected:
 
                      auto reason = inMessage->string();
                      self->wsSendClose(status, reason);
-                     self->_wsConnection->onClose(status, reason);
+                     self->_wsState->onClose(status, reason);
 
                      self->processCompleted(self->id(), "websocket, " + reason);
                      return;
@@ -1377,7 +1621,7 @@ protected:
                      *outMessage << inMessage->string();
                      self->wsSend(outMessage, nullptr, finRsvOpcode + 1);
 
-                     self->_wsConnection->onPing();
+                     self->_wsState->onPing();
 
                      // Next message
                      self->readWebSocket();
@@ -1385,7 +1629,7 @@ protected:
                   // If pong
                   else if ((finRsvOpcode & 0x0f) == 10)
                   {
-                     self->_wsConnection->onPong();
+                     self->_wsState->onPong();
                      // Next message
                      self->readWebSocket();
                   }
@@ -1397,10 +1641,10 @@ protected:
                   }
                   else
                   {
-                     self->_wsConnection->onMessage(inMessage->string());
+                     self->_wsState->onMessage(inMessage->string());
                      // Next message
                      // Only reset _wsFragmentedInMessage for non-control frames (control frames can be in between a fragmented message)
-                     self->_wsConnection->fragmentedInMessage = nullptr;
+                     self->_wsState->fragmentedInMessage = nullptr;
                      self->readWebSocket();
                   }
                }
@@ -1408,8 +1652,8 @@ protected:
                {
                   if (!self->closed())
                   {
-                     if (self->_wsConnection && self->_wsConnection->wsContext)
-                        self->_wsConnection->onError(error, ErrorType::system);
+                     if (self->_wsState && self->_wsState->wsContext)
+                        self->_wsState->onError(error, ErrorType::system);
 
                      self->processError(self->id(), error, ErrorType::system, "ServerConnection");
                   }
@@ -1452,8 +1696,8 @@ protected:
       else
          outHeader->put(static_cast<char>(length));
 
-      _wsConnection->sendQueue.emplace_back(std::move(outHeader), std::move(outMessage), std::move(callback));
-      if (_wsConnection->sendQueue.size() == 1)
+      _wsState->sendQueue.emplace_back(std::move(outHeader), std::move(outMessage), std::move(callback));
+      if (_wsState->sendQueue.size() == 1)
          wsSendFromQueue();
    }
 
@@ -1482,12 +1726,12 @@ protected:
          this->executor(),
          [self, status, reason, callback = std::move(callback)]() mutable
          {
-            if (self->closed() ||  !self->_wsConnection ||  self->_wsConnection->closed)
+            if (self->closed() ||  !self->_wsState ||  self->_wsState->closed)
             {
                return;
             }
 
-            self->_wsConnection->closed = true;
+            self->_wsState->closed = true;
 
             auto sendStream = std::make_shared<ws::OutMessage>();
             sendStream->put(status >> 8);
@@ -1508,7 +1752,7 @@ protected:
          this->executor(),
          [self, data, callback = std::move(callback)]() mutable
          {
-            if (self->closed() || !self->_wsConnection)
+            if (self->closed() || !self->_wsState)
             {
                self->_logger.debug("[{}] [conn:{}] WebSocket connection with {} already closed", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
                return;
@@ -1526,7 +1770,7 @@ protected:
          this->executor(),
          [self, data, callback = std::move(callback)]() mutable
          {
-            if (self->closed() || !self->_wsConnection)
+            if (self->closed() || !self->_wsState)
             {
                self->_logger.debug("[{}] [conn:{}] WebSocket connection with {} already closed", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
                return;
@@ -1540,7 +1784,7 @@ protected:
    {
       // All handlers in the queue is called with error
       std::vector<WsSendErrorHandler> callbacks;
-      for (auto &outData : _wsConnection->sendQueue)
+      for (auto &outData : _wsState->sendQueue)
       {
          try
          {
@@ -1553,7 +1797,7 @@ protected:
          }
       }
 
-      _wsConnection->sendQueue.clear();
+      _wsState->sendQueue.clear();
 
       for (auto &callback : callbacks)
          callback(error);
@@ -1624,7 +1868,7 @@ protected:
          this->processError(this->id(), result.message(), ErrorType::internal, ERROR_CODE_WRITE_FAIL, "ServerConnection");
    }
 
-   virtual void readHttp2()
+   void readHttp2()
    {
       this->startTimer(this->timeoutRead());
       this->_socket.async_read_some(
@@ -1687,7 +1931,7 @@ protected:
       );
    }
 
-   virtual void writeHttp2()
+   void writeHttp2()
    {
       if (this->_http2Session->writingData()) {
          return;

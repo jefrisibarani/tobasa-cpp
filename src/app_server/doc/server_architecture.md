@@ -1,245 +1,305 @@
-# Application Server: Architecture, Features, and TLS
+# Using the Tobasa application server
 
-The application server is the HTTP service built by `app_server`. It combines
-the Tobasa HTTP server with the Tobasa web-service layer, controllers,
-middleware, database services, authentication, static resources, and optional
-modules such as LIS.
+This document is for someone who wants to run or extend the Tobasa web
+service. It explains the useful parts of the server in simple terms:
+configuration, startup, middleware, controllers, routes, and HTTPS.
 
-The server creates two listeners during startup:
+For the complete list of routes, see [`endpoints.md`](endpoints.md). For all
+configuration fields, see [`configuration_reference.md`](configuration_reference.md).
 
-- a plain HTTP listener on `webapp.httpServer.address` and `port`;
-- a TLS listener on the same address and `portHttps`.
+## What the application server does
 
-When `webapp.httpServer.runHttpsOnly` is `true`, only the TLS listener is
-started. Otherwise both listeners are started. Both listeners use the same
-web-service request pipeline.
+The application server is a ready-to-use HTTP service built with Tobasa. It
+can provide:
 
-## Request lifecycle
+- normal HTTP and HTTPS requests;
+- JSON APIs and HTML pages;
+- cookie and bearer-token authentication;
+- sessions and authorization checks;
+- file and embedded web resources;
+- multipart uploads;
+- WebSocket and server-sent event connections;
+- optional database, LIS, and test modules.
 
-The high-level startup sequence is:
+You normally extend it by adding a controller, registering routes, and adding
+middleware when a request needs special processing.
 
-1. Load `appsettings.json`, using the embedded configuration as a fallback.
-2. Deserialize the `webapp` and `logging` options.
-3. Configure the database service and run registered database migrations.
-4. Register middleware and controllers.
-5. Initialize the router, including configured authentication rules.
-6. Construct the HTTP and HTTPS servers.
-7. Start the configured listeners and worker/I/O pools.
+## Startup in practical terms
 
-Requests are passed through the web-service middleware manager. The configured
-middleware includes exception handling, database connectivity checking,
-session handling, authentication/authorization, request identification, and
-optional multipart parsing. The router then selects a controller handler by
-HTTP method and path.
+The application starts in `src/app_server/src/main.cpp`. The important steps
+are:
 
-See [`endpoints.md`](endpoints.md) for the route inventory and
-[`app_configuration.md`](app_configuration.md) for the configuration loading
-model.
+1. Create a `web::Webapp` object.
+2. Load `appsettings.json`. If the file is missing, the embedded configuration
+   is used.
+3. Read the web server and database settings.
+4. Create the database service and register database migrations.
+5. Add application middleware.
+6. Add controllers and their routes.
+7. Add optional modules such as LIS or the test module.
+8. Configure the default TLS assets.
+9. Call `webapp.start()`.
 
-## Related configuration
+The application does not need a separate route-registration step after
+`start()`. `WebService::setupHandlers()` connects the middleware and
+controller factories to the router before requests are accepted.
 
-The server settings are under `webapp.httpServer` in
-`configuration/appsettings.json`:
+## The request path
 
-| Setting group | Controls |
+For a normal request, the flow is:
+
+```text
+client
+  -> HTTP or HTTPS listener
+  -> HTTP parsing
+  -> web middleware
+  -> authentication and authorization
+  -> router
+  -> controller handler
+  -> http::Result
+  -> http::Response
+  -> client
+```
+
+The controller usually returns an `http::Result`. The web layer converts that
+result into an `http::Response`, which is then serialized and sent by the
+HTTP server.
+
+The exact middleware order depends on how the application adds middleware.
+In the current application, the chain includes exception handling, database
+checking, multipart parsing, response-header rules, request identification,
+cache control, content-type checks, sessions, authentication, and
+authorization.
+
+## Adding a controller
+
+A controller normally inherits from `web::ControllerBase` and registers its
+routes in `bindHandler()`:
+
+```cpp
+class HealthController : public web::ControllerBase
+{
+public:
+   void bindHandler() override
+   {
+      router()->httpGet(
+         "/health",
+         std::bind(&HealthController::onHealth, this,
+                   std::placeholders::_1));
+   }
+
+   http::ResultPtr onHealth(const web::RouteArgument& arg)
+   {
+      return http::makeResult<http::Result>("OK", "text/plain");
+   }
+};
+```
+
+Then add the controller to the web application before calling `start()`:
+
+```cpp
+webapp.addController(
+   web::makeController<HealthController>());
+```
+
+Use the router method that matches the HTTP method:
+
+```cpp
+router()->httpGet("/items", handler);
+router()->httpPost("/items", handler);
+router()->httpPut("/items", handler);
+router()->httpDelete("/items", handler);
+```
+
+Typed path values are declared in the route and read from `RouteArgument`:
+
+```cpp
+router()->httpGet(
+   "/users/{user_id:int}",
+   std::bind(&UserController::onUser, this,
+             std::placeholders::_1));
+```
+
+The application route API currently registers `GET`, `POST`, `PUT`, and
+`DELETE` handlers. The lower HTTP parser also recognizes `HEAD` and
+`OPTIONS`, but `app_server` does not register application handlers for them.
+
+## Returning a result
+
+For controller code, returning a result is usually simpler than constructing
+a response by hand:
+
+```cpp
+http::ResultPtr UserController::onUser(const web::RouteArgument& arg)
+{
+   auto userId = arg.get("user_id");
+   if (!userId)
+      return web::badParameter("user_id is required");
+
+   auto user = findUser(userId.value());
+   if (!user)
+      return web::notFound("User not found");
+
+   auto result = http::makeResult<http::Result>(user->json().dump(),
+                                                "application/json");
+   return result;
+}
+```
+
+When using the application server, common result helpers include:
+
+- `web::object(value)` for JSON data;
+- `web::okResult(message)` for a successful message;
+- `web::badRequest(message)` for an HTTP 400 response;
+- `web::badParameter(message)` for an application validation error;
+- `web::notFound(message)` for an HTTP 404 response;
+- `web::unauthorized(message)` and `web::forbidden(message)` for access errors;
+- `web::appError(message)` for an HTTP 500 response.
+
+The application-specific helpers are implemented in
+[`src/app_server/src/api_result.h`](../src/api_result.h). A library user can
+also create a class derived from `http::Result` when a different response
+format is needed.
+
+## Middleware
+
+Middleware receives the request context and a `next` handler. It can inspect
+the request, stop the request with its own result, or call `next` and continue
+the chain.
+
+```cpp
+webapp.addMiddleware(
+   [](const http::HttpContext& context,
+      const http::RequestHandler& next) {
+      // Check or change the request here.
+      return next(context);
+   },
+   "ExampleMiddleware");
+```
+
+Add middleware before adding controllers and before `webapp.start()`. Put
+checks that must happen before routing early in the chain. Authentication and
+authorization should stay in the web-service middleware layer instead of
+being copied into every controller.
+
+## Authentication
+
+When a route is registered, it can declare an authentication scheme:
+
+```cpp
+router()->httpGet("/profile", handler, web::AuthScheme::COOKIE);
+router()->httpGet("/api/data", handler, web::AuthScheme::BEARER);
+router()->httpGet("/public", handler, web::AuthScheme::NONE);
+```
+
+The available schemes are `NONE`, `COOKIE`, `BEARER`, and `BASIC`.
+
+This declaration is the route default. The `routeAuthLists` configuration is
+also checked by the router and can change the effective rule for a matching
+path. Check the configuration as well as the controller when debugging an
+authentication problem.
+
+## HTTP and HTTPS settings
+
+The listener settings are under `webapp.httpServer`:
+
+| Setting | Use |
 | --- | --- |
-| `address`, `port`, `portHttps` | Listener bind address and ports. |
-| `runHttpsOnly` | Whether the plain HTTP listener is started. |
-| `http2Enabled` | HTTP/2 on the TLS listener when HTTP/2 support is compiled in. |
-| `timeoutRead`, `timeoutWrite`, `timeoutProcessing` | Request timeout limits. |
-| `readBufferSize`, `sendBufferSize`, `maxHeaderSize` | HTTP buffer and header limits. |
-| `maxRequestsPerConnection` | Connection request limit. |
-| `ioPoolSize`, `workerPoolSize` | I/O and request worker pool sizes. |
-| `docRoot` | Filesystem document root used by the HTTP service. |
-| `temporaryDir`, `enableMultipartParsing` | Multipart request processing. |
-| `compression` | Response compression. |
-| `useRateLimiter` and `rateLimiter*` | Optional request rate limiting. |
-| `tls` | HTTPS certificate, key, DH, and SNI host configuration. |
+| `address` | Address to bind. |
+| `port` | Plain HTTP port. |
+| `portHttps` | HTTPS port. |
+| `runHttpsOnly` | Start only HTTPS when `true`. |
+| `http2Enabled` | Enable HTTP/2 on HTTPS when it is compiled in. |
+| `timeoutRead`, `timeoutWrite`, `timeoutProcessing` | Time limits for request work. |
+| `maxHeaderSize` | Maximum request header size. |
+| `maxRequestsPerConnection` | Maximum requests on one connection. |
+| `ioPoolSize`, `workerPoolSize` | I/O and request worker counts. |
+| `docRoot` | Directory used for files served from disk. |
+| `temporaryDir` | Temporary directory for multipart uploads. |
+| `enableMultipartParsing` | Enable multipart request parsing. |
+| `compression` | Response compression settings. |
+| `useRateLimiter` | Enable request rate limiting. |
 
-The application resolves the temporary directory and TLS file paths relative
-to the executable when the configured path is relative. An empty temporary
-directory is replaced with the platform temporary directory, and the
-application creates the resulting directory if it does not exist.
+With the default mode, the server starts both listeners. With
+`runHttpsOnly: true`, it starts only the HTTPS listener. Both listeners use
+the same middleware, router, and controller code.
 
-The server settings are deserialized into `tbs::http::conf::Server` and then
-copied into `http::Settings` and `http::SettingsTls`. The detailed field
-reference is in [`configuration_reference.md`](configuration_reference.md).
+## TLS setup
 
-## Features
+The default TLS settings are under `webapp.httpServer.tls`:
 
-### HTTP and HTTPS
+```json
+"tls": {
+   "certificateChainFile": "./tls_asset/server.crt",
+   "privateKeyFile": "./tls_asset/server.key",
+   "tmpDhFile": "./tls_asset/dh2048.pem"
+}
+```
 
-The server supports plain HTTP and TLS-enabled HTTPS. The TLS listener uses
-the configured HTTPS port and can optionally enable HTTP/2 when the binary is
-built with `TOBASA_HTTP_USE_HTTP2`.
+Use certificates that match the hostnames used by clients. The application
+has embedded development assets for the certificate, private key, and DH
+parameters. They are useful for local testing, but they are not deployment
+certificates.
 
-#### Supported HTTP methods
-
-At the HTTP connection layer, the server accepts these request methods:
-
-| Method | Protocol status | Application use |
-| --- | --- | --- |
-| `GET` | Accepted | Used by page, API, administration, resource, LIS, and WebSocket route registrations. |
-| `POST` | Accepted | Used by form, API, administration, LIS, and test route registrations. |
-| `PUT` | Accepted | Used by the user profile update route. |
-| `DELETE` | Accepted | Used by user and administration delete routes. |
-| `HEAD` | Accepted by the HTTP parser | No application route is registered with `Router::httpHead`; support at the application route layer is not provided by `app_server`. |
-| `OPTIONS` | Accepted by the HTTP parser | No application route is registered with `Router::httpOptions`; support at the application route layer is not provided by `app_server`. |
-
-The server rejects `CONNECT`, `TRACE`, `PATCH`, and unknown methods during
-request parsing with `405 Method Not Allowed`. For that response it sends an
-`Allow` header containing the parser-level method list. Although the HTTP
-method conversion utility defines enum values for `CONNECT`, `TRACE`, and
-`PATCH`, those methods are intentionally not in the server's accepted-method
-set.
-
-The router's public registration API exposes only `httpGet`, `httpPost`,
-`httpPut`, and `httpDelete`, which is why the application's route inventory
-contains those four methods. A method being accepted by the parser does not
-mean that every path has a handler for that method; consult
-[`endpoints.md`](endpoints.md) for the registered method/path combinations.
-
-### Routing and controllers
-
-Routes are registered by controller factories during `WebService::setupHandlers`.
-The router supports method-specific handlers and typed path parameters such as
-`{user_id:int}`. A default handler serves unmatched routes through the core
-controller.
-
-### Middleware and authentication
-
-Middleware is initialized before controllers and the router. Controller route
-authentication declarations use `NONE`, `COOKIE`, `BEARER`, or `BASIC`; the
-configured `routeAuthLists` can change the effective authentication decision
-for matching paths. Cookie sessions and bearer-token authentication are both
-used by the application.
-
-### Static and embedded resources
-
-The application can serve templates and static web-root resources from disk or
-from resources compiled into the executable, depending on the build and
-`webapp.webService.useInMemoryResources`. Configuration files and default TLS
-assets have their own embedded resource group and are available independently
-of the template/static-resource setting.
-
-### Database-backed service
-
-The web server is coupled to the configured application database. It runs the
-database migration check before starting HTTP, and the database-check
-middleware protects request processing when the database is unavailable. See
-[`database_setup.md`](database_setup.md) for setup and migration details.
-
-### WebSockets and optional modules
-
-The HTTP routing layer can upgrade registered GET routes to WebSocket handling.
-The test WebSocket controller and LIS controller are conditional build/module
-features. They are not present in every executable.
-
-### Operational controls
-
-The server supports request timeouts, bounded connection request counts,
-compression, multipart parsing, rate limiting, configurable thread pools,
-custom status-page rendering, and graceful shutdown on `SIGINT`.
-
-## TLS certificates
-
-HTTPS uses one default TLS context and can create additional contexts for
-configured SNI hostnames.
-
-### Default certificate and key
-
-The default settings come from `webapp.httpServer.tls`:
-
-| Setting | Meaning |
-| --- | --- |
-| `certificateChainFile` | Default server certificate chain. |
-| `privateKeyFile` | Default server private key. |
-| `password` | Defined in the configuration model, but the current server setup does not pass it to `SettingsTls` as the private-key password. |
-| `tmpDhFile` | Default temporary Diffie-Hellman parameter file. |
-
-For each default asset, the HTTPS connection starter checks whether the
-configured file exists. If it exists, that file is used. If it does not exist,
-the application callback supplies an embedded asset:
-
-| Asset | Embedded resource |
-| --- | --- |
-| Certificate chain | `tls_asset/127.0.0.1.crt` |
-| Private key | `tls_asset/127.0.0.1.key` |
-| DH parameters | `tls_asset/dh2048.pem` |
-
-The embedded assets are compiled from the application `tls_asset` resources.
-They provide a development fallback; they are not a replacement for a
-deployment certificate issued for the server's real hostnames.
-
-### Host-specific certificates and SNI
-
-Add entries to `webapp.httpServer.tls.hostCertificates` to configure
-hostname-specific certificates:
+For several hostnames, add entries to `hostCertificates`:
 
 ```json
 "hostCertificates": [
-	{
-		"hostname": "example.test",
-		"certificateChainFile": "./tls_asset/example.test.crt",
-		"privateKeyFile": "./tls_asset/example.test.key",
-		"password": ""
-	}
+   {
+      "hostname": "api.example.com",
+      "certificateChainFile": "./tls_asset/api.crt",
+      "privateKeyFile": "./tls_asset/api.key",
+      "password": ""
+   }
 ]
 ```
 
-At TLS setup time, the server creates an additional TLS context for each
-entry and stores it by `hostname`. The TLS SNI callback selects that context
-when the client supplies the matching hostname. If the client hostname has no
-matching entry, TLS keeps using the default context.
+The TLS SNI callback selects a host certificate when the client hostname
+matches an entry. Otherwise, the default TLS context is used. Relative paths
+are resolved relative to the executable by the application configuration
+loader.
 
-For each host-specific entry independently:
+TLS contexts are created during startup. Changing certificate files or TLS
+settings does not reload them in a running process; restart the application
+after changing them.
 
-- an existing `certificateChainFile` is loaded from disk;
-- a missing certificate file falls back to the default embedded certificate;
-- an existing `privateKeyFile` is loaded from disk;
-- a missing key file falls back to the default embedded private key;
-- the configured host `password` is used as the private-key password when it
-	is non-empty;
-- the configured/default DH file is used when it exists, otherwise embedded
-	DH parameters are used.
+## Files and embedded resources
 
-The host-specific certificate paths are resolved relative to the executable
-during application configuration loading. The default and host-specific
-certificate entries are not automatically discovered from the filesystem;
-they must be listed in configuration.
+The application can serve resources from the document root. A build can also
+include web resources inside the executable. The setting
+`webapp.webService.useInMemoryResources` controls whether the application uses
+those embedded resources when that build feature is available.
 
-## What this server is not
+The application also has embedded fallback configuration and TLS assets. This
+does not mean that every file is embedded, so production deployments should
+still provide their configured files and templates.
 
-The source defines this component as an application web service, so its scope
-has important limits:
+## WebSockets, SSE, and optional modules
 
-- It is not a general-purpose reverse proxy or load balancer. No upstream
-	proxy routing is configured by the application server.
-- It is not a database server. It connects to an existing server database or
-	creates a local SQLite file, while the database engine performs the actual
-	storage and query work.
-- It is not a certificate authority. It loads certificate material and does
-	not issue, renew, or obtain certificates.
-- It is not a hot-reload configuration service. Configuration and TLS contexts
-	are built during startup; editing configuration or certificate files does
-	not reload them in a running process.
-- It is not a static-file-only server. Static resources are one capability;
-	requests also pass through middleware, authentication, routing, controllers,
-	database services, and optional WebSocket/LIS handlers.
-- It is not automatically HTTP/2 capable in every build. HTTP/2 settings are
-	compiled conditionally and only affect the HTTPS server when that support is
-	present.
-- It is not a guarantee that the embedded TLS certificate matches a requested
-	hostname. The embedded default assets are development fallbacks; use
-	host-specific certificates for deployed names.
+WebSocket endpoints are registered as `GET` routes. The HTTP handler checks
+the upgrade request and changes the connection to WebSocket processing. SSE
+uses a long-lived HTTP response instead of a WebSocket upgrade.
 
-## Shutdown and failure behavior
+The LIS and test controllers are optional. Their routes exist only when the
+corresponding module is compiled and registered. Do not assume that routes in
+[`endpoints.md`](endpoints.md) exist in every build.
 
-The server listens for `SIGINT` and stops the secure listener alone in
-HTTPS-only mode, or both listeners otherwise. It then shuts down the web
-service and joins the I/O and worker threads.
+## Practical troubleshooting
 
-Configuration, TLS setup, and server-start exceptions are logged and prevent a
-normal running server. A database migration connection failure is logged by
-the migration subsystem; the later database connectivity checks determine
-whether startup can proceed successfully.
+- A route returns 404: check the HTTP method, the exact path, and whether the
+  controller was added to the application.
+- Authentication fails: check both the route declaration and
+  `routeAuthLists` in the configuration.
+- A JSON controller rejects a request: check the request content type and
+  body format. Many application handlers require `application/json`.
+- Uploaded files are missing: check multipart parsing and `temporaryDir`.
+- HTTPS does not start: check the certificate, key, DH file, and their paths.
+  The startup log contains the configuration or TLS error.
+- A route works in one executable but not another: check compile-time modules
+  such as LIS and the test module.
+
+## Shutdown
+
+The application handles `SIGINT`, stops its listeners, stops optional modules,
+and joins its I/O and worker threads. Startup or TLS configuration errors are
+reported and prevent normal server operation.

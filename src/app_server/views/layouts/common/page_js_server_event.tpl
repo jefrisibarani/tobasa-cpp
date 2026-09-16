@@ -74,16 +74,20 @@
          }
       }
 
+      // Notification system
+      let notificationsList = [];
+
       function handleConnectedEvent(eventMessage)
       {
          if (eventMessage.data && eventMessage.data.wsConnIdentity !== undefined) {
             TBS.log('[EVT ] WebSocket connection ID: ' + eventMessage.data.wsConnIdentity);
             TBS.wsConnIdentity = eventMessage.data.wsConnIdentity;
          }
+         if (eventMessage.data && eventMessage.data.sseConnIdentity !== undefined) {
+            TBS.log('[EVT ] SSE connection ID: ' + eventMessage.data.sseConnIdentity);
+            TBS.sseConnIdentity = eventMessage.data.sseConnIdentity;
+         }
       }
-
-      // Notification system
-      let notificationsList = [];
 
       function handleNotificationEvent(eventMessage)
       {
@@ -107,15 +111,13 @@
          const unreadCount = notificationsList.filter(n => !n.read).length;
          const icon = document.getElementById('notification_icon');
          
-         if (!icon) {
+         if (!icon)
             return;
-         }
          
          // Remove existing badge if any
          let existingBadge = icon.querySelector('.notification_badge');
-         if (existingBadge) {
+         if (existingBadge)
             existingBadge.remove();
-         }
          
          if (unreadCount > 0) {
             icon.classList.add('has-unread');
@@ -124,9 +126,9 @@
             badge.className = 'notification_badge';
             badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
             icon.appendChild(badge);
-         } else {
+         } 
+         else
             icon.classList.remove('has-unread');
-         }
       }
 
       function showNotificationDialog()
@@ -136,9 +138,9 @@
 
          let content = '<div style="max-height: 500px; overflow-y: auto; padding: 10px;">';
          
-         if (notificationsList.length === 0) {
+         if (notificationsList.length === 0)
             content += '<div class="text-muted text-center py-4"><p>No notifications</p></div>';
-         } else {
+         else {
             notificationsList.forEach(notif => {
                const iconMap = {
                   'info'    : 'fas fa-info-circle',
@@ -150,8 +152,8 @@
                const time = new Date(notif.timestamp).toLocaleString();
                
                let actionHtml = '';
-               if (notif.action && notif.action.actionType === 'button' && notif.action.actionLink) {
-                  actionHtml = `<div style="margin-top:10px;"><a href="${notif.action.actionLink}" class="btn btn-sm btn-primary" target="_blank">Download</a></div>`;
+               if (notif.action && notif.action.type === 'button' && notif.action.link) {
+                  actionHtml = `<div style="margin-top:10px;"><a href="${notif.action.link}" class="btn btn-sm btn-primary" target="_blank">Download</a></div>`;
                }
                
                content += `
@@ -186,8 +188,160 @@
          });
       }
 
-      let socket = null;
-      let appSocketUrl = TBS.urlServerEventEndpoint();
+      function handleServerEventMessage(rawMessage, source)
+      {
+         if (typeof rawMessage !== 'string') {
+            TBS.log('[WARN] Ignoring unsupported ' + source + ' message type.');
+            return;
+         }
+
+         rawMessage = rawMessage.trim();
+         if (!rawMessage)
+            return;
+
+         let payload;
+         try {
+            payload = JSON.parse(rawMessage);
+         } 
+         catch (parseError) {
+            TBS.log('[EVT ] ' + rawMessage);
+            return;
+         }
+
+         try {
+            const eventMessage = EventMessage.fromJson(payload);
+            if (eventMessage.type === 'websocket.connected' ||
+                eventMessage.type === 'sse.connected') {
+               handleConnectedEvent(eventMessage);
+               return;
+            }
+
+            if (eventMessage.type === 'notification') {
+               handleNotificationEvent(eventMessage);
+               return;
+            }
+
+            if (!eventMessage.message) {
+               TBS.log('[WARN] ' + source + ' JSON message has no message field.');
+               return;
+            }
+
+            const type = eventMessage.type.toLowerCase();
+            if (type === 'error' || type === 'failure') {
+               TBS.alert.error(eventMessage.message, 'Toast', '');
+            } 
+            else {
+               TBS.alert.info(eventMessage.message, 'Toast', '');
+            }
+         } 
+         catch (error) {
+            TBS.log('[ERR ] Failed to handle ' + source + ' message: ' +
+               (error.message || 'An unknown error occurred.'));
+         }
+      }
+
+      let socket       = null;
+      let sseSource    = null;
+      let appSocketUrl = TBS.urlServerEventWebsocketEndpoint();
+      let appSseUrl    = TBS.urlServerEventSseEndpoint();
+
+      function initSocketForServerEvent()
+      {
+         if (socket)
+            return socket;
+
+         if (typeof appSocketUrl !== 'string' || !appSocketUrl.trim()) {
+            TBS.log('[WARN] WebSocket endpoint is not configured.');
+            return null;
+         }
+
+         try {
+            socket = new WebSocket(appSocketUrl);
+
+            socket.addEventListener('open', () => {
+               TBS.log('[EVT ] Connected to WebSocket server at ' + appSocketUrl);
+            });
+
+            socket.addEventListener('message', event => {
+               handleServerEventMessage(event.data, 'WebSocket');
+            });
+
+            socket.addEventListener('close', () => {
+               TBS.log('[EVT ] Disconnected from WebSocket server.');
+               socket = null;
+            });
+
+            socket.addEventListener('error', error => {
+               TBS.log('[ERR ] WebSocket error: ' +
+                  (error.message || 'An unknown error occurred.'));
+            });
+         } 
+         catch (error) {
+            socket = null;
+            TBS.log('[ERR ] Failed to initialize WebSocket: ' +
+               (error.message || 'An unknown error occurred.'));
+         }
+
+         return socket;
+      }
+
+      function initSseForServerEvent()
+      {
+         if (sseSource)
+            return sseSource;
+
+         if (typeof EventSource !== 'function') {
+            TBS.log('[WARN] Server-Sent Events are not supported by this browser.');
+            return null;
+         }
+
+         if (typeof appSseUrl !== 'string' || !appSseUrl.trim()) {
+            TBS.log('[WARN] SSE endpoint is not configured.');
+            return null;
+         }
+
+         try {
+            sseSource = new EventSource(appSseUrl, { withCredentials: true });
+
+            sseSource.addEventListener('open', () => {
+               TBS.log('[EVT ] Connected to SSE server at ' + appSseUrl);
+            });
+
+            sseSource.onmessage = event => {
+               handleServerEventMessage(event.data, 'SSE');
+            };
+
+            // The server uses the SSE event field, so named events need listeners.
+            [
+               'sse.connected',
+               'notification',
+               'message',
+               'failure'
+            ].forEach(eventType => {
+               sseSource.addEventListener(eventType, event => {
+                  handleServerEventMessage(event.data, 'SSE');
+               });
+            });
+
+            sseSource.onerror = () => {
+               if (sseSource && sseSource.readyState === EventSource.CLOSED) {
+                  TBS.log('[EVT ] SSE connection closed.');
+                  sseSource = null;
+               } 
+               else {
+                  TBS.log('[WARN] SSE connection interrupted; browser will retry.');
+               }
+            };
+         } 
+         catch (error) {
+            sseSource = null;
+            TBS.log('[ERR ] Failed to initialize SSE: ' +
+               (error.message || 'An unknown error occurred.'));
+         }
+
+         return sseSource;
+      }
+
       window.addEventListener('DOMContentLoaded', event => {
          try {
             // Initialize notification icon
@@ -197,81 +351,15 @@
             if (notificationIcon) {
                notificationIcon.addEventListener('click', showNotificationDialog);
             }
+
             updateNotificationBadge();
-
-            if (typeof appSocketUrl !== 'string' || !appSocketUrl.trim()) {
-               TBS.log('[WARN] WebSocket endpoint is not configured.');
-               return;
-            }
-
-            // WebSocket construction can throw for an invalid URL or security policy.
-            socket = new WebSocket(appSocketUrl);
-
-            socket.addEventListener('open', () => {
-               TBS.log("[EVT ] Connected to WebSocket server at " + appSocketUrl);
-            });
-
-            socket.addEventListener('message', (event) => {
-               try {
-                  if (typeof event.data !== 'string') {
-                     TBS.log('[WARN] Ignoring unsupported WebSocket message type.');
-                     return;
-                  }
-
-                  const rawMessage = event.data.trim();
-                  if (!rawMessage) {
-                     return;
-                  }
-
-                  let payload;
-                  try {
-                     payload = JSON.parse(rawMessage);
-                  } catch (parseError) {
-                     // The server sends a plain-text welcome message on connect.
-                     TBS.log("[EVT ] " + rawMessage);
-                     return;
-                  }
-
-                  const eventMessage = EventMessage.fromJson(payload);
-                  if (eventMessage.type === 'websocket.connected') {
-                     handleConnectedEvent(eventMessage);
-                     return;
-                  }
-
-                  if (eventMessage.type === 'notification') {
-                     handleNotificationEvent(eventMessage);
-                     return;
-                  }
-
-                  if (!eventMessage.message) {
-                     TBS.log('[WARN] WebSocket JSON message has no message field.');
-                     return;
-                  }
-
-                  const type = eventMessage.type.toLowerCase();
-
-                  if (type === 'error' || type === 'failure') {
-                     TBS.alert.error(eventMessage.message, 'Toast', '');
-                  } else {
-                     TBS.alert.info(eventMessage.message, 'Toast', '');
-                  }
-               } catch (error) {
-                  TBS.log('[ERR ] Failed to handle WebSocket message: ' +
-                     (error.message || 'An unknown error occurred.'));
-               }
-            });
-
-            socket.addEventListener('close', () => {
-               TBS.log("[EVT ] Disconnected from WebSocket server.");
-               socket = null;
-            });
-
-            socket.addEventListener('error', (error) => {
-               TBS.log("[ERR ] " + (error.message || "An unknown error occurred."));
-            });
-         } catch (error) {
+            initSseForServerEvent();
+            //initSocketForServerEvent();
+         } 
+         catch (error) {
             socket = null;
-            TBS.log('[ERR ] Failed to initialize WebSocket: ' +
+            sseSource = null;
+            TBS.log('[ERR ] Failed to initialize server events: ' +
                (error.message || 'An unknown error occurred.'));
          }
       });

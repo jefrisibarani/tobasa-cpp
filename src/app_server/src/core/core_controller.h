@@ -12,6 +12,7 @@ namespace web { class Session; }
 namespace app {
 
 class EventEngine;
+
 class CoreController
    : public web::ControllerBase
 {
@@ -62,8 +63,10 @@ public :
    http::ResultPtr onUserProfile(const web::RouteArgument& arg);   
 
    //! Handle GET request to /server_event_socket
-   /// App Websocket Entry Point
-   http::ResultPtr onServerEventSocket(const web::RouteArgument& arg);
+   http::ResultPtr onServerEventWebsocket(const web::RouteArgument& arg);
+
+   //! Handle GET request to /server_event_sse
+   http::ResultPtr onServerEventSse(const web::RouteArgument& arg);
 
 protected:
    void bindHandler();
@@ -75,8 +78,6 @@ protected:
          const std::string& password);
 
    http::ResultPtr redirectOnLoggedIn(std::shared_ptr<web::Session> session);
-
-   void initWebSocketContext();
 
    app::DbServicePtr _dbService {nullptr};
 

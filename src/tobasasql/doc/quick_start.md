@@ -2,61 +2,58 @@
 
 ## Introduction
 
-TobasaSQL is a lightweight C++ SQL abstraction layer. It lets an application
-use the same high-level connection, parameter, query, and result APIs with
-SQLite, PostgreSQL, MySQL/MariaDB, and Microsoft SQL Server. The ODBC and ADO
-drivers in this project are implemented and tested specifically for Microsoft
-SQL Server; they are not general-purpose ODBC/ADO database integrations.
+TobasaSQL is a small C++ SQL library. It gives your application the same main
+connection, parameter, query, and result APIs for SQLite, PostgreSQL,
+MySQL/MariaDB, and Microsoft SQL Server.
 
-TobasaSQL is deliberately not an ORM. SQL statements remain visible to the
-application, while the library provides:
+The ODBC and ADO drivers in this project are built and tested for Microsoft
+SQL Server. They are not general-purpose ODBC or ADO integrations for every
+database.
 
-* driver-specific connection and parameter binding behind `SqlConnection`;
-* parameterized SQL through `SqlQuery` and `DataType`;
-* scalar, command, and navigable result operations;
-* normalized column metadata and backend-native metadata access;
-* optional SQL and execution logging.
+TobasaSQL is not an ORM. You write the SQL yourself. The library handles the
+backend-specific parts of connections, parameters, results, metadata, and
+optional logging.
 
-The central types are templates over a selected driver:
+The main types are templates that use a selected driver:
 
 | Type | Purpose |
 | --- | --- |
-| `sql::SqlConnection<Driver>` | Open/close a connection and execute SQL. |
-| `sql::SqlQuery<Driver>` | Hold SQL plus typed parameters and execute it. |
-| `sql::SqlResult<Driver>` | Navigate rows and read values/metadata. |
-| `sql::SqlTable<Driver>` | Open and edit a table through the table helper API. |
-| `sql::DataType` | Portable type requested for a parameter or reported for a column. |
+| `sql::SqlConnection<Driver>` | Connect, disconnect, and run SQL. |
+| `sql::SqlQuery<Driver>` | Store SQL and typed parameters, then execute it. |
+| `sql::SqlResult<Driver>` | Move through rows and read values or metadata. |
+| `sql::SqlTable<Driver>` | Open and edit a table with the table helper API. |
+| `sql::DataType` | Portable type used for a parameter or reported for a column. |
 
-The complete portable type and conversion reference is in
-[`data_types.md`](data_types.md).
+See [`data_types.md`](data_types.md) for the complete type and conversion
+reference.
 
 ## Before you start
 
 Build the repository with CMake as described in [`BUILD.md`](../../../BUILD.md).
-The TobasaSQL CMake options are:
+Choose the TobasaSQL backend options you need:
 
 | Option | Backend |
 | --- | --- |
-| `TOBASA_SQL_USE_SQLITE` | SQLite; enabled by the TobasaSQL CMake file if no backend is selected. |
+| `TOBASA_SQL_USE_SQLITE` | SQLite. The TobasaSQL CMake file enables it when no backend is selected. |
 | `TOBASA_SQL_USE_PGSQL` | PostgreSQL through `libpq`. |
 | `TOBASA_SQL_USE_MYSQL` | MySQL/MariaDB through the MariaDB C connector. |
-| `TOBASA_SQL_USE_ODBC` | Microsoft SQL Server through the tested SQL Server ODBC driver configuration. |
+| `TOBASA_SQL_USE_ODBC` | Microsoft SQL Server through the tested SQL Server ODBC setup. |
 | `TOBASA_SQL_USE_ADODB` | Microsoft SQL Server through ADO on MSVC/Windows; the source also requires `_MSC_VER`. |
 
-The selected option controls which driver aliases are available. For example,
-`SqliteDriver` is declared only when `TOBASA_SQL_USE_SQLITE` is defined.
+The CMake option controls which driver types are available. For example,
+`SqliteDriver` exists only when `TOBASA_SQL_USE_SQLITE` is defined.
 
 ## Two ways to use TobasaSQL
 
-TobasaSQL can be used directly with a known backend or through its
-configuration-driven connector layer. Both patterns use the same low-level SQL
-APIs; the difference is when the backend is chosen.
+There are two common ways to use the library. Use a typed connection when the
+backend is fixed. Use the connector layer when configuration should choose the
+backend at runtime.
 
 ### Direct typed connection
 
-Use `sql::SqlConnection<Driver>` when the application knows its database
-backend at compile time. This is the simplest approach and is suitable for
-small tools, sample programs, tests, and fixed-backend applications.
+Use `sql::SqlConnection<Driver>` when the database type is known at compile
+time. This is usually the easiest choice for a small tool, test, sample, or
+application that always uses one backend.
 
 ```cpp
 tbs::sql::SqlConnection<tbs::sql::SqliteDriver> connection;
@@ -69,24 +66,24 @@ if (connection.connect("Database=./app.db3;OpenCreate=True;"))
 }
 ```
 
-The driver type selects the implementation, for example `SqliteDriver`,
+The driver type selects the implementation, such as `SqliteDriver`,
 `PgsqlDriver`, `MysqlDriver`, `OdbcDriver`, or `AdodbDriver`, when that driver
-is enabled by CMake. SQL execution, typed parameters, and result handling are
-available directly from the connection and related `SqlQuery` and `SqlResult`
-types.
+is enabled by CMake.
+
+The connection, `SqlQuery`, and `SqlResult` types then give you the same SQL,
+parameter, and result operations for that backend.
 
 ### Configuration-driven connector
 
-Use `DatabaseConnector` or `DbServiceFactory` when the database configuration
-should select the backend at runtime. This is the application-oriented path for
-configured services, connection pools, and repository code.
+Use `DatabaseConnector` or `DbServiceFactory` when configuration should choose
+the backend at runtime. This is a better fit for configured applications,
+services, repositories, and connection pools.
 
-`DatabaseConnector` selects the development or production settings, creates the
-matching typed connection internally, applies logging options, connects, and
-exposes connection, transaction, and service-creation operations.
+`DatabaseConnector` reads the development or production settings, creates the
+matching typed connection, applies SQL logging options, connects, and exposes
+connection, transaction, and service operations.
 
-`DbServiceFactory` builds on that connector and can create pooled or
-non-pooled services:
+`DbServiceFactory` builds on it and can create pooled or non-pooled services:
 
 ```cpp
 tbs::sql::DbServiceFactory factory;
@@ -95,36 +92,41 @@ factory.addConnectorOption("MainDb", connectorOptions);
 auto service = factory.createService<MyService>("MainDb", true);
 ```
 
-Use `true` for pooled service creation when connections should be acquired and
-returned automatically, or `false` for a long-lived non-pooled connector.
-The connector configuration contains the backend, connection string,
-environment selection, and SQL logging settings. The configured backend must
-also have its corresponding CMake driver enabled.
+Use `true` when the service should acquire and return pooled connections
+automatically. Use `false` for a long-lived non-pooled connector.
+
+The connector settings contain the backend, connection string, selected
+environment, and SQL logging options. The matching CMake driver must also be
+enabled.
 
 ### Choosing an approach
 
 | Approach | Best suited for | Backend selection |
 | --- | --- | --- |
-| Direct `SqlConnection<Driver>` | Small programs, tests, samples, fixed-backend applications | Compile time |
-| `DatabaseConnector` / `DbServiceFactory` | Configured applications, services, repositories, connection pooling | Runtime configuration |
+| Direct `SqlConnection<Driver>` | Small programs, tests, samples, and fixed-backend applications | Compile time |
+| `DatabaseConnector` / `DbServiceFactory` | Configured applications, services, repositories, and connection pools | Runtime configuration |
 
-Both approaches ultimately use the same typed `SqlConnection<Driver>` APIs.
-The connector layer adds lifecycle and configuration management; it does not
-replace SQL with an ORM.
+Both approaches eventually use a typed `SqlConnection<Driver>`. The connector
+layer adds configuration and connection lifetime handling; it does not turn
+SQL into an ORM.
 
 ## Sample programs
 
-The repository includes three focused examples in [`../../samples/tobasasql`](../../samples/tobasasql):
+The repository has four focused examples in
+[`../../samples/tobasasql`](../../samples/tobasasql):
 
-* [`simple.cpp`](../../samples/tobasasql/simple.cpp) — direct typed-connection smoke test for enabled backends;
-* [`connector.cpp`](../../samples/tobasasql/connector.cpp) — runtime configuration via `DatabaseConnector`;
-* [`dbservice.cpp`](../../samples/tobasasql/dbservice.cpp) — service-layer example using `DbServiceFactory`.
-* [`pool.cpp`](../../samples/tobasasql/pool.cpp) — pooled-connection example using `DbServiceFactory`.
+* [`simple.cpp`](../../samples/tobasasql/simple.cpp) - direct typed-connection test for enabled backends;
+* [`connector.cpp`](../../samples/tobasasql/connector.cpp) - runtime configuration with `DatabaseConnector`;
+* [`dbservice.cpp`](../../samples/tobasasql/dbservice.cpp) - service-layer example with `DbServiceFactory`;
+* [`pool.cpp`](../../samples/tobasasql/pool.cpp) - pooled-connection example with `DbServiceFactory`.
 
 ## Minimal SQLite program
 
-The following is the smallest useful pattern for a **direct typed connection**.
-It follows the setup performed by [`../../samples/tobasasql/simple.cpp`](../../samples/tobasasql/simple.cpp), which also uses direct typed connections for each enabled backend. This pattern does not use `DatabaseConnector` or `DbServiceFactory`.
+This is a small working example for a **direct typed connection**. It follows
+the setup in [`../../samples/tobasasql/simple.cpp`](../../samples/tobasasql/simple.cpp),
+which also uses direct typed connections for each enabled backend.
+
+This example does not use `DatabaseConnector` or `DbServiceFactory`.
 
 ```cpp
 #include <iostream>
@@ -163,21 +165,20 @@ int main()
 }
 ```
 
-`connect()` returns `true` on a successful connection. SQL failures throw a
-`SqlException` (which derives from `std::exception`); a connection object also
-disconnects itself when it is destroyed while connected.
+`connect()` returns `true` when the connection succeeds. SQL failures throw a
+`SqlException`, which derives from `std::exception`. A connected connection
+also disconnects when its object is destroyed.
 
-The SQLite connection string in the sample uses a file database and
-`OpenCreate=True`. The sample also includes a password in its SQLite string
-because that build can use the bundled encrypted SQLite variant. Do not copy
-passwords or production credentials into source code.
+The sample uses a file database and `OpenCreate=True`. It also includes a
+password in its SQLite string because that build can use the bundled encrypted
+SQLite variant. Do not put passwords or production credentials in source code.
 
 ## Execute commands and scalars
 
-Use `execute()` for commands where the affected-row count matters, and
-`executeVoid()` when a Boolean success result is sufficient. Use
-`executeScalar()` when only the first column of the first row is needed. The
-scalar API returns `std::string`, including for numeric and date values.
+Use `execute()` when you need the affected-row count. Use `executeVoid()` when
+a Boolean success result is enough. Use `executeScalar()` when you need only
+the first column from the first row. The scalar API returns a `std::string`,
+even for numbers and dates.
 
 ```cpp
 int affected = connection.execute(
@@ -191,15 +192,16 @@ std::string name = connection.executeScalar(
    "SELECT name FROM people ORDER BY id LIMIT 1");
 ```
 
-Do not build SQL by concatenating user input. Use typed parameters for values.
+Do not build SQL by joining user input into a string. Use typed parameters.
 
 ## Parameterized SQL with `SqlQuery`
 
-`SqlQuery` stores parameters in the order they are added. By default, its SQL
-uses named placeholders such as `:id`; TobasaSQL rewrites those placeholders
-to the native placeholder syntax of the selected backend. The sample uses
-`ParameterStyle::native` for MySQL because its SQL already contains `?`
-placeholders.
+`SqlQuery` keeps parameters in the order you add them. By default, write named
+placeholders such as `:id`; TobasaSQL changes them to the syntax required by
+the selected backend.
+
+The sample uses `ParameterStyle::native` for MySQL because the SQL already
+uses `?` placeholders.
 
 ```cpp
 #include <tobasasql/sql_query.h>
@@ -212,8 +214,8 @@ query.addParam("id", tbs::sql::DataType::integer, 1);
 std::string result = query.executeScalar();
 ```
 
-The parameter `DataType` controls the backend type used for binding. Common
-examples are:
+The `DataType` tells the backend which type to use for binding. Common types
+look like this:
 
 ```cpp
 query.addParam("id",      tbs::sql::DataType::integer, 1);
@@ -222,13 +224,13 @@ query.addParam("score",   tbs::sql::DataType::float8,  3.14);
 query.addParam("name",    tbs::sql::DataType::varchar, std::string("Ada"));
 ```
 
-For strings and binary values, pass a size when the backend needs an explicit
-parameter size. `DataType::numeric` is represented by decimal text, and
-`DataType::varbinary` is represented by binary bytes in the portable API. See
-[`data_types.md`](data_types.md) for backend-specific exceptions.
+For strings and binary values, give a size when the backend needs an explicit
+parameter size. `DataType::numeric` uses decimal text, while
+`DataType::varbinary` uses binary bytes in the portable API. See
+[`data_types.md`](data_types.md) for backend-specific details.
 
-To use native placeholders instead of named placeholders, construct the query
-with `ParameterStyle::native` and add parameters in placeholder order:
+To use native placeholders, construct the query with
+`ParameterStyle::native` and add parameters in placeholder order:
 
 ```cpp
 tbs::sql::SqlQuery<tbs::sql::SqliteDriver> nativeQuery(
@@ -241,10 +243,11 @@ std::string nativeResult = nativeQuery.executeScalar();
 
 ## Read multiple rows
 
-For a result set, call `SqlQuery::executeResult()` or construct a
-`SqlResult` and call `runQuery()`. Check `isValid()` and `totalRows()`, then
-navigate with `moveFirst()`/`moveNext()` and read by column name or zero-based
-column index.
+For several rows, call `SqlQuery::executeResult()` or create a `SqlResult` and
+call `runQuery()`. Check `isValid()` and `totalRows()`, then move through the
+rows with `moveFirst()` and `moveNext()`.
+
+You can read a column by name or by its zero-based index.
 
 ```cpp
 auto resultSet = query.executeResult();
@@ -261,36 +264,41 @@ if (resultSet->isValid() && resultSet->totalRows() > 0)
 }
 ```
 
-Typed access is available through `get<T>()` when the backend variant contains
-that exact alternative:
+You can also request a typed value when the backend variant contains the exact
+type:
 
 ```cpp
 auto value = resultSet->getVariantValue("id");
 int64_t id = resultSet->get<int64_t>("id");
 ```
 
-The portable convenience getters include `getStringValue`, `getLongValue`,
+Convenience getters include `getStringValue`, `getLongValue`,
 `getLongLongValue`, `getDoubleValue`, `getBoolValue`, and
-`getDateTimeValue`. `getStringValue(column, valueIfNull)` can supply a value
-for a NULL field. A typed `get<T>()` call must match the actual backend
-variant alternative; use `getVariantValue()` or a convenience getter when
-backend representation differs.
+`getDateTimeValue`. Use `getStringValue(column, valueIfNull)` to provide a
+value for a NULL column.
 
-Column metadata is available through `columnDataType`,
+A typed `get<T>()` call must match the backend's actual variant type. Use
+`getVariantValue()` or a convenience getter when that type may differ between
+backends.
+
+Column information is available through `columnDataType`,
 `columnNativeTypeStr`, `columnNativeFullTypeStr`, `columnDefinedSize`, and
-`columnTypeClass`. Native-to-portable conversion can be lossy, so use the
-native metadata when an application needs backend-specific precision,
-unsignedness, time-zone information, or a type not present in `DataType`.
+`columnTypeClass`.
+
+Portable conversion can lose backend-specific details. Use native metadata when
+you need exact precision, unsigned values, time-zone information, or a type
+that is not in `DataType`.
 
 ## Backend-independent service interfaces
 
-When using `DbServiceFactory`, a service can expose a non-templated interface
-to the rest of the application while keeping the backend-specific SQL code in
-a templated implementation. This is the pattern shown in
-[`../../samples/tobasasql/dbservice.cpp`](../../samples/tobasasql/dbservice.cpp).
+With `DbServiceFactory`, you can give the rest of your application a normal,
+non-templated service interface while keeping backend-specific SQL in a
+templated implementation. See
+[`../../samples/tobasasql/dbservice.cpp`](../../samples/tobasasql/dbservice.cpp)
+for the same pattern.
 
-The public service interface derives from `sql::SqlServiceBase` and declares
-only operations that application code needs:
+The public interface derives from `sql::SqlServiceBase` and contains only the
+operations the application needs:
 
 ```cpp
 class UserServiceBase : public tbs::sql::SqlServiceBase
@@ -301,7 +309,7 @@ public:
 };
 ```
 
-The implementation remains templated because it stores and uses a concrete
+The implementation is still templated because it stores a concrete
 `SqlConnection<SqlDriverType>`:
 
 ```cpp
@@ -321,8 +329,8 @@ public:
 };
 ```
 
-Pass the service template to `createService()`. The configured connector
-selects the driver and internally creates the matching specialization, such as
+Pass the service template to `createService()`. The connector chooses the
+driver and creates the right specialization, such as
 `UserService<SqliteDriver>` or `UserService<PgsqlDriver>`:
 
 ```cpp
@@ -336,19 +344,21 @@ userService->addUser("Ada", 1);
 auto names = userService->getUserNames();
 ```
 
-The caller does not need to name the driver when calling service methods. The
-driver template is still required at the factory boundary so the factory can
-construct the correct typed implementation for the selected backend.
+Callers do not need to name the database driver when using the service. The
+driver template is needed at the factory boundary so the factory can create
+the correct implementation.
 
 ## Connection strings and backend syntax
 
-TobasaSQL does not impose a single portable connection-string format across all
-backends. The application passes the connection string through to the selected
-backend driver almost unchanged. In other words, the library expects the string
-syntax required by the underlying database client or provider, while the
-TobasaSQL API is responsible for opening the connection and executing SQL.
+TobasaSQL does not use one connection-string format for every backend. It passes
+the string to the selected database client or provider with little or no
+rewriting.
 
-The sample includes corresponding blocks for all enabled drivers:
+Use the syntax required by the database client. TobasaSQL handles opening the
+connection and running SQL, not converting one backend's connection syntax to
+another's.
+
+The samples use these forms:
 
 | Driver | Driver type | Connection string form used by the sample |
 | --- | --- | --- |
@@ -358,26 +368,24 @@ The sample includes corresponding blocks for all enabled drivers:
 | ODBC | `OdbcDriver` | `Driver={...};Server=...;Database=...;Uid=...;Pwd=...;` |
 | MySQL/MariaDB | `MysqlDriver` | `Database=...;User=...;Password=...;Server=...;Port=...` |
 
-A few important details apply across all drivers:
+Keep these points in mind:
 
-* The string is passed directly to the selected backend library; TobasaSQL does
-  not rewrite or normalize it.
-* Use the exact syntax and option names required by that backend and the
-  installed client library.
-* The user name, password, hostname, and database name are backend-specific and
-  must match the server configuration.
-* If a driver uses a provider or DSN name, the value must be the one known to
-  the local installation.
+* The selected backend library receives the connection string directly.
+* Use the option names and syntax required by that backend and installed
+  client library.
+* The user, password, host, and database name must match the server setup.
+* When a driver uses a provider or DSN name, use the name installed locally.
 
-The ODBC and ADO examples target Microsoft SQL Server and are not documented or
-tested here for other database engines. For ADO on Windows, call
-`CoInitializeEx` before using ADO and `CoUninitialize` after the connection is
-finished.
+The ODBC and ADO examples target Microsoft SQL Server. They are not documented
+or tested here with other database engines.
+
+On Windows, call `CoInitializeEx` before using ADO and `CoUninitialize` after
+the connection is finished.
 
 ## Logging and errors
 
-The sample installs `CoutLogSink` before creating connections. Per-connection
-SQL logging can be enabled with:
+The samples install `CoutLogSink` before creating connections. You can turn on
+per-connection SQL logging like this:
 
 ```cpp
 connection.setLogSqlQuery(true);
@@ -385,16 +393,16 @@ connection.setLogSqlQueryInternal(true);
 connection.setLogExecuteStatus(true);
 ```
 
-These settings can expose SQL text and parameter activity, so enable them
-carefully in production. Catch `std::exception` around connection and query
-operations, and log or handle `SqlException` without leaking connection
-credentials.
+SQL logging can expose SQL text and parameter activity. Use it carefully in
+production.
+
+Catch `std::exception` around connection and query calls. Handle
+`SqlException` without writing connection passwords or other credentials to
+the log.
 
 ## Next steps
 
 * Read [`data_types.md`](data_types.md) before designing portable schemas.
-* Use `SqlQuery` parameters for all external values.
-* Use `SqlResult` when a query returns rows and inspect `columnDataType()` when
-  converting values.
-* Use `SqlTable` only when its table-editing workflow fits the application;
-  direct SQL remains the primary TobasaSQL model.
+* Use `SqlQuery` parameters for every value that comes from outside the program.
+* Use `SqlResult` for queries that return rows, and check `columnDataType()` when converting values.
+* Use `SqlTable` only when its table-editing workflow fits your application. Direct SQL is still the main TobasaSQL approach.

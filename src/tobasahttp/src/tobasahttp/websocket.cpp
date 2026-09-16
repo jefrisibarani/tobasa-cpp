@@ -12,157 +12,238 @@ namespace http {
 
 namespace ws {
 
-void WebSocketConn::onOpen()
+void WebSocketState::onOpen()
 {
+   if (!wsContext || !wsPtr)
+      return;
+
    wsContext->addConnection(wsPtr);
 
    if (wsContext->onOpen)
       wsContext->onOpen(wsPtr);
 }
 
-void WebSocketConn::onClose(int32_t status, const std::string& reason)
+void WebSocketState::onClose(int32_t status, const std::string& reason)
 {
-   if (wsContext->onClose)
-      wsContext->onClose(wsPtr, status, reason);
+   if (closed || !wsContext || !wsPtr)
+      return;
 
-   wsContext->stop(wsPtr, reason);
+   closed = true;
+   auto connection = wsPtr;
+   auto context = wsContext;
+
+   if (context->onClose)
+      context->onClose(connection, status, reason);
+
+   context->stop(connection, reason);
+   wsPtr.reset();
+   wsContext.reset();
+   fragmentedInMessage.reset();
 }
 
-void WebSocketConn::onPing()
+void WebSocketState::onPing()
 {
-   if (wsContext->onPing)
+   if (wsContext && wsPtr && wsContext->onPing)
       wsContext->onPing(wsPtr);
 }
 
-void WebSocketConn::onPong()
+void WebSocketState::onPong()
 {
-   if (wsContext->onPong)
+   if (wsContext && wsPtr && wsContext->onPong)
       wsContext->onPong(wsPtr);
 }
 
-void WebSocketConn::onMessage(const std::string& message)
+void WebSocketState::onMessage(const std::string& message)
 {
-   if (wsContext->onMessage)
+   if (wsContext && wsPtr && wsContext->onMessage)
       wsContext->onMessage(wsPtr, message);
 }
 
-void WebSocketConn::onError(const ErrorData& error)
+void WebSocketState::onError(const ErrorData& error)
 {
-   if (wsContext->onError)
-      wsContext->onError(wsPtr, error);
+   if (closed || !wsContext || !wsPtr)
+      return;
+
+   closed = true;
+   auto connection = wsPtr;
+   auto context = wsContext;
+
+   if (context->onError)
+      context->onError(connection, error);
    
-   wsContext->stop(wsPtr, error.message);
+   context->stop(connection, error.message);
+   wsPtr.reset();
+   wsContext.reset();
+   sendQueue.clear();
+   fragmentedInMessage.reset();
 }
 
-void WebSocketConn::onError(const std::error_code& error, ErrorType errorTpe, const std::string& source)
+void WebSocketState::onError(const std::error_code& error, ErrorType errorTpe, const std::string& source)
 {
-   if (wsContext->onError)
+   if (closed || !wsContext || !wsPtr)
+      return;
+
+   closed = true;
+   auto connection = wsPtr;
+   auto context = wsContext;
+
+   if (context->onError)
    {
       ErrorData err;
       err.code    = error.value();
       err.message = error.message();
-      err.connId  = wsPtr->id();
+      err.connId  = connection->id();
       err.type    = errorTpe;
       err.source  = source;
 
-      wsContext->onError(wsPtr, err);
+      context->onError(connection, err);
    }
 
-   wsContext->stop(wsPtr, error.message());
+   context->stop(connection, error.message());
+   wsPtr.reset();
+   wsContext.reset();
+   sendQueue.clear();
+   fragmentedInMessage.reset();
 }
 
 } // namespace ws
 
-WebSocket::WebSocket(ConnectionPtr connection, std::any& userData, const asio::ip::tcp::endpoint& ep, Headers& requestHeader)
-   : _connection {connection}
-   , _userData   {userData}
+WebSocket::WebSocket(ConnectionPtr conn, 
+      const std::any& userData, 
+      const asio::ip::tcp::endpoint& ep, 
+      Headers& requestHeader)
+   : _connection {conn}
+   , _userData {userData}
    , _remoteEndpoint {std::move(ep)}
-   , _requestHeaders {requestHeader} 
+   , _requestHeaders {requestHeader}
 {}
 
 void WebSocket::sendText(const std::string& data, WsSendErrorHandler callback)
 {
-   if (_connection->closed())
+   auto connection = _connection.lock();
+   if (!connection || connection->closed())
    {
-      Logger::logT("[websocket] Connection {} already closed", _connection->id());
+      Logger::logT("[websocket] Connection already closed");
       return;
    }
    
-   auto sender = std::dynamic_pointer_cast<WebSocketSender>(_connection);
+   auto sender = std::dynamic_pointer_cast<WebSocketSender>(connection);
    if (sender)
       sender->wsSendText(data, callback);
    else
-      Logger::logT("[websocket] Connection {} does not support wsSendText", _connection->id());
+      Logger::logT("[websocket] Connection {} does not support wsSendText", connection->id());
 }
 
 void WebSocket::sendBinary(const std::string& data, WsSendErrorHandler callback)
 {
-   if (_connection->closed())
+   auto connection = _connection.lock();
+   if (!connection || connection->closed())
    {
-      Logger::logT("[websocket] Connection {} already closed", _connection->id());
+      Logger::logT("[websocket] Connection already closed");
       return;
    }
 
-   auto sender = std::dynamic_pointer_cast<WebSocketSender>(_connection);
+   auto sender = std::dynamic_pointer_cast<WebSocketSender>(connection);
    if (sender)
       sender->wsSendBinary(data, callback);
    else
-      Logger::logT("[websocket] Connection {} does not support wsSendBinary", _connection->id());
+      Logger::logT("[websocket] Connection {} does not support wsSendBinary", connection->id());
 }
 
 void WebSocket::close(const std::string& reason, int32_t closeCode)
 {
-   auto sender = std::dynamic_pointer_cast<WebSocketSender>(_connection);
+   auto connection = _connection.lock();
+   if (!connection)
+      return;
+
+   auto sender = std::dynamic_pointer_cast<WebSocketSender>(connection);
    if (sender)
       sender->wsSendClose(closeCode, reason);
    else
-      Logger::logT("[websocket] Connection {} does not support wsSendClose", _connection->id());
+      Logger::logT("[websocket] Connection {} does not support wsSendClose", connection->id());
 
-   // Use callClose() to ensure the ConnectionManager properly handles the closure of this connection.
-   _connection->callClose(reason);
+   // Use callClose() to ensure the ConnectionManager properly handles
+   // the closure while the underlying connection is still available.
+   connection->callClose(reason);
 }
 
-ConnectionId WebSocket::id()
+ConnectionId WebSocket::id() const
 {
-   return _connection->id();
+   if (auto connection = _connection.lock())
+      return connection->id();
+
+   return 0;
 }
 
-bool WebSocket::closed()
+std::string WebSocket::identifier() const 
+{ 
+   return _identifier; 
+}
+
+asio::ip::tcp::endpoint WebSocket::remoteEndpoint() const
+{ 
+   return _remoteEndpoint; 
+}
+
+bool WebSocket::closed() const
 {
-   return _connection->closed();
+   if (auto connection = _connection.lock())
+      return connection->closed();
+
+   return true;
 }
 
 void WebSocket::identifier(const std::string& id) 
 { 
-   _connection->identifier(id);
+   if (auto connection = _connection.lock())
+      connection->identifier(id);
+
    _identifier = id;
 }
 
+std::any& WebSocket::userData() 
+{ 
+   return _userData; 
+}
+
+Headers& WebSocket::requestHeaders() 
+{ 
+   return _requestHeaders; 
+}
+
+
 WebSocketContext::~WebSocketContext()
 {
+   std::lock_guard<std::mutex> lock(_connectionsMutex);
    _connections.clear();
 }
 
 void WebSocketContext::addConnection(WebSocketPtr sock)
-{  
+{
+   std::lock_guard<std::mutex> lock(_connectionsMutex);
    _connections.emplace(std::move(sock));
 }
 
 /// Stop the specified connection.
 void WebSocketContext::stop(WebSocketPtr sock, const std::string& reason)
 {
+   std::size_t connectionCount;
+   {
+      std::lock_guard<std::mutex> lock(_connectionsMutex);
+      _connections.erase(sock);
+      connectionCount = _connections.size();
+   }
+
    if (!reason.empty()) {
       Logger::logD("[websocket] Closing web socket client id: {} reason: {}", sock->id(), reason);
    }
 
-   _connections.erase(sock);
-
-   Logger::logD("[websocket] Total web socket client: {}", _connections.size());
+   Logger::logD("[websocket] Total web socket client: {}", connectionCount);
 }
 
 void WebSocketContext::stop(ConnectionId id, const std::string& reason)
 {
-   for (auto sock: _connections)
+   for (auto sock: connectionsSnapshot())
    {
       if (sock->id() == id)
       {
@@ -174,7 +255,7 @@ void WebSocketContext::stop(ConnectionId id, const std::string& reason)
 
 void WebSocketContext::close(ConnectionId id, const std::string& reason, int32_t closeCode)
 {
-   for (auto sock: _connections)
+   for (auto sock: connectionsSnapshot())
    {
       if (sock->id() == id)
       {
@@ -190,20 +271,18 @@ void WebSocketContext::close(ConnectionId id, const std::string& reason, int32_t
 
 bool WebSocketContext::isClientConnected(const std::string& identifier) const
 {
-   // Bacause we allow a client to connect from multiple devices with one identifier.
-   // Therefore, check if any device is still connected.
-   auto conn = findClient(identifier);
-   while (conn != nullptr)
+   for (const auto& conn : connectionsSnapshot())
    {
-      if (!conn->closed())
+      if (conn->identifier() == identifier && !conn->closed())
          return true;
    }
+
    return false;
 }
 
 WebSocketPtr WebSocketContext::findClient(const std::string& identifier) const
 {
-   for (auto conn: _connections)
+   for (auto conn: connectionsSnapshot())
    {
       if (conn->identifier() == identifier) {
          return conn;
@@ -214,12 +293,13 @@ WebSocketPtr WebSocketContext::findClient(const std::string& identifier) const
 
 bool WebSocketContext::hasClient() const
 {
-   return _connections.size() > 0;
+   std::lock_guard<std::mutex> lock(_connectionsMutex);
+   return !_connections.empty();
 }
 
 void WebSocketContext::sendText(const std::string& data, ConnectionId connId, WsSendErrorHandler callback)
 {
-   for (auto conn: _connections)
+   for (auto conn: connectionsSnapshot())
    {
       if (connId==0)
          conn->sendText(data, callback);
@@ -230,7 +310,7 @@ void WebSocketContext::sendText(const std::string& data, ConnectionId connId, Ws
 
 void WebSocketContext::sendBinary(const std::string& data, ConnectionId connId, WsSendErrorHandler callback)
 {
-   for (auto conn: _connections)
+   for (auto conn: connectionsSnapshot())
    {
       if (connId==0)
          conn->sendBinary(data,callback);
@@ -239,12 +319,10 @@ void WebSocketContext::sendBinary(const std::string& data, ConnectionId connId, 
    }
 }
 
-void WebSocketContext::sendText(const std::string& data, 
-      const std::string identifier, 
-      WsSendErrorHandler callback,
-      ws::SkipSendHandler skipCallback )
+void WebSocketContext::sendText(const std::string& data, const std::string& identifier, 
+      WsSendErrorHandler callback, ws::SkipSendHandler skipCallback )
 {
-   for (auto conn: _connections)
+   for (auto conn: connectionsSnapshot())
    {
       if (skipCallback)
       {
@@ -259,12 +337,10 @@ void WebSocketContext::sendText(const std::string& data,
    }
 }
 
-void WebSocketContext::sendBinary(const std::string& data, 
-      const std::string identifier, 
-      WsSendErrorHandler callback,
-      ws::SkipSendHandler skipCallback )
+void WebSocketContext::sendBinary(const std::string& data, const std::string& identifier, 
+      WsSendErrorHandler callback, ws::SkipSendHandler skipCallback )
 {
-   for (auto conn: _connections)
+   for (auto conn: connectionsSnapshot())
    {
       if (skipCallback)
       {
@@ -277,6 +353,12 @@ void WebSocketContext::sendBinary(const std::string& data,
       else if (conn->identifier() == identifier)
          conn->sendBinary(data, callback);
    }
+}
+
+std::vector<WebSocketPtr> WebSocketContext::connectionsSnapshot() const
+{
+   std::lock_guard<std::mutex> lock(_connectionsMutex);
+   return {_connections.begin(), _connections.end()};
 }
 
 } // namespace http

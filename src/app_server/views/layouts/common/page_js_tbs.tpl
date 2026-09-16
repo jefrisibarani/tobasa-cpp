@@ -17,6 +17,7 @@
         accessToken: null,
 
         wsConnIdentity: null,
+        sseConnIdentity: null,
 
         PROJECT_ID: '',
         CLIENT_APP_ID: '',

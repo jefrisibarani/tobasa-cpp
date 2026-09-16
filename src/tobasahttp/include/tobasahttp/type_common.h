@@ -83,11 +83,16 @@ struct ConnectionInfo
 class Connection;
 class WebSocket;
 class WebSocketContext;
+class SseConnection;
+class SseContext;
 
 using ConnectionPtr = std::shared_ptr<Connection>;
+
 using WebSocketPtr = std::shared_ptr<WebSocket>;
 using WebSocketContextPtr = std::shared_ptr<WebSocketContext>;
 
+using SseConnectionPtr = std::shared_ptr<SseConnection>;
+using SseContextPtr = std::shared_ptr<SseContext>;
 
 /// @brief OnComplete Handler
 /// Callback function invoked when a connection wants to close/complete successfully.

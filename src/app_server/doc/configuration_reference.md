@@ -1,53 +1,61 @@
 # `appsettings.json` configuration reference
 
-This document describes the configuration objects used by the application
-server. It is based on the two checked-in files:
+This document explains the settings used by the application server. It keeps
+the same layout as the configuration file, so you can find a setting quickly
+and know what it changes.
+
+The server uses these two files:
 
 - [`configuration/appsettings.json`](../configuration/appsettings.json): the
-	local/runtime profile.
+  normal file used at runtime.
 - [`configuration_embed/appsettings.json`](../configuration_embed/appsettings.json):
-	the portable configuration compiled into the executable.
+  a copy built into the executable.
 
-Both files have the same object model. Their values are different profiles,
-not two files that are merged together. The runtime file is loaded first; the
-embedded file is used only when the runtime file cannot be opened.
+These files are not merged. The server tries the runtime file first. It uses
+the embedded file only when it cannot open the runtime file.
 
 ## Processing rules
 
-The application loads the main file into [`tbs::Config`](../../tobasa/include/tobasa/config.h#L16) during startup, using [`Config::load`](../../tobasa/src/config.cpp#L26). The
-loader accepts comments in JSON and performs placeholder substitution in
-string values while parsing.
+At startup, the application loads the main file into
+[`tbs::Config`](../../tobasa/include/tobasa/config.h#L16) with
+[`Config::load`](../../tobasa/src/config.cpp#L26). The loader accepts comments
+in JSON and replaces the variables defined in `configVariables`.
 
 ### Configuration variables
 
-`configVariables` is a map of string-to-string substitutions. A placeholder
-is written as `${NAME}` and must be present as a key in this object. The
-placeholder can appear more than once in a string, and a string can contain
-multiple different placeholders.
+`configVariables` lets you reuse text in several settings. Define a value and
+write it as `${NAME}` where you need it:
 
 ```json
 "configVariables": {
-	"${WS_DATADIR}": "./appdata",
-	"${WS_LOGDIR}": "./appdata/log",
-	"${DBSUFFIX}": ""
+   "${WS_DATADIR}": "./appdata",
+   "${WS_LOGDIR}": "./appdata/log",
+   "${DBSUFFIX}": ""
 }
 ```
 
-These are not operating-system environment variables. They are values defined
-by the JSON file. An undefined placeholder causes configuration loading to
-fail. Do not include a trailing slash in directory variable values when the
-value is later followed by `/`.
+These are variables from the JSON file, not operating-system environment
+variables. Every placeholder must have a matching key. An unknown placeholder
+makes configuration loading fail.
+
+A variable can appear more than once, and one string can contain several
+different variables. Do not add a trailing slash to a directory variable when
+the setting adds another `/` after it.
 
 ### Values after startup
 
-[`Webapp::loadConfig`](../../tobasaweb/src/tobasaweb/webapp.cpp#L187) copies `securitySalt` into
-`webapp.dbConnection.securitySalt`. It also resolves the HTTP temporary
-directory and TLS file paths relative to the executable and creates the
-temporary directory when needed. The path normalization is applied to the
-deserialized `Webapp` option; the salt assignment is also written into the
-JSON held by `Config`.
+[`Webapp::loadConfig`](../../tobasaweb/src/tobasaweb/webapp.cpp#L187) does a
+little extra work after loading the JSON:
 
-The JSON object can be read in C++ with [`Config::getOption`](../../tobasa/include/tobasa/config.h#L76) and [`Config::getNestedOption`](../../tobasa/include/tobasa/config.h#L159):
+- it copies the top-level `securitySalt` into
+  `webapp.dbConnection.securitySalt`;
+- it resolves relative temporary-directory and TLS paths from the executable
+  directory;
+- it creates the temporary directory if it does not exist.
+
+You can read the loaded values in C++ with
+[`Config::getOption`](../../tobasa/include/tobasa/config.h#L76) and
+[`Config::getNestedOption`](../../tobasa/include/tobasa/config.h#L159):
 
 ```cpp
 auto webapp = tbs::Config::getOption<tbs::web::conf::Webapp>("webapp");
@@ -59,65 +67,60 @@ auto port = tbs::Config::getNestedOption<int>("webapp.httpServer.port");
 
 | Property | JSON type | C++ type | Description |
 | --- | --- | --- | --- |
-| `configVariables` | object | `map<string, string>` internally | String substitutions used during parsing. |
-| `securitySalt` | string | `std::string` | Application salt used by authentication, encryption helpers, and database password operations. |
+| `configVariables` | object | `map<string, string>` internally | Text replacements used while the file is read. |
+| `securitySalt` | string | `std::string` | Salt used by authentication, encryption helpers, and database password handling. |
 | `webapp` | object | [`tbs::web::conf::Webapp`](../../tobasaweb/include/tobasaweb/settings_webapp.h#L86) | Database, HTTP server, and web-service settings. |
-| `logging` | object | [`tbs::log::conf::Logging`](../../tobasaweb/include/tobasaweb/settings_log.h#L29) | stdout and file logger settings. |
+| `logging` | object | [`tbs::log::conf::Logging`](../../tobasaweb/include/tobasaweb/settings_log.h#L29) | Console and file logging settings. |
 
-Secrets in this document's sample files are configuration values, not
-placeholders for machine environment variables. Replace them for a real
-deployment and protect the files.
+The sample files contain real configuration values, including secrets. Change
+them before deployment and protect the files.
 
 ## `webapp`
 
 | Property | JSON type | Source default | Description |
 | --- | --- | --- | --- |
-| `environment` | string | `"development"` for the option type | Selects the database profile used by the web application.|
-| `dbConnection` | object | none | Database profiles and SQL logging settings. |
-| `httpServer` | object | `Server` defaults | HTTP/HTTPS server settings. |
-| `webService` | object | `WebService` defaults | Sessions, routes, JWT, and application directories. |
-| `dbConnectionPoolSize` | integer | none in the struct | Database connection pool size. |
+| `environment` | string | `"development"` for the option type | Appears in the JSON files, but the active database profile is selected by `webapp.dbConnection.environment`. |
+| `dbConnection` | object | none | Database profiles and SQL logging options. |
+| `httpServer` | object | `Server` defaults | HTTP and HTTPS listener settings. |
+| `webService` | object | `WebService` defaults | Sessions, authentication, routes, JWT, and application directories. |
+| `dbConnectionPoolSize` | integer | none in the struct | Number of database connections to keep in the pool. |
 
-`environment` is a member of `dbConnection`, not of the outer `Webapp`
-object. The outer `webapp.environment` value is present in both JSON files,
-but the source `Webapp` struct does not serialize that member. The database
-selection value consumed by `DbServiceFactory` is
+The active `environment` value belongs inside `dbConnection`. The outer
+`webapp.environment` value is present in the JSON files, but it is not used by
+the `Webapp` option type. `DbServiceFactory` reads
 `webapp.dbConnection.environment`.
 
 ### `webapp.dbConnection`
 
-This object is [`tbs::sql::conf::ConnectorOption`](../../tobasasql/include/tobasasql/settings.h#L43). It contains two named
-database profiles, allowing the active profile to be selected by
-`environment`.
+This object is [`tbs::sql::conf::ConnectorOption`](../../tobasasql/include/tobasasql/settings.h#L43). It gives you two named database profiles and lets you choose which one is active.
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `production` | object | Database settings for the production profile. |
-| `development` | object | Database settings for the development profile. |
-| `environment` | string | Profile name, normally `"production"` or `"development"`. |
-| `logInternalSqlQuery` | boolean | Enables internal SQL query logging. |
-| `logSqlQuery` | boolean | Enables SQL query logging. |
-| `securitySalt` | string | Optional per-connection salt. Startup overwrites it with the top-level `securitySalt`. |
+| `production` | object | Settings for the production database. |
+| `development` | object | Settings for the development database. |
+| `environment` | string | Profile to use, normally `"production"` or `"development"`. |
+| `logInternalSqlQuery` | boolean | Log SQL used internally by the framework. |
+| `logSqlQuery` | boolean | Log application SQL queries. |
+| `securitySalt` | string | Optional connection salt. Startup replaces it with the top-level `securitySalt`. |
 
 Each profile is a [`tbs::sql::conf::Database`](../../tobasasql/include/tobasasql/settings.h#L33) object:
 
 | Property | JSON type | Accepted values/meaning |
 | --- | --- | --- |
 | `dbDriver` | string | `SQLITE`, `MYSQL`, `PGSQL`, `ODBC`, or `ADODB`. |
-| `connectionString` | string | Driver-specific connection string without the password. Placeholders are expanded before use; the framework appends the decrypted `password` value. |
-| `password` | string | Database password or encrypted password, depending on the database utility path. |
-
+| `connectionString` | string | Driver-specific connection settings, without the password. Variables are replaced before use. |
+| `password` | string | Database password or encrypted password, depending on the database setup. |
 
 #### `connectionString` syntax by driver
 
-The framework starts with `connectionString`, decrypts the profile's
-`password` using `dbConnection.securitySalt`, and appends the password in a
-driver-specific form. Keep credentials out of `connectionString` and put them
-in the sibling `password` property. An empty `password` is still appended.
+Keep the password in the separate `password` property. Do not put it in
+`connectionString`. The framework decrypts that property with
+`dbConnection.securitySalt` and adds the password in the format expected by
+the selected driver. An empty password is also added.
 
 ##### SQLite
 
-SQLite uses semicolon-delimited parameters parsed by Tobasa:
+SQLite uses semicolon-separated settings:
 
 ```json
 "dbDriver": "SQLITE",
@@ -125,25 +128,22 @@ SQLite uses semicolon-delimited parameters parsed by Tobasa:
 "password": ""
 ```
 
-Supported parameters recognized by the SQLite connection implementation are:
-
 | Parameter | Value | Meaning |
 | --- | --- | --- |
-| `Database` | path or `:memory:` | Database file. `OpenMemory=True` forces `:memory:`. |
-| `OpenReadOnly` | `True` or `False` | Open read-only. |
-| `OpenReadWrite` | `True` or `False` | Open read/write. |
-| `OpenCreate` | `True` or `False` | Create the database when it does not exist. |
-| `OpenMemory` | `True` or `False` | Use an in-memory SQLite database. |
-| `Password` | appended by framework | Passed to the SQLite encryption/key step. Do not add it manually. |
+| `Database` | path or `:memory:` | Database file. `OpenMemory=True` forces an in-memory database. |
+| `OpenReadOnly` | `True` or `False` | Open the database as read-only. |
+| `OpenReadWrite` | `True` or `False` | Open the database for reading and writing. |
+| `OpenCreate` | `True` or `False` | Create the file when it does not exist. |
+| `OpenMemory` | `True` or `False` | Use an in-memory database. |
+| `Password` | added by the framework | Used by the SQLite encryption/key step. Do not add it yourself. |
 
-The implementation recognizes parameter names by prefix and extracts the
-value immediately after the name, so use the shown `Name=Value;` form without
-spaces around `=`. The runtime `password` is appended as
+Use the `Name=Value;` form shown above, without spaces around `=`. The
+framework adds the decrypted password as
 `Password=<decrypted-password>;`.
 
 ##### PostgreSQL
 
-PostgreSQL uses libpq keyword/value syntax, with fields separated by spaces:
+PostgreSQL uses libpq keyword/value syntax. Separate fields with spaces:
 
 ```json
 "dbDriver": "PGSQL",
@@ -151,16 +151,13 @@ PostgreSQL uses libpq keyword/value syntax, with fields separated by spaces:
 "password": "27CA998DA4C4D345BC0C86F62B7C81BA"
 ```
 
-The framework appends the password as ` password=<decrypted-password>` before
-calling `PQconnectdb`. The connection string therefore follows libpq's
-keyword/value rules, including libpq quoting/escaping when a value contains
-spaces or special characters. The runtime sample uses `dbname`, `user`,
-`hostaddr`, and `port`; other libpq connection keywords may be supplied in
-the same string.
+The framework adds ` password=<decrypted-password>` before calling
+`PQconnectdb`. Use the normal libpq quoting rules when a value contains spaces
+or special characters. Other libpq keywords can be added in the same string.
 
 ##### ODBC
 
-ODBC uses a semicolon-delimited ODBC connection string:
+ODBC uses a semicolon-separated connection string:
 
 ```json
 "dbDriver": "ODBC",
@@ -168,12 +165,9 @@ ODBC uses a semicolon-delimited ODBC connection string:
 "password": "27CA998DA4C4D345BC0C86F62B7C81BA"
 ```
 
-The framework appends `Pwd=<decrypted-password>;` and passes the result to
-`SQLDriverConnect` with `SQL_DRIVER_NOPROMPT`. Use the driver name installed
-on the machine. ODBC attribute names and supported values are supplied by the
-selected ODBC driver; for SQL Server, `Driver`, `Server`, `Database`, `UID`,
-`APP`, and `TrustServerCertificate` are the attributes shown by the runtime
-example.
+The framework adds `Pwd=<decrypted-password>;` and calls
+`SQLDriverConnect` without prompting. Use the driver name installed on the
+machine. The available attributes and values come from that ODBC driver.
 
 ##### ADODB
 
@@ -185,15 +179,14 @@ ADODB uses an OLE DB provider connection string:
 "password": "27CA998DA4C4D345BC0C86F62B7C81BA"
 ```
 
-On supported MSVC builds, the framework appends `Pwd=<decrypted-password>;`
-to the string and passes it to `ADODB::Connection::Open`. `Provider` selects
-the installed OLE DB provider; the remaining attributes are provider-specific.
-The runtime example uses SQL Native Client (`SQLNCLI11`). ADODB support is
-conditional in the source and is not available on non-MSVC builds.
+On supported MSVC builds, the framework adds
+`Pwd=<decrypted-password>;` and opens the connection. `Provider` selects the
+installed OLE DB provider. ADODB is conditional and is not available on
+non-MSVC builds.
 
 ##### MySQL/MariaDB
 
-MySQL uses semicolon-delimited parameters parsed by Tobasa:
+MySQL uses semicolon-separated settings:
 
 ```json
 "dbDriver": "MYSQL",
@@ -201,24 +194,23 @@ MySQL uses semicolon-delimited parameters parsed by Tobasa:
 "password": ""
 ```
 
-The framework appends `Password=<decrypted-password>;`. The connection
-implementation reads these parameter names:
+The framework adds `Password=<decrypted-password>;` before calling
+`mysql_real_connect`.
 
 | Parameter | Meaning |
 | --- | --- |
-| `Database` | Database/schema name. |
-| `User` | User name. |
+| `Database` | Database or schema name. |
+| `User` | Database user name. |
 | `Server` | Host name or address. |
-| `Port` | Numeric TCP port. |
-| `Password` | Appended by the framework. |
+| `Port` | TCP port number. |
+| `Password` | Added by the framework. |
 
-Use the exact `Name=Value;` spelling shown because the Tobasa parser matches
-these names by prefix. The resulting values are passed to
-`mysql_real_connect`.
+Use the exact `Name=Value;` spelling because the Tobasa parser matches these
+names by prefix.
 
 ##### Password handling summary
 
-The final connection string is constructed as follows:
+The framework adds the password like this:
 
 | Driver | Appended form |
 | --- | --- |
@@ -228,10 +220,9 @@ The final connection string is constructed as follows:
 | `ADODB` | `Pwd=<decrypted-password>;` |
 | `MYSQL` | `Password=<decrypted-password>;` |
 
-The `password` field is passed through `crypt::passwordDecrypt` with the
-effective database security salt before appending. If the value is not in the
-expected encrypted format, the decryption behavior belongs to the crypto
-helper; do not assume that a plaintext password is automatically encrypted.
+The `password` value is passed to `crypt::passwordDecrypt` with the effective
+database salt. Do not assume that a plain-text password will be encrypted for
+you automatically.
 
 ### `webapp.httpServer`
 
@@ -239,32 +230,32 @@ This object maps to [`tbs::http::conf::Server`](../../tobasaweb/include/tobasawe
 
 | Property | JSON type | Default | Description |
 | --- | --- | --- | --- |
-| `runHttpsOnly` | boolean | `false` | Run HTTPS only. |
-| `http2Enabled` | boolean | `false` when HTTP/2 is compiled in | Enable HTTP/2. This field is deserialized only when `TOBASA_HTTP_USE_HTTP2` is defined. |
-| `address` | string | `127.0.0.1` | Bind address. |
-| `port` | integer | `8084` | HTTP port. |
+| `runHttpsOnly` | boolean | `false` | Start only the HTTPS listener. |
+| `http2Enabled` | boolean | `false` when HTTP/2 is compiled in | Enable HTTP/2. This setting is read only when `TOBASA_HTTP_USE_HTTP2` is defined. |
+| `address` | string | `127.0.0.1` | Address where the server listens. |
+| `port` | integer | `8084` | Plain HTTP port. |
 | `portHttps` | integer | `8085` | HTTPS port. |
-| `timeoutRead` | integer | `60` seconds | Read timeout. |
-| `timeoutWrite` | integer | `60` seconds | Write timeout. |
-| `timeoutProcessing` | integer | `120` seconds | Request-processing timeout. |
-| `readBufferSize` | integer | `65536` bytes | Read buffer size. |
-| `sendBufferSize` | integer | `65536` bytes | Send buffer size. |
-| `maxHeaderSize` | integer | `65536` bytes | Maximum HTTP header size. |
-| `docRoot` | string | `./wwwroot` | Web document root; no trailing slash is expected. |
-| `temporaryDir` | string | empty, then platform temporary directory | Multipart-processing temporary directory. Resolved relative to the executable. |
-| `tls` | object | `Tls` defaults | Server certificate and key settings. |
+| `timeoutRead` | integer | `60` seconds | Maximum time to read a request. |
+| `timeoutWrite` | integer | `60` seconds | Maximum time to send a response. |
+| `timeoutProcessing` | integer | `120` seconds | Maximum time for request processing. |
+| `readBufferSize` | integer | `65536` bytes | Size of the read buffer. |
+| `sendBufferSize` | integer | `65536` bytes | Size of the send buffer. |
+| `maxHeaderSize` | integer | `65536` bytes | Largest accepted HTTP header block. |
+| `docRoot` | string | `./wwwroot` | Directory for files served from disk. Do not add a trailing slash. |
+| `temporaryDir` | string | empty, then platform temporary directory | Temporary directory for multipart requests. Relative paths use the executable directory. |
+| `tls` | object | `Tls` defaults | Certificate and private-key settings. |
 | `compression` | object | `Compression` defaults | Response compression settings. |
-| `ioPoolSize` | integer | `4` | I/O context thread-pool size; `0` disables that pool. |
-| `workerPoolSize` | integer | `4` | HTTP request worker-pool size; `0` disables that pool. |
-| `logVerbose` | boolean | `false` | Verbose HTTP logging. |
-| `logVerboseHttp2` | boolean | `false` when HTTP/2 is compiled in | Verbose HTTP/2 logging. |
-| `useRateLimiter` | boolean | `false` | Enable the rate limiter. |
-| `rateLimiterMaxRequests` | integer | `10` | Requests allowed in one rate-limit window. |
-| `rateLimiterWindowDuration` | integer | `1000` ms | Rate-limit window duration. |
-| `rateLimiterBlockDuration` | integer | `30000` ms | Block duration after rate-limit violations. |
-| `rateLimiterMaxViolations` | integer | `3` | Violations before blocking. |
-| `maxRequestsPerConnection` | integer | `100` | Maximum requests per connection; `0` means unlimited in the runtime profile's comment. |
-| `enableMultipartParsing` | boolean | `true` | Enable multipart request parsing. |
+| `ioPoolSize` | integer | `4` | Number of I/O threads. `0` disables this pool. |
+| `workerPoolSize` | integer | `4` | Number of request worker threads. `0` disables this pool. |
+| `logVerbose` | boolean | `false` | Write detailed HTTP logs. |
+| `logVerboseHttp2` | boolean | `false` when HTTP/2 is compiled in | Write detailed HTTP/2 logs. |
+| `useRateLimiter` | boolean | `false` | Turn on request limiting. |
+| `rateLimiterMaxRequests` | integer | `10` | Requests allowed in one window. |
+| `rateLimiterWindowDuration` | integer | `1000` ms | Length of the rate-limit window. |
+| `rateLimiterBlockDuration` | integer | `30000` ms | How long to block after too many violations. |
+| `rateLimiterMaxViolations` | integer | `3` | Violations allowed before blocking. |
+| `maxRequestsPerConnection` | integer | `100` | Maximum requests on one connection. `0` means unlimited in the runtime profile. |
+| `enableMultipartParsing` | boolean | `true` | Parse multipart form and upload requests. |
 
 #### `webapp.httpServer.tls`
 
@@ -272,76 +263,75 @@ This object maps to [`tbs::http::conf::Tls`](../../tobasaweb/include/tobasaweb/s
 
 | Property | JSON type | Default | Description |
 | --- | --- | --- | --- |
-| `certificateChainFile` | string | `./localhost.crt` | Server certificate chain path. |
-| `privateKeyFile` | string | `./localhost.key` | Server private key path. |
-| `password` | string | empty | Private-key password. |
-| `tmpDhFile` | string | `./dh2048.pem` | Temporary Diffie-Hellman parameter file. |
-| `hostCertificates` | array | empty | Host-specific certificate entries. |
+| `certificateChainFile` | string | `./localhost.crt` | Path to the server certificate chain. |
+| `privateKeyFile` | string | `./localhost.key` | Path to the server private key. |
+| `password` | string | empty | Password for the private key. |
+| `tmpDhFile` | string | `./dh2048.pem` | Path to the temporary DH parameter file. |
+| `hostCertificates` | array | empty | Certificates for specific hostnames. |
 
 Each `hostCertificates` entry has:
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `hostname` | string | Hostname matched by the certificate. |
+| `hostname` | string | Hostname selected by TLS SNI. |
 | `certificateChainFile` | string | Certificate chain path. |
 | `privateKeyFile` | string | Private key path. |
 | `password` | string | Private-key password. |
 
-TLS paths are resolved relative to the executable during `loadConfig`.
+TLS paths are resolved relative to the executable while `loadConfig` runs.
 
 #### `webapp.httpServer.compression`
 
 | Property | JSON type | Default | Description |
 | --- | --- | --- | --- |
-| `enable` | boolean | `true` | Enable compression. |
-| `minimalLength` | integer | `1024` bytes | Minimum response length for compression. |
-| `encoding` | string | `gzip` | Compression encoding. |
-| `mimetypes` | string | selected text/JSON types | Space-separated MIME types eligible for compression. |
+| `enable` | boolean | `true` | Turn response compression on or off. |
+| `minimalLength` | integer | `1024` bytes | Compress responses at least this large. |
+| `encoding` | string | `gzip` | Compression format. |
+| `mimetypes` | string | selected text/JSON types | Space-separated MIME types that may be compressed. |
 
 ### `webapp.webService`
 
-This object maps to `tbs::web::conf::WebService`.
+This object maps to [`tbs::web::conf::WebService`](../../tobasaweb/include/tobasaweb/settings_webapp.h).
 
 | Property | JSON type | Default | Description |
 | --- | --- | --- | --- |
-| `routeAuthLists` | object | none | Authentication rules for routes. |
-| `sessionExpirationMinutes` | integer | `15` | Session lifetime. `0` expires when the browser closes. |
-| `sessionSavePath` | string | `./appdata/session` | Session file directory; no trailing slash. |
-| `acceptedClientAppId` | string | `TBSRESTC_DEV,TBSRESTC_TOBASA` | Comma-separated accepted client application IDs. |
-| `authJwtIssuer` | string | `TBS_WEBSVC` | JWT issuer. |
-| `authJwtSecret` | string | built-in sample secret | JWT access-token secret. |
-| `authJwtSecretRefresh` | string | built-in sample secret | JWT refresh-token secret. |
+| `routeAuthLists` | object | none | Extra authentication rules for route paths. |
+| `sessionExpirationMinutes` | integer | `15` | Session lifetime. `0` means the session ends when the browser closes. |
+| `sessionSavePath` | string | `./appdata/session` | Directory for session files. Do not add a trailing slash. |
+| `acceptedClientAppId` | string | `TBSRESTC_DEV,TBSRESTC_TOBASA` | Comma-separated client application IDs accepted by the service. |
+| `authJwtIssuer` | string | `TBS_WEBSVC` | Issuer written into JWTs. |
+| `authJwtSecret` | string | built-in sample secret | Secret used for access tokens. Replace it for deployment. |
+| `authJwtSecretRefresh` | string | built-in sample secret | Secret used for refresh tokens. Replace it for deployment. |
 | `authJwtExpireTimeSpanMinutes` | integer | `15` | Access-token lifetime. |
 | `authJwtRefreshExpireTimeSpanMinutes` | integer | `1440` | Refresh-token lifetime. |
-| `useInMemoryResources` | boolean | `true` | Use compiled templates and static resources when available. The executable forces the runtime flag to `false` if it was not built with in-memory resources. |
-| `templateDir` | string | `./views` | Template directory. |
-| `uploadDir` | string | `./appdata/upload` | Upload directory; no trailing slash. |
-| `dataDir` | string | `./appdata` | Application data directory; no trailing slash. |
-| `homePage` | string | `/dashboard` | Home-page route. |
-| `loginPage` | string | `/login` | Login route. |
+| `useInMemoryResources` | boolean | `true` | Use compiled templates and static files when the executable contains them. The app forces this to `false` when the build has no embedded resources. |
+| `templateDir` | string | `./views` | Directory containing templates. |
+| `uploadDir` | string | `./appdata/upload` | Directory for uploaded files. Do not add a trailing slash. |
+| `dataDir` | string | `./appdata` | Application data directory. Do not add a trailing slash. |
+| `homePage` | string | `/dashboard` | Page opened as the application home page. |
+| `loginPage` | string | `/login` | Login page route. |
 | `logoutPage` | string | `/logout` | Logout route. |
-| `noSessionList` | array | empty | Routes or patterns that do not use sessions. |
+| `noSessionList` | array | empty | Paths that should not create or use a session. |
 
 #### `routeAuthLists`
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `noAuthenticationList` | array | Routes that do not require authentication. |
-| `needAuthenticationList` | array | Routes that require authentication. |
+| `noAuthenticationList` | array | Paths that should not require authentication. |
+| `needAuthenticationList` | array | Paths that should require authentication. |
 
-Each route entry contains `path`, `check`, and `authScheme` strings. The
-checked-in files use `starts_with` checks and the `bearer` authentication
-scheme. The matching behavior is implemented by the web router, so keep the
-`check` value consistent with the router's supported checks.
+Each entry has `path`, `check`, and `authScheme`. The checked-in examples use
+`starts_with` and the `bearer` scheme. Use a `check` value supported by the
+router, otherwise the rule may not match as expected.
 
 #### `noSessionList`
 
-Each entry contains:
+Each entry has:
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `path` | string | Path or path fragment to match. |
-| `check` | string | Matching operation, for example `ends_with`. |
+| `path` | string | Path or path part to match. |
+| `check` | string | Matching operation, such as `ends_with`. |
 
 ## `logging`
 
@@ -349,23 +339,23 @@ The `logging` object maps to [`tbs::log::conf::Logging`](../../tobasaweb/include
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `multiSinkLevel` | string | Overall multi-sink level. |
-| `stdoutColor` | object | Colored stdout sink. |
-| `fileSink` | object | Main file sink. |
-| `fileSinkD` | object | Optional detailed/debug file sink. |
+| `multiSinkLevel` | string | Overall minimum level for the logging system. |
+| `stdoutColor` | object | Colored console output settings. |
+| `fileSink` | object | Main log-file settings. |
+| `fileSinkD` | object | Optional detailed/debug log-file settings. |
 
-Log level strings are `trace`, `debug`, `info`, `warn`, `error`, `critical`,
-`off`, or `n_level` as defined by the `spdlog` enum conversion.
+Log levels are `trace`, `debug`, `info`, `warn`, `error`, `critical`, `off`,
+or `n_level`, matching the `spdlog` enum conversion.
 
 Each sink object has:
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `level` | string | Minimum log level for the sink. |
-| `pattern` | string | `spdlog` output pattern. |
-| `filePath` | string | File path; used by file sinks only. Placeholders are expanded. |
-| `truncate` | boolean | Truncate the file when opened. Used by file sinks only. |
-| `enable` | boolean | Enable the file sink. Used by file sinks only. |
+| `level` | string | Lowest level written by the sink. |
+| `pattern` | string | `spdlog` output format. |
+| `filePath` | string | Log-file path. Used by file sinks; variables are expanded. |
+| `truncate` | boolean | Clear the file when it is opened. Used by file sinks. |
+| `enable` | boolean | Turn a file sink on or off. Used by file sinks. |
 
 `stdoutColor` uses only `level` and `pattern`. `fileSink` and `fileSinkD` use
 all five properties. The checked-in configuration enables `fileSink` and
@@ -373,10 +363,10 @@ disables `fileSinkD`.
 
 ## Separate header-rule configuration
 
-`configuration/appsettings_header_rules.json` and its embedded counterpart
-are loaded separately after the main file. They are stored in the effective
-configuration under `httpResponseHeaderRule`, using
-`HttpResponseHeaderRule`.
+The application loads `configuration/appsettings_header_rules.json` separately
+after the main configuration. The embedded copy is used in the same way as
+the embedded main configuration. The loaded option is stored as
+`httpResponseHeaderRule` and uses `HttpResponseHeaderRule`.
 
 ### `httpResponseHeaderRule`
 
@@ -385,17 +375,14 @@ configuration under `httpResponseHeaderRule`, using
 | `cacheControl` | array | Cache-control rules selected by host and request path. |
 | `headerRule` | array | Response-header and CORS rules. |
 
-Each `cacheControl` item contains `host`, `requestPath`, and `rules`. Each
-`rules` entry contains a regular-expression `pattern` and the resulting
-`header` value.
+Each `cacheControl` item has `host`, `requestPath`, and `rules`. Each rule
+contains a regular-expression `pattern` and the header `value` to send.
 
-Each `headerRule` item contains:
+Each `headerRule` item has:
 
 | Property | JSON type | Description |
 | --- | --- | --- |
-| `type` | string | `none` for ordinary response headers or `cors` for CORS headers. |
-| `hostOrigin` | array of strings | Hosts, or origins when `type` is `cors`. |
-| `requestPath` | array of strings | Paths to which the rule applies. |
-| `headers` | array | Header objects containing string `key` and `value`. |
-
-
+| `type` | string | `none` for normal headers or `cors` for CORS headers. |
+| `hostOrigin` | array of strings | Hosts, or allowed origins when `type` is `cors`. |
+| `requestPath` | array of strings | Paths where the rule applies. |
+| `headers` | array | Header objects with string `key` and `value`. |

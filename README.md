@@ -20,11 +20,27 @@ Each sub‑project is self‑contained; you can link only the libraries you need
 |                | and MSSQL(through ODBC and ADO) with connection pools, query helpers. |
 | [`tobasalis`](src/tobasalis/README.md)    | **LIS (Lab Instrument) library** – message parsing (LIS2‑A2/ASTM and HL7), 
 |                | TCP/serial transports, session management. |
-| [`webservice`](src/app_server/README.md)   | **Production-ready web service application** – demonstrates a complete,
+| [`webservice`](src/app_server/README.md)   | **Web service application** – demonstrates a complete,
 |                | scalable REST API with JWT/session authentication, middleware pipeline,
-|                | database migrations, controllers, and configurable TLS support. |
+|                | database migrations, controllers, static-file serving, and configurable
+|                | TLS support. |
+
+
+## Sample projects
+
+| Sample | Description |
+|--------|-------------|
+| [`http_server`](src/samples/http_server/README.md) | HTTP/HTTPS server sample with static files, uploads, and WebSocket handling. |
+| [`https_server_minimal`](src/samples/https_server_minimal/README.md) | Minimal HTTPS server showing request handling with and without a worker pool. |
+| [`https_client`](src/samples/https_client/README.md) | HTTPS client sample with TLS, GET/POST requests, JSON, and certificate validation. |
+| [`tobasasql`](src/samples/tobasasql/README.md) | SQL examples for direct connections, configured services, transactions, and connection pools. |
 | [`webclient`](src/samples/app_client/README.md)    | **HTTP client demo** – simple client using `tobasahttp`.
 
+## Documentation
+
+See [DOCUMENTATION.md](DOCUMENTATION.md) for the full documentation index,
+including application-server guides, TobasaSQL guides, development notes, and
+sample documentation.
 
 
 ## Repository layout
@@ -59,6 +75,7 @@ MSVC on Windows and GCC on Linux.
 
 See [build_all.cmd](./build_all.cmd) and [build_all.sh](./build_all.sh) for example\
 See also [BUILD](./BUILD.md) for more information 
+
 
 
 ## License

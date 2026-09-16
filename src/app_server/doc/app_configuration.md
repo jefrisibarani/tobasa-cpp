@@ -1,31 +1,30 @@
 # Application configuration
 
-The application configuration is JSON loaded into the process-wide
-[`tbs::Config`](../../tobasa/include/tobasa/config.h#L16) singleton. The application server loads its main configuration
-once during startup, before it creates the database service and starts the
-HTTP server.
+The application configuration is JSON stored in the process-wide
+[`tbs::Config`](../../tobasa/include/tobasa/config.h#L16) object. The
+application server loads it once during startup. It does this before creating
+the database service and before starting the HTTP server.
 
 ## Configuration files
 
-The application server has two sources for its main configuration:
+The application server can get its main configuration from two places:
 
-- `configuration/appsettings.json` is the runtime configuration file.
-- `configuration_embed/appsettings.json` is the embedded fallback compiled
-	into the executable as an application resource.
+- `configuration/appsettings.json` is the file used at runtime.
+- `configuration_embed/appsettings.json` is a fallback compiled into the
+  executable as an application resource.
 
-The path used by the application server is the executable directory followed
-by `configuration/appsettings.json` (`app::configDir()`). The runtime file is
-copied there by the CMake post-build step when the source configuration files
-exist.
+At runtime, the server looks beside the executable in
+`<executable directory>/configuration/appsettings.json`. The CMake post-build
+step copies the runtime file there when the source file is available.
 
-The embedded file is generated from `configuration_embed/*.json` at build
-time. It is available through `app::Resource::get("config/appsettings.json",
-"config")`, regardless of whether templates and static files are built into
-memory.
+The embedded file is created from `configuration_embed/*.json` during the
+build. The application can read it with
+`app::Resource::get("config/appsettings.json", "config")` even when templates
+and static files are not embedded.
 
 ## Loading
 
-Startup calls:
+Startup uses code like this:
 
 ```cpp
 auto configFile = app::configDir() + path::SEPARATOR + "appsettings.json";
@@ -33,49 +32,47 @@ auto embeddedConfig = app::Resource::get("config/appsettings.json", "config");
 webapp.loadConfig(configFile, embeddedConfig);
 ```
 
-`Webapp::loadConfig` delegates to `Config::load`(configFile,
-embeddedConfig). `Config::load` uses this order:
+`Webapp::loadConfig` calls `Config::load(configFile, embeddedConfig)`. The
+loader uses this order:
 
-1. Open and parse the file at `configFile`.
-2. If the file cannot be opened and `embeddedConfig` is non-empty, parse the
-	 embedded bytes instead.
-3. If neither source can be parsed, report a configuration error and fail
-	 startup.
+1. Open and parse `configFile`.
+2. If the file cannot be opened and embedded data is available, parse the
+   embedded data.
+3. If neither source can be parsed, report the error and stop startup.
 
-This is fallback behavior, not a merge. A partially populated runtime file is
-not supplemented with missing keys from the embedded file. The selected JSON
-document becomes the singleton's `_jsonConf` object and `Config::valid()` is
-set to `true` after a successful parse.
+This is fallback behavior, not a merge. A runtime file with missing settings
+does not receive those settings from the embedded file. The one JSON document
+that was selected becomes the configuration object in `_jsonConf`.
 
-The parser accepts JSON comments. Parse errors, missing required data, and
-other configuration errors are reported by `Webapp::loadConfig`, which
-returns `false`; the application server exits without starting.
+After a successful parse, `Config::valid()` is `true`. The parser accepts
+comments in JSON. Parse errors, missing required data, and other configuration
+problems are reported by `Webapp::loadConfig`, which returns `false`. The
+application server then exits without starting.
 
 ## Embedded configuration
 
-Embedded configuration is useful for a self-contained executable and as a
-last-known default. It is not a second layer of defaults at runtime. To
-change the embedded fallback, edit the corresponding file under
-`configuration_embed/` and rebuild the application.
+The embedded file is useful when you want a self-contained executable or a
+known fallback configuration. It is not an extra layer of defaults at runtime.
+To change it, edit the matching file under `configuration_embed/` and rebuild.
 
-The main embedded file normally contains these top-level objects:
+The main embedded file normally contains:
 
-- `configVariables`: substitutions used while parsing string values.
-- `securitySalt`: the application-wide salt used by authentication and
-	database password operations.
-- `webapp`: database, HTTP server, and web-service settings.
-- `logging`: stdout and file logger settings.
+- `configVariables`: replacements used while reading string values;
+- `securitySalt`: the application-wide salt for authentication and database
+  password operations;
+- `webapp`: database, HTTP server, and web-service settings;
+- `logging`: console and file logger settings.
 
 The separate `configuration_embed/appsettings_header_rules.json` resource is
-loaded after the main configuration with:
+loaded after the main configuration:
 
 ```cpp
 [`Config::addOption`](../../tobasa/include/tobasa/config.h#L104)<web::conf::HttpResponseHeaderRule>(
 	 "httpResponseHeaderRule", headerRuleFile, embeddedHeaderRule);
 ```
 
-It is also file-first with embedded fallback, but is added under the
-`httpResponseHeaderRule` key rather than merged into the main JSON document.
+It also tries the file first and then the embedded copy. It is stored under
+`httpResponseHeaderRule`; it is not merged into the main JSON document.
 
 ## Runtime configuration
 
@@ -85,38 +82,42 @@ Edit the deployed file beside the executable:
 <executable directory>/configuration/appsettings.json
 ```
 
-The runtime file wins whenever it can be opened and parsed. Removing or
-renaming it makes the application use the embedded `appsettings.json` on the
-next startup. Configuration is loaded at startup; editing the file while the
-server is running does not reload it.
+When this file can be opened and parsed, it is used instead of the embedded
+copy. If you remove or rename it, the embedded file is used at the next
+startup.
 
-The main settings are deserialized from the JSON object at the point where
-they are used:
+Configuration is read only during startup. Editing the file while the server
+is running does not reload it.
+
+The main objects can be read in C++ like this:
 
 ```cpp
 auto webapp = Config::getOption<web::conf::Webapp>("webapp");
 auto logging = Config::getOption<log::conf::Logging>("logging");
 ```
 
-Nested values can be read by dotted path:
+You can read a nested value by using a dotted path:
 
 ```cpp
 auto port = Config::getNestedOption<int>("webapp.httpServer.port");
 ```
 
-Use `tryGetNestedOption(path, defaultValue)` when a missing key or a type
-mismatch should use a fallback. `getOption` throws when the global
-configuration is invalid; a missing top-level option logs an error and
-returns a default-constructed option object. `getNestedOption` throws when a
-path is missing or cannot be converted.
+Use `tryGetNestedOption(path, defaultValue)` when a missing key or wrong type
+should use a value you provide.
+
+`getOption` throws when the global configuration is invalid. If a top-level
+option is missing, it logs an error and returns a default-constructed option.
+`getNestedOption` throws when the path is missing or cannot be converted to the
+requested type.
 
 ### Variable substitution
 
-`configVariables` is an object whose keys and values are strings. Every string
-value in the main `appsettings.json` is scanned for placeholders such as
-`${WS_DATADIR}` and `${DBSUFFIX}`. The placeholder must match a key in
-`configVariables`; an undefined placeholder raises a configuration error.
-Multiple placeholders in one value are supported.
+`configVariables` contains string-to-string replacements. The loader checks
+every string value in the main file for placeholders such as
+`${WS_DATADIR}` and `${DBSUFFIX}`.
+
+Every placeholder must have a matching key. You can use several placeholders
+in one value and several copies of the same placeholder.
 
 For example:
 
@@ -134,32 +135,31 @@ For example:
 ```
 
 These are application configuration variables, not operating-system
-environment variables. They are not automatically populated from the
-process environment.
+environment variables. They are not filled from the process environment.
 
 ### Startup adjustments
 
-After parsing, `Webapp::loadConfig` copies the top-level `securitySalt` into
-`webapp.dbConnection.securitySalt` with:
+After reading the JSON, `Webapp::loadConfig` copies the top-level
+`securitySalt` into `webapp.dbConnection.securitySalt`:
 
 ```cpp
 Config::setNestedOption("webapp.dbConnection.securitySalt", globalSalt);
 ```
 
-It also normalizes the configured temporary directory and TLS certificate
-paths relative to the executable, creating the temporary directory when
-necessary. Those path changes are applied to `Webapp`'s deserialized option;
-they are not written back to `_jsonConf`. The security-salt assignment above
-does update `_jsonConf` and is consequently visible through
-`getConfiguration()`.
+It also makes temporary-directory and TLS paths relative to the executable
+when needed. The temporary directory is created if it does not exist.
 
-The `useInMemoryResources` setting is additionally applied to the static
-`web::conf::Webapp::useInMemoryResources` flag. When the executable was not
-built with in-memory resources, the application forces that flag to `false`.
+The normalized path values are applied to the deserialized `Webapp` option;
+they are not written back to `_jsonConf`. The security-salt assignment is
+written to `_jsonConf`, so it can be seen through `getConfiguration()`.
+
+`useInMemoryResources` is also copied to the static
+`web::conf::Webapp::useInMemoryResources` flag. If the executable was not
+built with embedded resources, the application forces this flag to `false`.
 
 ## Dumping the effective configuration
 
-The authoritative in-memory JSON object is available through
+The configuration actually held in memory is available through
 [`Config::getConfiguration`](../../tobasa/include/tobasa/config.h#L213):
 
 ```cpp
@@ -167,16 +167,14 @@ const Json& effective = tbs::Config::get().getConfiguration();
 std::cout << effective.dump(3) << '\n';
 ```
 
-`getConfiguration()` returns the object after parsing and after configuration
-mutations made during startup. It is therefore the right object to inspect
-when diagnosing what the process is using, rather than rereading the runtime
-file.
+This object includes the values loaded from the selected file and the changes
+made during startup. It is the best object to inspect when debugging. Reading
+the runtime file again may not show those startup changes.
 
 ### Effective configuration structure
 
-At the point where the application server is ready to start, the effective
-configuration has this JSON structure. Values are shown as types rather than
-secrets or deployment-specific values:
+When the application is ready to start, the effective configuration has this
+shape. The values below show types, not real passwords or deployment values:
 
 ```text
 root
@@ -276,28 +274,29 @@ root
 			headers: array<KeyValue>
 ```
 
-`RouteAuth` entries contain `path`, `check`, and `authScheme` strings.
-`RouteSession` entries contain `path` and `check` strings. `KeyValue` entries
-contain `key` and `value` strings. `LogLevel` is one of `trace`, `debug`,
-`info`, `warn`, `error`, `critical`, `off`, or `n_level`.
+`RouteAuth` entries have `path`, `check`, and `authScheme`. `RouteSession`
+entries have `path` and `check`. `KeyValue` entries have `key` and `value`.
+`LogLevel` can be `trace`, `debug`, `info`, `warn`, `error`, `critical`, `off`,
+or `n_level`.
 
-The tree describes keys in the JSON returned by `getConfiguration()`, not
-only fields that are copied into a typed option. In particular,
-`webapp.environment` remains in the JSON loaded from either checked-in
-`appsettings.json`, but `tbs::web::conf::Webapp` does not declare or use it.
-The active database profile is selected by
+This tree shows the keys in the JSON returned by `getConfiguration()`. It is
+not limited to fields copied into typed option objects.
+
+In particular, `webapp.environment` stays in the JSON loaded from the checked-
+in `appsettings.json`, but `tbs::web::conf::Webapp` does not declare or use
+it. The active database profile comes from
 `webapp.dbConnection.environment`.
 
-When the LIS module is compiled and successfully initialized, an additional
-top-level `lisEngine` object is inserted by `Config::addOption`. Its shape is
-defined by `tbs::lis::conf::Engine` and comes from the separate
-`appsettings_lis.json` file; it is absent when the module is not enabled or
-its configuration fails to load.
+When the LIS module is compiled and starts successfully, the application adds
+another top-level `lisEngine` object through `Config::addOption`. Its shape is
+defined by `tbs::lis::conf::Engine` and comes from `appsettings_lis.json`.
+The object is absent when the module is disabled or its configuration fails.
 
-The application server exposes the same object through `GET
-/api/running_configuration`. That route requires bearer authentication and
-then additionally requires the authenticated user to be named `admin`.
-The response has the form:
+The application server also returns this object from
+`GET /api/running_configuration`. The route requires bearer authentication,
+and the authenticated user must also be named `admin`.
+
+The response looks like this:
 
 ```json
 {
@@ -308,8 +307,6 @@ The response has the form:
 }
 ```
 
-Treat this dump as sensitive. It can include database connection details,
-passwords, TLS passwords, the application security salt, and JWT secrets.
-Do not publish the endpoint or write its output to an unrestricted log.
-
-
+Treat this response as sensitive. It can contain database connection details,
+passwords, TLS passwords, the application security salt, and JWT secrets. Do
+not expose this endpoint publicly or write its output to an open log.

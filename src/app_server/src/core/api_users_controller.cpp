@@ -339,7 +339,7 @@ http::ResultPtr ApiUsersController::onRoles(const web::RouteArgument& arg)
 {
    auto httpCtx = arg.httpContext();
    auto parId = arg.get("user_id");
-   if (parId)
+   if (!parId)
       return web::badParameter("Invalid value for parameter user id");
 
    if ( !util::isNumber(parId.value()) )
