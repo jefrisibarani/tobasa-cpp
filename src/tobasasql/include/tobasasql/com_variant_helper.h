@@ -22,7 +22,6 @@ public:
    using NativeVariant = _variant_t;
 
    /// Check if variant value is empty.
-   /// TODO: what is empty??
    static bool isEmpty(const VariantType& variantValue);
 
    static std::string toString(const VariantType& variantValue);

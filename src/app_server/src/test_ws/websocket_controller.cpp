@@ -1,12 +1,13 @@
 #include <sstream>
 #include <tobasa/config.h>
-#include <tobasaweb/settings_webapp.h>
-#include <tobasahttp/websocket.h>
-#include <tobasahttp/server/status_page.h>
 #include <tobasa/format.h>
 #include <tobasa/datetime.h>
 #include <tobasa/util.h>
 #include <tobasa/json.h>
+#include <tobasahttp/websocket.h>
+#include <tobasahttp/server/status_page.h>
+#include <tobasaweb/settings_webapp.h>
+#include <tobasaweb/credential_info.h>
 
 #include "../page.h"
 #include "../clock.h" // for websocket test
@@ -57,24 +58,29 @@ void WebsocketController::bindHandler()
    {
       Logger::logD("[websocket:{}] connection started", conn->id());
 
+      // Retrieve the authenticated user's identity from the HTTP connection.
+      auto& usrData = std::any_cast<web::AuthResult&>( conn->userData() );
       // -------------------------------------------------------
       // add user to the list
-      auto chatUserId = util::getRandomString(10);
-      conn->identifier( chatUserId );
-      _chatUsers.emplace(std::make_shared<ChatUser>( conn->id(), chatUserId) );
+      auto userUuid = usrData.identity.pUser->uuid;
+      auto userName = usrData.identity.pUser->userName;
+      conn->identifier( userUuid );
+      _chatUsers.emplace(std::make_shared<ChatUser>( conn->id(), userUuid, userName) );
+
 
       // -------------------------------------------------------
       // Send welcome message
       std::ostringstream out;
       out <<  "Welcome to Tobasa Web Socket Service" << std::endl;
-      sendMessage("APP_TEXT", out.str() , "server001", chatUserId, "TEXT", conn);
+      sendMessage("APP_TEXT", out.str() , "server001", userUuid, "TEXT", conn);
 
-      // -------------------------------------------------------
-      // Send user info to client
+
+      // Send the authenticated user's info so the client can join the chat.(SYS_JOIN_CHAT)
       Json userInfo;
-      userInfo["userId"] = chatUserId;
-      userInfo["connId"] = conn->id();
-      sendMessage("SYS_RET_USER_INFO", userInfo.dump() , "server001", chatUserId, "SYS", conn);
+      userInfo["userId"]   = userUuid;
+      userInfo["connId"]   = conn->id();
+      userInfo["userName"] = userName;
+      sendMessage("SYS_RET_USER_INFO", userInfo.dump() , "server001", userUuid, "SYS", conn);
    };
 
    _webSocketContext->onClose = [this](WebSocketPtr conn, int closeCode, const std::string& reason)
@@ -164,20 +170,34 @@ void WebsocketController::bindHandler()
       }
       else if (messageCmd == "SYS_JOIN_CHAT")
       {
-         // Add user to userlist
          auto user = getUser(conn->id());
-         if (user != nullptr)
-            user->userName = senderName;
+         if (user == nullptr) 
+         {
+            return;
+         }
 
-         // Update all connected user userlist
-         std::string userListJson    = getUserListAsJsonString();
-         sendMessage("SYS_RET_USER_LIST", userListJson, "server001", "all_user", "SYS");
+         if (senderId == user->userId)
+         {
+            user->joinChat = true;
+            // senderName is a nickname
+            if (!senderName.empty())
+               user->userName = senderName;
+
+            // Brodcast to all connected users
+            std::string news = senderName + " has joined the chat";
+            sendMessage("APP_TEXT", news , "server001", "all_user", "TEXT");
+
+            // Send the updated user list to all connected users
+            std::string userListJson = getUserListAsJsonString();
+            sendMessage("SYS_RET_USER_LIST", userListJson, "server001", "all_user", "SYS");
+         }
+
          return;
       }
       else if (messageCmd == "SYS_GET_USER_LIST")
       {
-         std::string userListJson   = getUserListAsJsonString();
-         // Send message to destination user
+         std::string userListJson = getUserListAsJsonString();
+         // Send the user list to the requesting client.
          sendMessage("SYS_RET_USER_LIST", userListJson , "server001", senderId, "SYS", conn);
          return;
       }
@@ -187,10 +207,13 @@ void WebsocketController::bindHandler()
          sendMessage("APP_TEXT", content , senderId, "all_user", "TEXT");
          return;
       }
-      else if ( !receiverId.empty() && receiverId != "server001" )
+      else if ( !receiverId.empty() &&  !(receiverId == "server001" || receiverId == senderId) )
       {
-         // Send message to final user
-         sendMessage("APP_TEXT", content , senderId, receiverId, "TEXT");
+         if (userJoinedChat(conn->id()))
+         {
+            // Send message to final user
+            sendMessage("APP_TEXT", content , senderId, receiverId, "TEXT");
+         }
          return;
       }
       else
@@ -256,9 +279,9 @@ http::ResultPtr WebsocketController::onWebSocketA(const web::RouteArgument& arg)
 http::ResultPtr WebsocketController::onWebSocketB(const web::RouteArgument& arg)
 {
    auto httpContext = arg.httpContext();
-   
-   // we can assign another websocket handler,
-   // but this sample we use the same handler
+
+   // we can assign another websocket context,
+   // but in this sample we use the same context
 
    // set a context and establish websocket connection.
    httpContext->webSocketContext(_webSocketContext);
@@ -292,18 +315,34 @@ WebsocketController::ChatUserPtr WebsocketController::getUser(const std::string&
    return nullptr;
 }
 
-std::string WebsocketController::getUserListAsJsonString()
+std::string WebsocketController::getUserListAsJsonString(bool unique)
 {
-   // get all user as json array
    auto userList = Json::array();
+   std::set<std::string> userIds;
+
    for (auto us: _chatUsers)
    {
+      if (unique && !userIds.emplace(us->userId).second)
+         continue;
+
       auto user = Json::object();
       user["userId"]   = us->userId;
       user["userName"] = us->userName;
       userList.emplace_back(user);
    }
    return userList.dump();
+}
+
+bool WebsocketController::userJoinedChat(http::ConnectionId connId)
+{
+   auto user = getUser(connId);
+   if (user == nullptr) 
+      return false;
+
+   if (user->joinChat)
+      return true;
+
+   return false;
 }
 
 void WebsocketController::sendMessage(
@@ -339,6 +378,10 @@ void WebsocketController::sendMessage(
    {
       for (auto user: _chatUsers)
       {
+         // Do not send the broadcast back to the sender.
+         if (user->userId == senderId)
+            continue;
+
          chatmsg::ChatMessage msgOut;
          msgOut.set_id(            util::generateUniqueId());
          msgOut.set_content(       content);
@@ -350,8 +393,8 @@ void WebsocketController::sendMessage(
          msgOut.set_message_cmd(   messageCmd);
 
          std::string payload;
-         if (msgOut.SerializeToString(&payload) )
-            _webSocketContext->sendBinary( payload, user->userId ); 
+         if ( msgOut.SerializeToString(&payload) )
+            _webSocketContext->sendBinary( payload, user->userId );
       }
    }
    else 
@@ -367,18 +410,16 @@ void WebsocketController::sendMessage(
       msgOut.set_message_cmd(   messageCmd);
 
       std::string payload;
-      if (msgOut.SerializeToString(&payload) )
+      if ( msgOut.SerializeToString(&payload) )
       {
          if (conn != nullptr)
          {
-            // send back to the originating connection
+            // Send the response through the originating WebSocket connection.
             auto user = getUser(conn->id());
             if (user != nullptr && user->userId == receiverId)
                conn->sendBinary(payload);
-            else 
-            {
-               throw std::runtime_error("invalid conn object for sender");
-            }
+            else
+               Logger::logE("[websocket:{}] invalid user object for conn", conn->id());
          }
          else
             _webSocketContext->sendBinary( payload, receiverId ); 
@@ -431,8 +472,10 @@ void WebsocketController::sendMessage(
          auto user = getUser(conn->id());
          if (user != nullptr && user->userId == receiverId)
             conn->sendText(msg.str());
-         else 
-            throw std::runtime_error("invalid conn object for sender");
+         else {
+            //throw std::runtime_error("invalid conn object for sender");
+            Logger::logE("[websocket:{}] invalid conn object for sender", conn->id());
+         }
       }
       else
          _webSocketContext->sendText( msg.str(), receiverId ); 

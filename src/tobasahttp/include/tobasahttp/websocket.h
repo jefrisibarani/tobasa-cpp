@@ -43,21 +43,19 @@ constexpr int32_t WS_CLOSE_CODE_MANDATORY_EXTENSION   = 1010;
 constexpr int32_t WS_CLOSE_CODE_INTERNAL_ERROR        = 1011;
 constexpr int32_t WS_CLOSE_CODE_TLS_FAILURE           = 1015;
 
-/**
- * @brief Interface for sending WebSocket frames.
- * Implemented by connection types that support WebSocket communication.
- */
-class WebSocketSender
-{
-public:
-   virtual ~WebSocketSender() = default;
-
-   virtual void wsSendBinary(const std::string& data, WsSendErrorHandler callback = nullptr) = 0;
-   virtual void wsSendText(const std::string& data, WsSendErrorHandler callback = nullptr) = 0;
-   virtual void wsSendClose(int32_t status, const std::string &reason = "", WsSendErrorHandler callback = nullptr) = 0;
-};
 
 namespace ws {
+
+using SocketReadHandler  = std::function<void(const std::error_code&, std::size_t)>;
+using SocketWriteHandler = std::function<void(const std::error_code&, std::size_t)>;
+
+/// WebSocket Send Error Handler
+/// @param ErrorData
+using SendErrorHandler = std::function<void(const ErrorData&)>;
+
+/// Callback for filtering which WebSocket clients get a broadcast.
+/// Return true to skip this client; return false to send to it.
+using SkipSendHandler   = std::function<bool(ConnectionId)>;
 
 /**
  * @brief Represents an incoming WebSocket message.
@@ -123,7 +121,7 @@ class OutData
    public:
       OutData(std::shared_ptr<OutMessage> outHdr,
               std::shared_ptr<OutMessage> outMsg,
-              WsSendErrorHandler &&cb) noexcept
+              ws::SendErrorHandler &&cb) noexcept
          : outHeader(std::move(outHdr))
          , outMessage(std::move(outMsg))
          , callback(std::move(cb))
@@ -131,7 +129,27 @@ class OutData
 
       std::shared_ptr<OutMessage> outHeader;
       std::shared_ptr<OutMessage> outMessage;
-      WsSendErrorHandler callback;
+      ws::SendErrorHandler callback;
+};
+
+
+/**
+ * @brief Transport operations used by WebSocketState.
+ *
+ * The WebSocket protocol is independent of the underlying HTTP transport.
+ * HTTP/1 supplies socket operations, while HTTP/2 supplies stream operations.
+ */
+struct WebSocketTransport
+{
+   std::function<bool()> closed;
+   std::function<void(std::size_t, SocketReadHandler)> read;
+   std::function<void(const OutData&, SocketWriteHandler)> write;
+   std::function<void()> startReadTimer;
+   std::function<void()> startWriteTimer;
+   std::function<void()> cancelTimer;
+   std::function<void(const std::error_code&, ErrorType)> error;
+   std::function<void(const std::string&)> complete;
+   std::size_t messageMaxSize { 0 };
 };
 
 /**
@@ -145,6 +163,9 @@ class OutData
 struct WebSocketState
 {
    asio::streambuf     sendStreamBuf;
+#ifdef TOBASA_HTTP_USE_HTTP2
+   std::vector<uint8_t> receiveBuffer;
+#endif
    bool                closed { false };
    InMessagePtr        fragmentedInMessage;
    std::list<OutData>  sendQueue;
@@ -153,14 +174,88 @@ struct WebSocketState
    /// Public WebSocket handle associated with this transport state.
    http::WebSocketPtr  wsPtr;
 
+   WebSocketTransport transport;
+
+   void configureTransport(WebSocketTransport value);
+
+   /**
+    * @brief Queue an outgoing WebSocket message for transport.
+    *
+    * finRsvOpcode values: 129 = one-fragment text, 130 = one-fragment binary,
+    * 136 = close connection.
+    * See http://tools.ietf.org/html/rfc6455#section-5.2 for more information.
+    *
+    * @param outMessage Message payload to frame and send.
+    * @param callback Called after the transport completes or fails.
+    * @param finRsvOpcode WebSocket FIN, RSV, and opcode byte.
+    */
+   void send(const std::shared_ptr<OutMessage>& outMessage,
+      ws::SendErrorHandler callback = nullptr, unsigned char finRsvOpcode = 129);
+
+   /**
+    * Convenience function for sending a string.
+    */
+   void send(std::string_view outMessageStr,
+      ws::SendErrorHandler callback = nullptr, unsigned char finRsvOpcode = 129);
+
+   void sendClose(int32_t status, const std::string& reason = "",
+      ws::SendErrorHandler callback = nullptr);
+
+   void sendBinary(const std::string& data, ws::SendErrorHandler callback = nullptr);
+   
+   void sendText(const std::string& data, ws::SendErrorHandler callback = nullptr);
+   
+   /**
+    * @brief Reads the next WebSocket frame header and enforces protocol checks.
+    *
+    * For client-to-server frames, the masking bit is required by RFC 6455.
+    * Invalid or unmasked frames are rejected here before any payload bytes are
+    * decoded or dispatched to the application layer.
+    */
+   void readWebSocket();
+   
+   /**
+    * @brief Read and process the remaining bytes of an HTTP/1 WebSocket frame.
+    * Reads and unmaskes the client payload for a validated frame, then dispatches the
+    * WebSocket opcode (text, binary, close, ping, pong, or fragmented message).
+    *
+    * @param length WebSocket payload length from the frame header.
+    * @param finRsvOpcode FIN, RSV, and opcode byte from the frame header.
+    */
+   void readMessageContent(std::size_t length, unsigned char finRsvOpcode);
+   
+   void sendFromQueue();
+   
+   void handleConnError(const ErrorData& error, std::size_t bytesTransferred = static_cast<std::size_t>(-1));
+   
+#ifdef TOBASA_HTTP_USE_HTTP2
+   /**
+    * @brief Consume HTTP/2 DATA bytes containing WebSocket frames.
+    *
+    * Buffers incomplete frames and processes complete frames, including
+    * masking, fragmentation, ping, pong, close, and message delivery.
+    *
+    * @param data Pointer to the received HTTP/2 DATA bytes.
+    * @param length Number of bytes available at @p data.
+    */
+   void feedHttp2WebSocket(const uint8_t* data, std::size_t length);
+#endif
+
    void onOpen();
+   
    void onClose(int32_t status, const std::string& reason);
+   
    void onMessage(const std::string& message);
+   
    void onError(const ErrorData& error);
+   
    void onError(const std::error_code& error, ErrorType errorTpe, const std::string& source="WebSocketState");
+   
    void onPing();
+   
    void onPong();
 };
+
 using WebSocketStatePtr  = std::shared_ptr<WebSocketState>;
 using WebSocketStateUPtr = std::unique_ptr<WebSocketState>;
 
@@ -171,8 +266,14 @@ using OnPongHandler     = std::function<void(http::WebSocketPtr)>;
 using OnMessageHandler  = std::function<void(http::WebSocketPtr, const std::string&)>;
 using OnErrorHandler    = std::function<void(http::WebSocketPtr, const ErrorData&)>;
 
-using SkipSendHandler   = std::function<bool(ConnectionId)>;
 } // namespace ws
+
+
+
+// Forward declaration for WebSocket's internal transport hook.
+template <class Traits>
+class ServerConnection;
+
 
 /**
  * @brief Public handle for an upgraded WebSocket connection.
@@ -183,11 +284,30 @@ using SkipSendHandler   = std::function<bool(ConnectionId)>;
 class WebSocket
 {
 private:
-   std::weak_ptr<Connection> _connection;  // HttpConnection
+   // Non-owning reference to the underlying HTTP connection.
+   std::weak_ptr<Connection> _connection;
+   ConnectionId              _connId;
    asio::ip::tcp::endpoint   _remoteEndpoint;
+   Headers                   _requestHeaders;
    std::any                  _userData;
    std::string               _identifier;
-   Headers                   _requestHeaders;
+
+   template <class Traits>
+   friend class ServerConnection;
+
+   // Only ServerConnection specializations may access this method.
+   void setTransport(
+      std::function<void(const std::string&, ws::SendErrorHandler)>          sendText,
+      std::function<void(const std::string&, ws::SendErrorHandler)>          sendBinary,
+      std::function<void(int32_t, const std::string&, ws::SendErrorHandler)> sendClose);
+
+   /**
+    * Internal transport callbacks installed by ServerConnection.
+    * They route public WebSocket operations to the active HTTP transport.
+    */
+   std::function<void(const std::string&, ws::SendErrorHandler)>          _sendTextHandler;
+   std::function<void(const std::string&, ws::SendErrorHandler)>          _sendBinaryHandler;
+   std::function<void(int32_t, const std::string&, ws::SendErrorHandler)> _sendCloseHandler;
 
 public:
    WebSocket(const WebSocket&) = delete;
@@ -195,16 +315,18 @@ public:
    ~WebSocket() = default;
 
    WebSocket(ConnectionPtr conn, 
-      const std::any& userData, 
-      const asio::ip::tcp::endpoint& ep, 
-      Headers& requestHeader);
+      ConnectionId id,
+      const asio::ip::tcp::endpoint& ep,
+      const Headers& requestHeader,
+      const std::any& userData );
 
-   void sendText(  const std::string& data, WsSendErrorHandler callback = nullptr);
-   void sendBinary(const std::string& data, WsSendErrorHandler callback = nullptr);
+   void sendText(  const std::string& data, ws::SendErrorHandler callback = nullptr);
+   void sendBinary(const std::string& data, ws::SendErrorHandler callback = nullptr);
 
    /// Closes internal HTTP connection
    void close(const std::string& reason="", int32_t closeCode=WS_CLOSE_CODE_NORMAL_CLOSURE);
-   
+
+
    ConnectionId id() const;
    std::string identifier() const;
    asio::ip::tcp::endpoint remoteEndpoint() const;
@@ -215,7 +337,6 @@ public:
    Headers& requestHeaders();
 };
 
-class Context;
 
 /** 
  * WebSocketContext
@@ -252,10 +373,9 @@ class Context;
  *     });
  * @endcode
  */
-class WebSocketContext : public std::enable_shared_from_this<WebSocketContext>
+class WebSocketContext 
+   : public std::enable_shared_from_this<WebSocketContext>
 {
-   friend class http::Context;
-
 private:
    std::vector<WebSocketPtr> connectionsSnapshot() const;
 
@@ -296,15 +416,15 @@ public:
     * @param data   Data to send to client(s)
     * @param connId Connection id, if none given, send data to all clients
     */
-   void sendText(  const std::string& data, ConnectionId connId=0, WsSendErrorHandler callback = nullptr);
-   
-   void sendBinary(const std::string& data, ConnectionId connId=0, WsSendErrorHandler callback = nullptr);
+   void sendText(  const std::string& data, ConnectionId connId=0, ws::SendErrorHandler callback = nullptr);
+
+   void sendBinary(const std::string& data, ConnectionId connId=0, ws::SendErrorHandler callback = nullptr);
 
    void sendText(const std::string& data, const std::string& identifier, 
-      WsSendErrorHandler callback = nullptr, ws::SkipSendHandler skipCallback = nullptr);
-      
+      ws::SendErrorHandler callback = nullptr, ws::SkipSendHandler skipCallback = nullptr);
+
    void sendBinary(const std::string& data, const std::string& identifier, 
-      WsSendErrorHandler callback = nullptr, ws::SkipSendHandler skipCallback = nullptr);
+      ws::SendErrorHandler callback = nullptr, ws::SkipSendHandler skipCallback = nullptr);
 };
 
 /** @}*/

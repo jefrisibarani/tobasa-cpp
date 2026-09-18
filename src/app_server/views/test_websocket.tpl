@@ -11,10 +11,10 @@
                        style="width:290px;" id="txtEndpoint" type="text"
                        value="wss://localhost:8085/websocket_ep">
                     </input>
-                    <span class="me-1">Username:</span>
+                    <span class="me-1">Nickname:</span>
                     <input type="text" class="form-control form-control-sm me-1" 
-                       style="width:90px;" id="txtUSername" type="text"
-                       value="User001">
+                       style="width:90px;" id="txtNickname" type="text"
+                       value="">
                     </input>
                     <button type="button" class="btn btn-sm btn-outline-secondary ms-auto me-1" id="btnConnect" >Connect</button>
                   </div>
@@ -53,16 +53,16 @@
     const eventOutput = document.getElementById("eventOutput");
     const msgInput    = document.getElementById("msgInput");
     const txtEndpoint = document.getElementById("txtEndpoint");
-    const txtUSername = document.getElementById("txtUSername");
+    const txtNickname = document.getElementById("txtNickname");
     const userSelect  = document.getElementById("user_list_select");
     const endpoint    = txtEndpoint.value.trim();
 
     btnConnect.addEventListener("click", onConnect);
     btnSend.addEventListener("click", onSend);
     // ----------------------------------------------
-    let myUserId   = null;
-    let myConnId   = null;
-    let myUSerName = txtUSername.value;
+    let myUserID   = "";
+    let myConnID   = null;
+    let myNickName = txtNickname.value;
 
     {% if dataTestProtobuf %}
     const msg = protobuf.roots.default.chatmsg; 
@@ -71,88 +71,40 @@
     let websocket = null;
 
     function onConnect() {
-      myUSerName = txtUSername.value;
+      myNickName = txtNickname.value;
       websocket  = new WebSocket(endpoint);
-      
+
       {% if dataTestProtobuf %}
       websocket.binaryType = "arraybuffer";
       {% endif %}
 
       websocket.onopen = (event) => {
         appendEventMsg(`[EVT ] Connected to WebSocket server at ${endpoint}`);
-        btnSend.disabled = false;
-        doSend(`SYS_JOIN_CHAT`, "", "server001", "SYS");
-        // we can not do this here, because we haven't got userId from server
-        //doSend('SYS_GET_USER_LIST', "", "server001", "SYS");
+        btnSend.disabled = true;
       };
 
       websocket.onmessage = (event) => {
-        var timestamp;
-        var messageId;
-        var messageType;
-        var senderId;
-        var senderName;
-        var receiverId;
-        var messageCmd;
-        var content;
 
-        {% if dataTestProtobuf %}
-
-        // Decode the binary buffer using protobufjs
-        try {
-          let buffer  = getBuffer(event);
-          const msgIn = msg.ChatMessage.decode(buffer);
-
-          timestamp   = msgIn.timestamp;
-          messageId   = msgIn.id;
-          messageType = msg.ChatMessageType[msgIn.messageType];
-          senderId    = msgIn.senderId;
-          senderName  = msgIn.senderName;
-          receiverId  = msgIn.receiverId;
-          messageCmd  = msgIn.messageCmd;
-          content     = msgIn.content;
-        } catch (error) {
-          appendEventMsg(`[ERR ] Failed to decode message: ${error}`);
+        const msg = decodeMessage(event);
+        if (msg == null)
           return;
-        }
 
-        {% else %}
-
-          // Syntax: TBSMSG|{timestamp}|{message_id}|{message_type}|{sender_id}|{sender_name}|{receiver_id}|{messageCmd}|{content}
-          // e.g   : TBSMSG|1738328617569|-OHwSQ8XFWvkgCqOFzKd|MSG_TYPE_SYS|server001|server001|VziZC9hcD1|SYS_RET_USER_LIST|[{"userId":"VziZC9hcD1","userName":"Smith"}]'
-          // message_type : MSG_TYPE_TEXT, MSG_TYPE_STICKER, MSG_TYPE_NOTIFICATION, MSG_TYPE_SYS 
-          // message_cmd  : APP_TEXT, SYS_KILL_ME_NOW, SYS_JOIN_CHAT, SYS_GET_USER_LIST, SYS_RET_USER_LIST, SYS_RET_USER_INFO
-          const parts = event.data.split('|');
-          if (parts.length == 9) {
-            timestamp   = parts[1];
-            messageId   = parts[2];
-            messageType = parts[3];
-            senderId    = parts[4];
-            senderName  = parts[5];
-            receiverId  = parts[6];
-            messageCmd  = parts[7];
-            content     = parts[8];
-          } else {
-            appendEventMsg(`[ERR ] Invalid message format: ${event.data}`);
-            return;
-          }
-
-        {% endif %}
-        
-        if (messageCmd == null) {
+        if (msg.messageCmd == null) {
           appendEventMsg(`[ERR ] Invalid message command`);
           return;
         }
 
-        if (messageType === 'MSG_TYPE_TEXT' && messageCmd === 'APP_TEXT') {
-          const lines = content.split('\n');
+        if (msg.messageType === 'MSG_TYPE_TEXT' && msg.messageCmd === 'APP_TEXT') {
+
+          const lines = msg.content.split('\n');
           // Process each line
           lines.forEach((line, index) => {
-            appendMessage(`[${senderName}] ${line}`);
+            appendMessage(`[${msg.senderName}] ${line}`);
           });
+
         }
-        else if (messageType === 'MSG_TYPE_SYS') {
-          processSysMessage(messageCmd, content );
+        else if (msg.messageType === 'MSG_TYPE_SYS') {
+          processSysMessage(msg.messageCmd, msg.content );
         }
       };
 
@@ -201,8 +153,8 @@
         let chatMsg = msg.ChatMessage.create({
           id : newMessageId(),
           content: content,
-          senderId: myUserId,
-          senderName: myUSerName,
+          senderId: myUserID,
+          senderName: myNickName,
           receiverId: receiverId,
           messageType: msgType,
           messageCmd: messageCmd,
@@ -223,7 +175,7 @@
         var buffer = "TBSMSG" + "|" + newMessageTimestamp();
         buffer += "|" + newMessageId();
         buffer += "|" + "MSG_TYPE_" + messageType;
-        buffer += "|" + myUserId + "|" + myUSerName;
+        buffer += "|" + myUserID + "|" + myNickName;
         buffer += "|" + receiverId;
         buffer += "|" + messageCmd + "|" + content;
 
@@ -232,16 +184,16 @@
         {% endif %}
 
         if (messageType === 'SYS')
-          appendEventMsg(`[SENT] ${content}`);
+          appendEventMsg(`[SENT] ${content}`, 'OUTGOING');
         else
-          appendMessage(`[${myUSerName}] ${content}`);
+          appendMessage(`[${myNickName}] ${content}`, 'OUTGOING');
       }
       else
         appendEventMsg(`[ERR ] WebSocket is not connected or content is empty.`);
     }
 
     // Append messages to the message display area
-    function appendMessage(val) {
+    function appendMessage(val, type="INCOMING") {
        //msgOutput.insertAdjacentHTML("afterbegin", `<p style="margin-bottom:0px">${val}</p>`);
        const el = document.createElement('div');
 
@@ -251,8 +203,15 @@
           el.style.color = "red"; 
        else if (val.includes("[EVT ]"))
           el.style.color = "brown"; 
-       else // [SENT]
-          el.style.color = "green";
+       else {
+          if (type=='OUTGOING') {
+            el.style.color = "black";
+          }
+          else if (type=='INCOMING') {
+            el.style.color = "green";
+
+          }
+       }
 
        el.textContent = val;
        msgOutput.appendChild(el);
@@ -297,16 +256,90 @@
       return null;
     }
 
+    function decodeMessage(event) {
+
+      const decoded = {
+        timestamp: null,
+        messageId: null,
+        messageType: null,
+        senderId: null,
+        senderName: null,
+        receiverId: null,
+        messageCmd: null,
+        content: null
+      };
+
+      {% if dataTestProtobuf %}
+
+      // Decode the binary buffer using protobufjs
+      try {
+        let buffer  = getBuffer(event);
+        const msgIn = msg.ChatMessage.decode(buffer);
+
+        decoded.timestamp   = msgIn.timestamp;
+        decoded.messageId   = msgIn.id;
+        decoded.messageType = msg.ChatMessageType[msgIn.messageType];
+        decoded.senderId    = msgIn.senderId;
+        decoded.senderName  = msgIn.senderName;
+        decoded.receiverId  = msgIn.receiverId;
+        decoded.messageCmd  = msgIn.messageCmd;
+        decoded.content     = msgIn.content;
+      } 
+      catch (error) {
+        appendEventMsg(`[ERR ] Failed to decode message: ${error}`);
+        return null;
+      }
+
+      {% else %}
+
+      // Syntax: TBSMSG|{timestamp}|{message_id}|{message_type}|{sender_id}|{sender_name}|{receiver_id}|{messageCmd}|{content}
+      // e.g   : TBSMSG|1738328617569|-OHwSQ8XFWvkgCqOFzKd|MSG_TYPE_SYS|server001|server001|VziZC9hcD1|SYS_RET_USER_LIST|[{"userId":"VziZC9hcD1","userName":"Smith"}]'
+      // message_type : MSG_TYPE_TEXT, MSG_TYPE_STICKER, MSG_TYPE_NOTIFICATION, MSG_TYPE_SYS 
+      // message_cmd  : APP_TEXT, SYS_KILL_ME_NOW, SYS_JOIN_CHAT, SYS_GET_USER_LIST, SYS_RET_USER_LIST, SYS_RET_USER_INFO
+      const parts = event.data.split('|');
+      if (parts.length == 9) {
+        decoded.timestamp   = parts[1];
+        decoded.messageId   = parts[2];
+        decoded.messageType = parts[3];
+        decoded.senderId    = parts[4];
+        decoded.senderName  = parts[5];
+        decoded.receiverId  = parts[6];
+        decoded.messageCmd  = parts[7];
+        decoded.content     = parts[8];
+      } 
+      else {
+        appendEventMsg(`[ERR ] Invalid message format: ${event.data}`);
+        return null;
+      }
+
+      {% endif %}
+
+      return decoded;
+    };
+
     function processSysMessage(messageCmd, content)
     {
       if (messageCmd == 'SYS_RET_USER_INFO') {
+        // After successfull websocket open, server sent this message
 
-        const userInfo = JSON.parse(content);
-        myUserId = userInfo.userId;
-        myConnId = userInfo.connId;
+        const userInfo    = JSON.parse(content);
+        // Update nickname text box and our chat app username
+        if (txtNickname.value.length == 0) {
+          myNickName        = userInfo.userName;
+          txtNickname.value = userInfo.userName;
+        }
+        else {
+          myNickName  = txtNickname.value;
+        }
+
+        myUserID  = userInfo.userId;
 
         appendEventMsg(`[RECV] ${messageCmd}`);
-        appendEventMsg(`[INFO] User ID: ${myUserId}, Connection ID: ${myConnId}`);
+        appendEventMsg(`[INFO] User ID: ${userInfo.userId}, User Name: ${userInfo.userName}, Connection ID: ${userInfo.connId}` );
+
+        // we have to join, to be able to send chat message
+        doSend(`SYS_JOIN_CHAT`, "", "server001", "SYS");
+        btnSend.disabled = false;
 
         return;
       }
@@ -327,7 +360,7 @@
         userList.forEach(user => {
           const option = document.createElement("option");
           option.value = user.userId;
-          if (user.userId == myUserId)
+          if (user.userId == myUserID)
             option.textContent = '[Me] ' + user.userName;
           else
             option.textContent = user.userName;

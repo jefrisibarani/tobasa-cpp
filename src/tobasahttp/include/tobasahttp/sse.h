@@ -45,7 +45,7 @@ private:
    CloseHandler      _closeHandler;
    std::atomic_bool  _closed { false };
    
-   std::weak_ptr<Connection> _connection;  // HttpConnection
+   std::weak_ptr<Connection> _connection;
    std::any                  _userData;
    asio::ip::tcp::endpoint   _remoteEndpoint;
    std::string               _identifier;
@@ -55,9 +55,12 @@ public:
    SseConnection& operator=(const SseConnection&) = delete;
    ~SseConnection() = default;
 
-   SseConnection(SendHandler sendHandler, CloseHandler closeHandler,
+   SseConnection(
+      SendHandler sendHandler, 
+      CloseHandler closeHandler,
       ConnectionPtr connection, 
-      const std::any& userData, const asio::ip::tcp::endpoint& ep);
+      const asio::ip::tcp::endpoint& ep,
+      const std::any& userData);
 
    /// Send one SSE event. Data containing newlines is emitted as multiple data fields.
    void send(std::string_view data, std::string_view event = {}, std::string_view id = {});

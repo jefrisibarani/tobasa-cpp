@@ -28,38 +28,29 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
    switch (frame->hd.type) 
    {
       case NGHTTP2_DATA:
-      /*
       {
-         Logger::logT("[{}] [conn:{}] [http2] Receive (DATA)", LOGTYPE, httpSession->connId());
+        if (httpSession->option()->logVerbose)
+           Logger::logT("[{}] [conn:{}] [http2] Receive (DATA)", LOGTYPE, httpSession->connId());
 
-         // Retrieve the payload length
-         // Check that the client request has finished
-         if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) 
+         auto streamData = httpSession->findStream(frame->hd.stream_id);
+         if (!streamData)
+            return 0; // Stream already closed
+
+         if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) &&
+             !streamData->isWebSocketConnect() &&
+             !streamData->requestDispatched)
          {
-            auto streamData = httpSession->findStream(frame->hd.stream_id);
-            if (!streamData) {
-                  return 0; // Stream already closed
-            }
-
-            // Process the request when END_STREAM is set
+            streamData->requestDispatched = true;
             auto result = httpSession->handleRequest(frame->hd.stream_id);
             if (!result.success())
-                  return NGHTTP2_ERR_CALLBACK_FAILURE;
+               return NGHTTP2_ERR_CALLBACK_FAILURE;
          }
-         break;
-      }*/
+         return 0;
+      }
       case NGHTTP2_HEADERS:
       {
-         if (frame->hd.type == NGHTTP2_HEADERS)
-         {
-            if (httpSession->option()->logVerbose)
-               Logger::logT("[{}] [conn:{}] [http2] Receive (HEADERS)", LOGTYPE, httpSession->connId());
-         }
-         else
-         {
-            if (httpSession->option()->logVerbose)
-               Logger::logT("[{}] [conn:{}] [http2] Receive (DATA)", LOGTYPE, httpSession->connId());
-         }
+         if (httpSession->option()->logVerbose)
+            Logger::logT("[{}] [conn:{}] [http2] Receive (HEADERS)", LOGTYPE, httpSession->connId());
 
          auto streamData = httpSession->findStream(frame->hd.stream_id);
          // For DATA and HEADERS frame, this callback may be called after
@@ -74,7 +65,8 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
             if (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS)
             {
                http::HttpStatus status;
-               if (!httpSession->validateMethod(streamData->requestHeader.method, status))
+               if (!httpSession->validateMethod(streamData->requestHeader.method, status) &&
+               !streamData->isWebSocketConnect() )
                {
                   Logger::logW("[{}] [conn:{}] [http2] METHOD not allowed: {}", LOGTYPE, httpSession->connId(), streamData->requestHeader.method);
                   nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_INTERNAL_ERROR);
@@ -82,15 +74,15 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
                }
             }
 
-            // WebSocket request
-            if (streamData->isWebSocketConnect())
+         // WebSocket request
+            if (streamData->isWebSocketConnect() && !streamData->requestDispatched)
             {
+            
                Logger::logT("[{}] [conn:{}] [http2] Receive WebSocket CONNECT", LOGTYPE, httpSession->connId());
-               auto nva = std::vector<nghttp2_nv>();
-               nva.push_back(http2::makeNvLs(":status", std::string("200")));
-
-               // Accept the WebSocket connection
-               nghttp2_submit_headers(session, NGHTTP2_FLAG_END_HEADERS, frame->hd.stream_id, nullptr, nva.data(), nva.size(), nullptr);
+               streamData->requestDispatched = true;
+               auto result = httpSession->handleRequest(frame->hd.stream_id);
+               if (!result.success())
+                  return NGHTTP2_ERR_CALLBACK_FAILURE;
             }
 #if 0
             // auto content_length = req.fs.header(http2::HD_CONTENT_LENGTH);
@@ -184,9 +176,12 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
 
 
          // Check that the client request has finished
-         if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)
+         if ((frame->hd.flags & NGHTTP2_FLAG_END_STREAM) &&
+             !streamData->isWebSocketConnect() &&
+             !streamData->requestDispatched)
          {
             // create http request/response object, and process the request
+            streamData->requestDispatched = true;
             auto result = httpSession->handleRequest(frame->hd.stream_id);
             if (!result.success())
                return NGHTTP2_ERR_CALLBACK_FAILURE;
@@ -219,6 +214,9 @@ int onStreamCloseCallback(nghttp2_session *session, int32_t streamId, uint32_t c
    Http2StreamData* streamData = httpSession->findStream(streamId);
    if (!streamData)
       return 0;
+
+   if (auto wsStream = httpSession->findWebSocketStream(streamId); wsStream && wsStream->onClose)
+      wsStream->onClose();
 
    httpSession->closeStream(streamId);
 
@@ -419,7 +417,13 @@ int onDataChunkRecvCallback(nghttp2_session *session, uint8_t flags,
    auto streamData = httpSession->findStream(streamId);
    if (streamData) 
    {
-      if (streamData->hasMultipartBody)
+      if (httpSession->isWebSocketStream(streamId))
+      {
+         auto wsStream = httpSession->findWebSocketStream(streamId);
+         if (wsStream && wsStream->onData)
+            wsStream->onData(data, len);
+      }
+      else if (streamData->hasMultipartBody)
       {
          auto result = streamData->multipartParser().parse(data, len);
          if (streamData->multipartParser().done())
@@ -467,6 +471,37 @@ nghttp2_ssize readSseData(Http2Session* httpSession, int32_t streamId,
       *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
 
    return static_cast<nghttp2_ssize>(readCount);
+}
+
+// WebSocket
+// -------------------------------------------------------
+nghttp2_ssize readWebSocketData(Http2Session* httpSession, int32_t streamId,
+                                uint8_t* buffer, size_t length, uint32_t* dataFlags)
+{
+   auto stream = httpSession->findWebSocketStream(streamId);
+   if (!stream)
+      return NGHTTP2_ERR_DEFERRED;
+
+   if (stream->sendQueue.empty())
+   {
+      if (stream->closeRequested)
+         *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+      else
+         return NGHTTP2_ERR_DEFERRED;
+      return 0;
+   }
+
+   auto& data = stream->sendQueue.front();
+   auto count = std::min(length, data.size());
+   std::memcpy(buffer, data.data(), count);
+   data.erase(0, count);
+   if (data.empty())
+      stream->sendQueue.pop_front();
+
+   if (stream->sendQueue.empty() && stream->closeRequested)
+      *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+
+   return static_cast<nghttp2_ssize>(count);
 }
 
 #ifdef TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
@@ -545,6 +580,9 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
    auto httpSession = static_cast<Http2Session*>(userData);
    if (! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+   if (httpSession->isWebSocketStream(streamId))
+      return readWebSocketData(httpSession, streamId, buf, length, dataFlags);
 
    auto* httpContext = static_cast<http::Context*>(source->ptr);
    if (httpContext == nullptr || httpContext->closed()) {
@@ -656,6 +694,9 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
    if ( ! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
 
+   if (httpSession->isWebSocketStream(streamId))
+      return readWebSocketData(httpSession, streamId, buf, length, dataFlags);
+
    if (httpSession->isSseStream(streamId))
       return readSseData(httpSession, streamId, buf, length, dataFlags);
 
@@ -740,9 +781,8 @@ http::parser::MultipartParser& Http2StreamData::multipartParser()
 
 bool Http2StreamData::isWebSocketConnect()
 {
-   return 
-      requestHeader.protocol == "websocket" && 
-      requestHeader.method == "CONNECT" ;
+   return requestHeader.protocol == "websocket" && 
+          requestHeader.method == "CONNECT" ;
 }
 
 Result Http2Session::handleRequest(int32_t streamId)
@@ -808,6 +848,29 @@ Result Http2Session::submitResponse(http::HttpContext httpContext, int streamId)
 
    this->writeData();
    
+   return {};
+}
+
+// WebSocket
+
+Result Http2Session::submitWebSocketResponse(int32_t streamId)
+{
+   if (!isWebSocketStream(streamId))
+      return Result::fail("WebSocket stream not registered", streamId);
+
+   static const std::string statusCode = "200";
+   auto nva = std::vector<nghttp2_nv>();
+   nva.push_back(http2::makeNvLs(":status", statusCode));
+
+   nghttp2_data_provider2 dataProvider {};
+   dataProvider.source.ptr = findWebSocketStream(streamId);
+   dataProvider.read_callback = cb::dataSourceReadCallback;
+
+   int rv = nghttp2_submit_response2(rawSession(), streamId, nva.data(), nva.size(), &dataProvider);
+   if (rv < 0)
+      return Result(rv, "", streamId);
+
+   writeData();
    return {};
 }
 
@@ -899,6 +962,7 @@ void Http2Session::closeStream(int32_t streamId)
 {
    _streams.erase(streamId);
    _httpContexts.erase(streamId);
+   _webSocketStreams.erase(streamId);
 
    // Server-Sent Events (SSE)
    auto sseStream = findSseStream(streamId);
@@ -979,6 +1043,54 @@ Http2Session::SseStreamData* Http2Session::findSseStream(int32_t streamId)
    return it->second.get();
 }
 
+
+// -------------------------------------------------------
+// WebSocket
+// -------------------------------------------------------
+void Http2Session::registerWebSocketStream(int32_t streamId, WebSocketDataHandler onData,
+                                           WebSocketCloseHandler onClose)
+{
+   auto stream = std::make_unique<WebSocketStreamData>();
+   stream->onData = std::move(onData);
+   stream->onClose = std::move(onClose);
+   _webSocketStreams[streamId] = std::move(stream);
+}
+
+bool Http2Session::isWebSocketStream(int32_t streamId) const
+{
+   return _webSocketStreams.count(streamId) > 0;
+}
+
+Http2Session::WebSocketStreamData* Http2Session::findWebSocketStream(int32_t streamId)
+{
+   auto it = _webSocketStreams.find(streamId);
+   return it == _webSocketStreams.end() ? nullptr : it->second.get();
+}
+
+void Http2Session::enqueueWebSocketData(int32_t streamId, std::string data)
+{
+   auto stream = findWebSocketStream(streamId);
+   if (!stream || stream->closeRequested)
+      return;
+
+   stream->sendQueue.emplace_back(std::move(data));
+   nghttp2_session_resume_data(_session, streamId);
+   writeData();
+}
+
+void Http2Session::closeWebSocketStream(int32_t streamId)
+{
+   auto stream = findWebSocketStream(streamId);
+   if (!stream || stream->closeRequested)
+      return;
+
+   stream->closeRequested = true;
+   nghttp2_session_resume_data(_session, streamId);
+   writeData();
+}
+
+
+
 void Http2Session::addHttpContext(http::HttpContext context, int32_t streamId)
 {
    _httpContexts[context->streamId()] = context;
@@ -988,23 +1100,15 @@ Result Http2Session::sendServerConnectionHeader()
 {
    Logger::logT("[{}] [conn:{}] [http2] sendServerConnectionHeader", LOGTYPE, this->connId());
    
-   std::array<nghttp2_settings_entry, 5> entry;
-   size_t niv = 1;
+   std::array<nghttp2_settings_entry, 6> entry;
+   size_t niv = 0;
    
-   entry[0].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
-   entry[0].value = _option->maxConcurrentStreams;
-
-   entry[1].settings_id = NGHTTP2_SETTINGS_HEADER_TABLE_SIZE;
-   entry[1].value = _option->headerTableSize;
-
-   entry[2].settings_id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE;
-   entry[3].value = (1 << _option->windowBits) - 1;
-
-   entry[3].settings_id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES;
-   entry[3].value = 1;
-
-   entry[4].settings_id = NGHTTP2_SETTINGS_MAX_FRAME_SIZE;
-   entry[4].value = _option->maximumFrameSize; // Maximum allowed frame size
+   entry[niv++] = {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,  static_cast<uint32_t>(_option->maxConcurrentStreams)};
+   entry[niv++] = {NGHTTP2_SETTINGS_HEADER_TABLE_SIZE,       static_cast<uint32_t>(_option->headerTableSize)};
+   entry[niv++] = {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE,     static_cast<uint32_t>((1 << _option->windowBits) - 1)};
+   entry[niv++] = {NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES,   1};
+   entry[niv++] = {NGHTTP2_SETTINGS_MAX_FRAME_SIZE,          static_cast<uint32_t>(_option->maximumFrameSize)};
+   entry[niv++] = {NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, 1};
 
    int rv = nghttp2_submit_settings(_session, NGHTTP2_FLAG_NONE, entry.data(), niv);
    if (rv<0)
@@ -1012,7 +1116,7 @@ Result Http2Session::sendServerConnectionHeader()
 
    // rv = nghttp2_option_set_max_frame_size(_options, 128 * 1024); // Set to 128KB
    rv = nghttp2_session_set_local_window_size( _session, NGHTTP2_FLAG_NONE, 0,
-      (1 << _option->connectionWindowBits) - 1);
+                                              (1 << _option->connectionWindowBits) - 1);
 
    return Result(rv);
 }
@@ -1050,13 +1154,11 @@ Result Http2Session::fillSendBuffer(size_t& byteToTransfer)
       for (;;) 
       {
          const uint8_t *data;
-         if (_option->logVerbose)
-            Logger::logT("[{}] [conn:{}] [http2] fillSendBuffer,    START call nghttp2_session_mem_send2", LOGTYPE, connId());
-         
+
          auto readlen = nghttp2_session_mem_send2(_session, &data);
-         
+
          if (_option->logVerbose)
-            Logger::logT("[{}] [conn:{}] [http2] fillSendBuffer,    END   call nghttp2_session_mem_send2", LOGTYPE, connId());
+            Logger::logT("[{}] [conn:{}] [http2] fillSendBuffer, nghttp2_session_mem_send2 returns: {}", LOGTYPE, connId(), readlen);
 
          if (readlen < 0) 
             return Result((int)readlen);
@@ -1082,7 +1184,7 @@ Result Http2Session::fillSendBuffer(size_t& byteToTransfer)
    }
 
    if (_option->logVerbose)
-      Logger::logT("[{}] [conn:{}] [http2] fillSendBuffer, END sendBuffer size: {}", LOGTYPE, this->connId(), _sendBuffer->size());
+      Logger::logT("[{}] [conn:{}] [http2] fillSendBuffer, sendBuffer size: {}", LOGTYPE, this->connId(), _sendBuffer->size());
    
    return Result();
 }

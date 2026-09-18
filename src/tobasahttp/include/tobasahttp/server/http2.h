@@ -23,6 +23,10 @@ namespace tbs {
 namespace http { class Response; }
 namespace http2 {
 
+
+/**
+ * \brief Stores the result of an HTTP/2 operation.
+ */
 class Result
 {
 private:
@@ -47,6 +51,7 @@ public:
    int32_t streamId() { return _streamId; }
 };
 
+/// Main request headers received from an HTTP/2 client.
 struct RequestHeader 
 {
    // mandatory
@@ -63,6 +68,8 @@ struct RequestHeader
    size_t contentLength {0};
 };
 
+
+/// Stores request data and state for one HTTP/2 stream.
 class Http2StreamData
 {
 public:
@@ -93,6 +100,8 @@ public:
    bool hasContentLength {false};
    bool hasMultipartBody {false};
 
+   bool requestDispatched {false};
+
    http::MultipartBodyUPtr multipartBody {nullptr};
 
    bool isWebSocketConnect();
@@ -107,6 +116,7 @@ private:
 
 class Http2Session;
 
+/// Tracks entry and exit while an HTTP/2 callback is running.
 struct CallbackGuard 
 {
    CallbackGuard(Http2Session &h);
@@ -114,12 +124,29 @@ struct CallbackGuard
    Http2Session &http2Session;
 };
 
+/// Called after an HTTP/2 operation finishes.
 using HandlerCallback            = std::function<void()>;
+
+/// Called when the HTTP/2 session needs to write data.
 using WriteHandler               = std::function<void(HandlerCallback)>;
+
+/// Called when data must be added to the HTTP/2 send queue.
 using AddToSendQueueHandler      = std::function<void(std::shared_ptr<asio::streambuf>, HandlerCallback)>;
+
+/// Called when an HTTP/2 stream is closed.
 using StreamDataOnCloseHandler   = std::function<void(int32_t)>;
+
+/// Called when an HTTP/2 request is ready to handle.
 using RequestReadyHandler        = std::function<Result(int32_t) >;
+
+/// Checks whether an HTTP method is allowed.
 using ValidateMethodHandler      = std::function<bool(const std::string& , http::HttpStatus& )>;
+
+/// Receives data from an HTTP/2 WebSocket stream.
+using WebSocketDataHandler       = std::function<void(const uint8_t*, size_t)>;
+
+/// Called when an HTTP/2 WebSocket stream is closed.
+using WebSocketCloseHandler      = std::function<void()>;
 
 
 struct Http2Option
@@ -153,7 +180,25 @@ public:
    Http2StreamData* findStream(int32_t streamId);
 
    Result handleRequest(int32_t streamId);
+
    Result submitResponse(http::HttpContext httpContext, int streamId);
+
+   Result submitWebSocketResponse(int32_t streamId);
+
+   struct WebSocketStreamData
+   {
+      std::deque<std::string> sendQueue;
+      bool closeRequested {false};
+      WebSocketDataHandler onData;
+      WebSocketCloseHandler onClose;
+   };
+
+   void registerWebSocketStream(int32_t streamId, WebSocketDataHandler onData,
+      WebSocketCloseHandler onClose);
+   bool isWebSocketStream(int32_t streamId) const;
+   void enqueueWebSocketData(int32_t streamId, std::string data);
+   void closeWebSocketStream(int32_t streamId);
+   WebSocketStreamData* findWebSocketStream(int32_t streamId);
 
    // -------------------------------------------------------
    // Server-Sent Events (SSE)
@@ -252,6 +297,7 @@ private:
 
    std::map<int32_t, std::unique_ptr<Http2StreamData>> _streams;
    std::map<int32_t, http::HttpContext> _httpContexts;
+   std::map<int32_t, std::unique_ptr<WebSocketStreamData>> _webSocketStreams;
 
    // Server-Sent Events (SSE)
    std::map<int32_t, std::unique_ptr<SseStreamData>>  _sseStreams;
@@ -271,8 +317,7 @@ private:
    bool                       _writingData            = false;
    bool                       _closed                 = false;
    bool                       _insideCallback         = false;
-   // true if we have pending on_write call.  This avoids repeated call
-   // of io_service::post.
+   /// true if we have pending on_write call.  This avoids repeated call of io_service::post.
    bool                       _writeSignaled          = false;
 
    asio::streambuf*           _sendBuffer             = nullptr;

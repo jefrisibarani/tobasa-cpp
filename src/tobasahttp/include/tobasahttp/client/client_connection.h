@@ -13,9 +13,17 @@ namespace http {
  * @{
  */
 
-/** 
- * Http Client connection
- * \tparam Traits
+/**
+ * \brief HTTP client connection to a remote server.
+ *
+ * This class owns the client-side socket, serializes HTTP requests, sends
+ * them to the remote server, parses the responses, and passes each response
+ * to the configured response handler. HTTP/1 keep-alive connections can be
+ * reused for multiple requests until the connection or request limit is
+ * reached.
+ *
+ * \tparam Traits Provides the socket, settings, and logger types used by the
+ * connection.
  */
 template <class Traits>
 class ClientConnection

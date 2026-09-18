@@ -31,23 +31,29 @@ protected:
    
    // WebSocket context for our simple chat server
    std::shared_ptr<http::WebSocketContext> _webSocketContext;
+   
    // Chat user
    struct ChatUser
    {
-      ChatUser(http::ConnectionId cId, const std::string& uId)
-         :connId {cId} , userId {uId} {}
+      ChatUser(http::ConnectionId cId, const std::string& uId, const std::string& uname)
+         : connId {cId}, userId{uId}, userName{uname} {}
 
       http::ConnectionId connId;
+      // logged on user uuid
       std::string userId;
+      // logged on user name or user nickname from browser chat app
       std::string userName;
+
+      bool joinChat = false;
    };
    using ChatUserPtr = std::shared_ptr<ChatUser>;
    std::set<ChatUserPtr> _chatUsers;
 
    ChatUserPtr getUser(http::ConnectionId connId);
    ChatUserPtr getUser(const std::string& identifier);
-   std::string getUserListAsJsonString();
+   std::string getUserListAsJsonString(bool unique=true);
 
+   bool userJoinedChat(http::ConnectionId connId);
    
    void sendMessage(
       const std::string& messageCmd, 

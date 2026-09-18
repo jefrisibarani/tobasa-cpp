@@ -5,7 +5,7 @@
 namespace tbs {
 namespace http {
 
-const size_t  HTTP_COMPRESS_MIN_SIZE            = 1024; // in bytes
+const size_t  HTTP_COMPRESS_MIN_SIZE = 1024; // in bytes
 
 /// A fluent style interface for setting http server params.
 template <typename DerivedType>

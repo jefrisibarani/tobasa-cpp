@@ -51,8 +51,11 @@
 
 namespace tbs {
 
+
 bool ComVariantHelper::isEmpty(const VariantType& variantValue)
 {
+   // TODO_JEFRI: what is empty?
+
    try
    {
       // check native variant first

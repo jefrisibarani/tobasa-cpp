@@ -6,14 +6,17 @@
 namespace tbs {
 namespace http {
 
-SseConnection::SseConnection(SendHandler sendHandler, CloseHandler closeHandler,
+SseConnection::SseConnection(
+      SendHandler sendHandler, 
+      CloseHandler closeHandler,
       ConnectionPtr connection, 
-      const std::any& userData, const asio::ip::tcp::endpoint& ep)
+      const asio::ip::tcp::endpoint& ep,
+      const std::any& userData )
    : _sendHandler  { std::move(sendHandler) }
    , _closeHandler { std::move(closeHandler) }
    , _connection {connection}
-   , _userData   {userData}
-   , _remoteEndpoint {std::move(ep)}
+   , _remoteEndpoint {ep}
+   , _userData {userData}
 {
 }
 

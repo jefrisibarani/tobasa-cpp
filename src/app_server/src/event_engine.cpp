@@ -96,7 +96,7 @@ EventEngine::EventEngine(app::DbServicePtr dbService)
       // -------------------------------------------------------
 
       // TODO_JEFRI:
-      // check wether the connection still in valid session
+      // check wether the connection still in a valid session
    };
 
    wsContext->onError = [this](http::WebSocketPtr conn, const http::ErrorData& error)
