@@ -13,6 +13,7 @@ namespace app {
 
 struct EventAction
 {
+   /// button
    std::string type;
    std::string link;
 };
@@ -20,7 +21,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EventAction, type, link)
 
 struct EventData
 {
-   std::string type;
+   /// success, error, warning, info
+   std::string type;     
    std::string title;
    std::string content;
    long long   timestamp;
@@ -31,6 +33,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EventData, type, title, content, timestamp, a
 class EventMessage
 {
 public:
+   /// websocket.connected, sse.connected, notification, error, failure, message
    std::string type;
    std::string message;
    Json        data;    // Event Data

@@ -60,6 +60,8 @@ public:
     */
    const std::vector<std::string>& parameters() const;
 
+   bool hasNativePostgresPositionalPlaceholder(const std::string& sql);
+
 private:
 
    BackendType _dbms;
@@ -69,6 +71,8 @@ private:
    enum State { Normal, SingleQuote, DoubleQuote, LineComment, BlockComment, DollarQuote };
 
    std::string makePlaceholder(int index) const;
+
+
 };
 
 

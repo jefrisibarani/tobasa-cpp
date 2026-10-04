@@ -196,7 +196,7 @@ target_sources(${PROJECT_NAME}
    PRIVATE ${TOBASASQL_MARIADB_HEADERS_LIST}
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE tobasa)
+target_link_libraries(${PROJECT_NAME} PUBLIC tobasa)
 
 if(TOBASA_SQL_USE_PGSQL)
    if(TOBASA_SQL_USE_PGSQL_CUSTOM AND MSVC)
@@ -243,6 +243,10 @@ if(TOBASA_SQL_USE_MYSQL)
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include )
+
+if(TOBASA_BUILD_TESTS)
+   add_subdirectory(tests)
+endif()
 
 
 if(MSVC)

@@ -21,9 +21,9 @@ namespace sse {
 struct SseState
 {
    std::deque<std::string> sendQueue;
-   bool                    headersWritten      { false };
-   bool                    writing             { false };
-   bool                    closeRequested      { false };
+   bool                    headersWritten { false };
+   bool                    writing        { false };
+   bool                    closeRequested { false };
 
    /// Public SseConnection handle associated with this transport state.
    http::SseConnectionPtr  ssePtr;

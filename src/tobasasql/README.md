@@ -58,6 +58,23 @@ The library is built as part of the main project build.
 - Microsoft SQL Server: ODBC or ADO on Windows
 - zlib: required for the bundled MariaDB connector build path
 
+### Tests
+
+Unit tests are built with `TOBASA_BUILD_TESTS=ON`. MySQL integration tests are
+opt-in because they require a running MySQL or MariaDB server:
+
+```text
+cmake -S . -B build -DTOBASA_BUILD_INTEGRATION_TESTS=ON
+cmake --build build --target tobasasql_mysql_command_integration_tests --config Debug
+```
+
+Set `TOBASA_MYSQL_TEST_CONNECTION` before running CTest. The value uses the
+same format as `MysqlConnection::connect`, for example:
+`Database=testdb;User=testuser;Password=secret;Server=127.0.0.1;Port=3306`.
+The test also reads this variable from the project-root `.env` file as a
+fallback. The process environment takes priority. Without either value, the
+integration test is skipped. Keep `.env` local; it is ignored by Git.
+
 ## Architecture summary
 
 TobasaSQL keeps the abstraction thin:

@@ -81,7 +81,7 @@ private:
 
 public:
    SettingsBase(
-      std::string address = "localhost",
+      std::string address = "127.0.0.1",
       uint16_t port = 8084,
       asio::ip::tcp protocol = asio::ip::tcp::v4() )
       : _address  { address }

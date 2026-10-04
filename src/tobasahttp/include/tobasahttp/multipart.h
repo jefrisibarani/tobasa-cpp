@@ -42,7 +42,7 @@ class Disposition
    : public FieldLowerCaseCollection
 {
 private:
-   std::string _name;
+   std::string _name {};
 
 public:
    Disposition() = default;

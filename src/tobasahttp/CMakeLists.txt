@@ -101,7 +101,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC ASIO_STANDALONE )
 if (TOBASA_HTTP_USE_HTTP2)
    target_compile_definitions( ${PROJECT_NAME} 
       PUBLIC TOBASA_HTTP_USE_HTTP2
-      #PUBLIC TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
+      PUBLIC TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
       PUBLIC NGHTTP2_NO_SSIZE_T)
 endif()
 
@@ -132,3 +132,7 @@ source_group(
    TREE ${PROJECT_SOURCE_DIR}/src
    PREFIX "Source Files"
    FILES ${MY_SOURCES_LIST} )
+
+if(TOBASA_BUILD_TESTS)
+   add_subdirectory(tests)
+endif()

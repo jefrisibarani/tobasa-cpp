@@ -34,6 +34,10 @@ target_include_directories(${PROJECT_NAME}
    PUBLIC ${ASIO_INCLUDE_DIR}
    PUBLIC ${PROJECT_SOURCE_DIR}/include )
 
+if(TOBASA_BUILD_TESTS)
+   add_subdirectory(tests)
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PUBLIC ASIO_STANDALONE )
 
 if(MSVC)

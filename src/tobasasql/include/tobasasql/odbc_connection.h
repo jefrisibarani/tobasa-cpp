@@ -29,6 +29,12 @@ public:
    OdbcConnection();
    ~OdbcConnection();
 
+   OdbcConnection(const OdbcConnection&) = delete;
+   OdbcConnection& operator=(const OdbcConnection&) = delete;
+
+   OdbcConnection(OdbcConnection&& other) noexcept;
+   OdbcConnection& operator=(OdbcConnection&& other) noexcept;
+
    std::string name();
    bool connect(const std::string& connString);
    bool disconnect();
@@ -83,9 +89,8 @@ public:
    /// Allocate ODBC statement.
    SQLHSTMT allocateStatement();
 
-
-   /// Get field data.
-   VariantType getFieldData(SQLHSTMT pStmt, int col);
+   /// Get the native ODBC connection handle.
+   SQLHDBC nativeConnection() const;
 
 
    /// Get columns.
@@ -104,12 +109,6 @@ public:
 
 
    bool getPrimaryKeyColumns(std::vector<std::string>& primaryKeyCols, const std::string& tableName);
-
-   /**
-   * \brief Supply supply data-at-execution.
-   * Note: https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/sending-long-data?view=sql-server-ver15
-   */
-   SQLRETURN sqlPutData(SQLHSTMT pStmt, const SqlParameterCollection& parameters);
 
 private:
 

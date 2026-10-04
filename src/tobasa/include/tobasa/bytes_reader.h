@@ -36,6 +36,7 @@ public:
 
 private:
    nonstd::span<const unsigned char> _rawData;
+   std::size_t _position = 0;
    bool _opened = false;
 };
 

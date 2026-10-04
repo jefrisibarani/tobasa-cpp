@@ -2,7 +2,7 @@
 
 #include <string>
 #include <tobasa/logger.h>
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 
 namespace tbs {
 namespace sql {
@@ -226,12 +226,12 @@ public:
       std::string sql;
 
       if (_selectAll) {
-         sql += "SELECT * FROM " + util::quoteIdent(_referencedTable);
+         sql += "SELECT * FROM " + quoteIdent(_referencedTable);
       }
       else
       {
-         sql += "SELECT " + util::quoteIdent(_refdColKey) + ", ";
-         sql += util::quoteIdent(_refdColVal) + " FROM " + util::quoteIdent(_referencedTable);
+         sql += "SELECT " + quoteIdent(_refdColKey) + ", ";
+         sql += quoteIdent(_refdColVal) + " FROM " + quoteIdent(_referencedTable);
       }
 
       if (!_whereClause.empty()) {

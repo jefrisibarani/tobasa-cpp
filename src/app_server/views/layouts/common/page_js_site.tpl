@@ -421,4 +421,13 @@
          return siblings;
       };
 
+      TBS.clientEventIdentity = function() {
+        if (TBS.sseConnIdentity != null )
+          return TBS.sseConnIdentity;
+        else if (TBS.wsConnIdentity != null)
+          return TBS.wsConnIdentity;
+        else
+          return '';
+      }
+
     </script> <!-- JS SITE -->

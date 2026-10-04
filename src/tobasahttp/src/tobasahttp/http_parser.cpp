@@ -2,6 +2,7 @@
 #include <string>
 #include <map>
 #include <iostream>
+#include <limits>
 #include <vector>
 #include <tobasa/format.h>
 #include <tobasa/util.h>
@@ -31,7 +32,7 @@ bool StartLineContext::valid()
 
 bool StartLineContext::consume(char ch)
 {
-   if ( rule::isVchar(ch) )
+   if (ch == rule::SP || rule::isVchar(static_cast<unsigned char>(ch)))
    {
       data.append(1, ch);
       return true;
@@ -45,7 +46,7 @@ bool StartLineContext::consume(char ch)
 // -------------------------------------------------------
 bool Line::valid()
 {
-   return ( !fieldName.empty() && !fieldValue.empty() );
+   return !fieldName.empty();
 }
 
 bool HeadersContext::LineContext::done()
@@ -75,7 +76,7 @@ bool HeadersContext::LineContext::consume(char ch)
    // Collect field name
    if ( ! gotCOLON )
    {
-      if ( (rule::isDigit(ch) || rule::isAlpha(ch)) || !rule::isDelimiter(ch) )
+      if (rule::isToken(static_cast<unsigned char>(ch)))
       {
          nameBuff.append(1, ch);
          return true;
@@ -92,8 +93,10 @@ bool HeadersContext::LineContext::consume(char ch)
       }
       else
       {
-         if ( !rule::isCtl(ch) )
+         if (!rule::isCtl(static_cast<unsigned char>(ch)) || ch == rule::HTAB)
             valueBuff.append(1,ch);
+         else
+            return false;
       }
 
       return true;
@@ -156,17 +159,18 @@ bool HeadersContext::lineExists(const std::string& name, const std::string& valu
 // -------------------------------------------------------
 void ChunkedContext::prepareForNextChunk()
 {
-   sizeCR     = false;
-   sizeLF     = false;
-   dataCR     = false;
-   dataLF     = false;
-   lastCR     = false;
-   lastLF     = false;
-   finalChunk = false;
-   dataCount  = 0;
-   rawSize    = {};
-   hasTrailer = {false};
-   headersCtx = {};
+   sizeCR         = false;
+   sizeLF         = false;
+   sizeExtension  = false;
+   dataCR         = false;
+   dataLF         = false;
+   lastCR         = false;
+   lastLF         = false;
+   finalChunk     = false;
+   dataCount      = 0;
+   rawSize        = {};
+   hasTrailer     = {false};
+   headersCtx     = {};
 }
 
 
@@ -343,6 +347,9 @@ Info Parser::parseWithOwnParser(size_t bytesTransferred)
          currentIdx = it - _readBuffer.begin();
          char ch = *it;
 
+         if (_startLineContext.gotCR && !_startLineContext.gotLF && ch != rule::LF)
+            return withError("Invalid line ending in start line", currentIdx);
+
          if (!_startLineContext.done())
          {
             // -------------------------------------------------------
@@ -441,7 +448,7 @@ Info Parser::parseResponseStartLine(std::string_view rawtext)
    else
    {
       auto version = rawtext.substr(0, pos);
-      if ( version.length() !=8 && "HTTP/" != version.substr(0, 5) )
+      if (version.length() != 8 || version.substr(0, 5) != "HTTP/")
          return withError("Invalid start-line http protocol");
       else
       {
@@ -545,7 +552,7 @@ Info Parser::parseRequestStartLine(std::string_view rawtext)
 
          rawtext.remove_prefix(pos+1);
          auto version = rawtext;
-         if ( version.length() !=8 && "HTTP/" != version.substr(0, 5) )
+         if ( version.length() != 8 || version.substr(0, 5) != "HTTP/" )
             return withError("Invalid start-line http protocol");
          else
          {
@@ -590,17 +597,18 @@ Info Parser::processHeader(size_t bytesTransferred, size_t lastIndex)
 
    // https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2
 
-   // Read content length from header
-   auto contentLen = _headersCtx.findLine("Content-Length").fieldValue;
-   if ( !contentLen.empty() )
-   {
-      _contentLength    = std::stoull(contentLen);
-      _hasContentLength = true;
-   }
+   bool foundContentLength = false;
+   auto result = parseContentLength(foundContentLength, lastIndex);
+   if ( ! result.success() )
+      return result;
 
-   // Check for transfer encoding - chunked
-   _hasChunkedEncoding = _headersCtx.lineExists("Transfer-Encoding", "chunked");
+   _hasContentLength = foundContentLength;
+
+   _hasChunkedEncoding = parseChunkedEncoding();
    
+   if ( _hasChunkedEncoding && _hasContentLength )
+      return withError("Found content length and chunked transfer", lastIndex);
+
    // Check for multipart
    // https://httpwg.org/specs/rfc7231.html#header.content-type
    // If we have multipart body, init _multipartCtx's boundary
@@ -636,17 +644,15 @@ Info Parser::processHeader(size_t bytesTransferred, size_t lastIndex)
       }
    }
 
-   if ( _hasChunkedEncoding && _hasContentLength )
-      return withError("Found content length and chunked transfer", lastIndex);
-
    bool hasExpect100 = _headersCtx.lineExists("Expect", "100-continue");
    if ( hasExpect100 ) {
       return { true, "expect 100-continue", 0, HttpStatus(StatusCode::CONTINUE), lastIndex };
    }
 
-   if (_method == "GET" || _method == "HEAD" || _method == "TRACE")
-      _contentDone = true;
-   else if ( _contentLength == 0 && !_hasChunkedEncoding && !_hasMultipart ) {
+   const bool bodylessResponse = (_type == Type::RESPONSE) &&
+      ( (_statusCode >= 100 && _statusCode < 200) || _statusCode == 204 || _statusCode == 304);
+
+   if (bodylessResponse || (_contentLength == 0 && !_hasChunkedEncoding && !_hasMultipart)) {
       _contentDone = true; // no body in http message.
    }
 
@@ -804,11 +810,14 @@ Info Parser::retrieveMultipartBody(size_t dataStart, size_t totalData)
 
 Info Parser::retrieveBody(size_t dataStart, size_t totalData)
 {
-   size_t dataEnd = dataStart + totalData; 
-
    char* buffer = nullptr;
    buffer = _readBuffer.data() + dataStart ;
-   _content.append(buffer, totalData);
+
+   const size_t remainingData = _contentLength - _content.size();
+   const size_t contentSize   = totalData < remainingData ? totalData : remainingData;
+   _content.append(buffer, contentSize);
+
+   const size_t lastIndex = contentSize > 0 ? dataStart + contentSize - 1 : dataStart;
    if ( _content.size() == _contentLength )
    {
       _contentDone = true;
@@ -816,9 +825,10 @@ Info Parser::retrieveBody(size_t dataStart, size_t totalData)
       if ( onEventDone )
          onEventDone("body");
 
-      return withSuccess(dataEnd,totalData);
+      return withSuccess(lastIndex, contentSize);
    }
-   return withSuccess(dataEnd,totalData);
+   
+   return withSuccess(lastIndex, contentSize);
 }
 
 Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
@@ -836,9 +846,14 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
       // Parse chunked data
       if ( !_chunkedCtx.sizeDone())
       {
-         if ( rule::isHex(ch) )
+         if (rule::isHex(ch) && !_chunkedCtx.sizeExtension)
          {
             _chunkedCtx.rawSize.append(1,ch);
+            continue;
+         }
+         else if (ch == ';' && !_chunkedCtx.rawSize.empty() && !_chunkedCtx.sizeExtension)
+         {
+            _chunkedCtx.sizeExtension = true;
             continue;
          }
          else
@@ -853,15 +868,14 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
                _chunkedCtx.sizeLF = true;
                if ( _chunkedCtx.dataSize() == 0 )   // Final chunk
                {
-                  auto hdr = _headersCtx.findLine("Trailer");
-                  if (  hdr.valid() ) {
-                     _chunkedCtx.hasTrailer = true;
-                  }
+                  _chunkedCtx.hasTrailer = true;
                   _chunkedCtx.finalChunk = true;
                }
 
                continue;
             }
+            else if (_chunkedCtx.sizeExtension && rule::isVchar(ch))
+               continue;
             else
                return withError("Malformed input after size", currentIdx);
          }
@@ -894,12 +908,13 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
             {
                auto info = retrieveHeaders(_chunkedCtx.headersCtx, currentIdx, dataEnd-currentIdx);
                it = _readBuffer.begin() + info.lastIndex();
-
-               auto bytesReadX = info.lastIndex()-currentIdx;
                bytesRead += info.bytesRead();
 
                currentIdx = it - _readBuffer.begin();
-               if (info.success())
+               if (!info.success())
+                  return withError(info.message(), currentIdx);
+
+               if (_chunkedCtx.headersCtx.done())
                {
                   _contentDone = true;
 
@@ -908,8 +923,8 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
 
                   return withSuccess(currentIdx,bytesRead); // Return now with current index, 
                }
-               else
-                  return withError(info.message(), currentIdx);
+
+               return withSuccess(currentIdx, bytesRead);
             }
          }
          else if ( _chunkedCtx.dataCount < _chunkedCtx.dataSize() )
@@ -964,9 +979,6 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
             currentIdx = it - _readBuffer.begin();
             bytesRead += currentIdx;
             continue;
-            //_content.append(1, ch);
-            //++_chunkedCtx.dataCount;
-            //continue;
          }
          else
          {
@@ -1023,6 +1035,16 @@ Info parseHeaders(HeadersContext& hdrCtx, const uint8_t *data, size_t dataStart,
       lastIndex = currentIdx; // save current index. After this for-loop, currentIdx is equals dataEnd
       char ch = *(data + currentIdx);
 
+      if (hdrCtx.gotCR)
+      {
+         if (ch == rule::LF)
+         {
+            hdrCtx.gotLF = true;
+            return withSuccess(currentIdx, bytesRead);
+         }
+         return withError("Invalid header end", currentIdx);
+      }
+
       if ( !hdrCtx.done() )
       {
          if ( hdrCtx.lineCtx.done() )
@@ -1049,6 +1071,15 @@ Info parseHeaders(HeadersContext& hdrCtx, const uint8_t *data, size_t dataStart,
          }
 
          auto& line = hdrCtx.lineCtx;
+
+         if (line.gotCR && !line.gotLF && ch != rule::LF)
+            return withError("Invalid line ending in header", currentIdx);
+
+         if (line.nameBuff.empty() && ch == rule::CR)
+         {
+            hdrCtx.gotCR = true;
+            continue;
+         }
 
          // line starts with white space, stop here
          if ( line.nameBuff.empty() && isspace(ch) )
@@ -1090,6 +1121,103 @@ Info parseHeaders(HeadersContext& hdrCtx, const uint8_t *data, size_t dataStart,
    }
 
    return withSuccess(lastIndex, bytesRead);
+}
+
+Info Parser::parseContentLength(bool &outResult, size_t lastIndex)
+{
+   auto doParseContentLength = [](std::string_view value, size_t& parsedLength)
+   {
+      while (!value.empty() && (value.front() == ' ' || value.front() == rule::HTAB))
+         value.remove_prefix(1);
+      while (!value.empty() && (value.back() == ' ' || value.back() == rule::HTAB))
+         value.remove_suffix(1);
+      if (value.empty())
+         return false;
+
+      size_t length = 0;
+      for (const unsigned char ch : value)
+      {
+         if (ch < '0' || ch > '9')
+            return false;
+         const size_t digit = ch - '0';
+         if (length > (std::numeric_limits<size_t>::max() - digit) / 10)
+            return false;
+         length = length * 10 + digit;
+      }
+
+      parsedLength = length;
+      return true;
+   };
+
+   bool foundContentLength = false;
+   for (const auto& line : _headersCtx.lines)
+   {
+      if (util::toLower(line.fieldName) != "content-length")
+         continue;
+
+      std::string_view value{line.fieldValue};
+      size_t itemStart = 0;
+      while (itemStart <= value.size())
+      {
+         const size_t comma   = value.find(',', itemStart);
+         const size_t itemEnd = (comma == std::string_view::npos) ? value.size() : comma;
+         size_t parsedLength  = 0;
+
+         if (! doParseContentLength(value.substr(itemStart, itemEnd - itemStart), parsedLength))
+            return withError("Invalid Content-Length", lastIndex);
+
+         if (foundContentLength && parsedLength != _contentLength)
+            return withError("Conflicting Content-Length values", lastIndex);
+
+         _contentLength = parsedLength;
+         foundContentLength = true;
+         if (comma == std::string_view::npos)
+            break;
+
+         itemStart = comma + 1;
+      }
+   }
+   outResult = foundContentLength;
+
+   return withSuccess(lastIndex);
+}
+
+bool Parser::parseChunkedEncoding()
+{
+   // Transfer-coding names are case-insensitive and may be comma-separated.
+
+   bool foundChunkedEncoding = false;
+
+   for (const auto& line : _headersCtx.lines)
+   {
+      if (util::toLower(line.fieldName) != "transfer-encoding")
+         continue;
+
+      std::string_view value{line.fieldValue};
+      size_t itemStart = 0;
+      while (itemStart <= value.size())
+      {
+         const size_t comma = value.find(',', itemStart);
+         const size_t itemEnd = comma == std::string_view::npos ? value.size() : comma;
+         auto coding = value.substr(itemStart, itemEnd - itemStart);
+
+         while (!coding.empty() && (coding.front() == ' ' || coding.front() == rule::HTAB))
+            coding.remove_prefix(1);
+
+         while (!coding.empty() && (coding.back() == ' ' || coding.back() == rule::HTAB))
+            coding.remove_suffix(1);
+
+         if (util::toLower(std::string{coding}) == "chunked")
+            foundChunkedEncoding = true;
+
+         if (comma == std::string_view::npos)
+            break;
+
+         itemStart = comma + 1;
+      }
+   }
+
+   return foundChunkedEncoding;
 }
 
 } // namespace parser

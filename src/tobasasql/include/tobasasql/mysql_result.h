@@ -5,6 +5,7 @@
 #include <tobasa/navigator.h>
 #include "tobasasql/sql_result_common.h"
 #include "tobasasql/mysql_connection.h"
+#include "tobasasql/mysql_command.h"
 #include "tobasasql/mysql_variant_helper.h"
 
 namespace tbs {
@@ -28,10 +29,19 @@ class MysqlResult : public ResultCommon
 public:
 
    using VariantType   = MysqlVariantType;
-   using VectorVariant = std::vector<MysqlVariantType>;
+   using VariantHelper = MysqlVariantHelper;
+   using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
+   using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;
 
    MysqlResult(MysqlConnection* pconn = nullptr);
+
+   MysqlResult(const MysqlResult&) = delete;
+   MysqlResult& operator=(const MysqlResult&) = delete;
+
+   MysqlResult(MysqlResult&& other) noexcept;
+   MysqlResult& operator=(MysqlResult&& other) noexcept;
+
    ~MysqlResult();
 
    // -------------------------------------------------------
@@ -61,7 +71,10 @@ public:
     */
    virtual bool runQuery(
       const std::string& sql,
-      const MysqlParameterCollection& parameters = {});
+      const MysqlParameterCollection& parameters = {},
+      ParameterStyle paramStyle = ParameterStyle::named );
+
+   bool runPreparedQuery(MysqlCommand& command);
 
    /// Set specific driver sql connection class implementation.
    void connection(MysqlConnection* conn);
@@ -111,6 +124,8 @@ public:
     */
    virtual bool isNullField(const int columnIndex) const;
 
+   bool getData(DataSetPtr dataSet, MysqlCommand::ResultContext* context);
+
 private:
 
    /// Setup column informations.
@@ -127,7 +142,7 @@ private:
    std::vector<ColumnMetadata> _metadataCollection;
 
    /// Cached data from backend.
-   std::shared_ptr<sql::DataSet<VariantType>> _pDataset;
+   DataSetPtr _pDataset;
   
    /// Implemented Mysql connection object.
    MysqlConnection* _pConn;

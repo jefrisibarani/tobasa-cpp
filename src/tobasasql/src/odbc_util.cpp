@@ -3,6 +3,7 @@
 #include <tobasa/notifier.h>
 #include <tobasa/util_utf.h>
 #include "tobasasql/exception.h"
+#include "tobasasql/sql_util.h"
 #include "tobasasql/odbc_util.h"
 
 namespace tbs {

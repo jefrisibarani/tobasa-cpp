@@ -1,4 +1,12 @@
 #include <chrono>
+
+#include <charconv>  // for double/float to string
+#include <limits>    // for double/float to string
+
+// #include <iomanip>   // for double/float to string
+// #include <limits>    // for double/float to string
+// #include <sstream>   // for double/float to string
+
 #include "tobasa/util_string.h"
 
 namespace tbs {
@@ -191,12 +199,12 @@ bool strToBool(const std::string& value)
    if (value.empty())
       return false;
 
-   auto valueLowCase = toUpper(value);
+   auto valueUpCase = toUpper(value);
 
-   if (  valueLowCase == "T"
-      || valueLowCase == "TRUE"
-      || valueLowCase == "ON"
-      || valueLowCase == "Y"
+   if (  valueUpCase == "T"
+      || valueUpCase == "TRUE"
+      || valueUpCase == "ON"
+      || valueUpCase == "Y"
       || startsWith(value, "Y")
       || startsWith(value, "y")
       || startsWith(value, "1"))
@@ -301,6 +309,82 @@ void parseNameValue(const std::string& line, std::function<void(const std::strin
       handler(name,val);
    }
 }
+
+
+void doubleToString(double value, std::string& outStr)
+{
+   char buffer[64];
+
+   auto result = std::to_chars(
+        buffer
+      , buffer + sizeof(buffer)
+      , value
+      , std::chars_format::general
+      /*, std::numeric_limits<double>::max_digits10*/
+   );
+
+   if (result.ec != std::errc())
+      throw std::runtime_error("double conversion failed");
+
+   outStr.assign(buffer, result.ptr);
+}
+
+
+void floatToString(float value, std::string& outStr)
+{
+   char buffer[32];
+
+   auto result = std::to_chars(
+        buffer
+      , buffer + sizeof(buffer)
+      , value
+      , std::chars_format::general
+      /*, std::numeric_limits<float>::max_digits10*/
+   );
+
+   if (result.ec != std::errc())
+      throw std::runtime_error("float conversion failed");
+
+   outStr.assign(buffer, result.ptr);
+}
+
+
+std::string doubleToString(double value)
+{
+   std::string res;
+   doubleToString(value,res);
+   return res;
+}
+
+
+std::string floatToString(float value)
+{
+   std::string res;
+   floatToString(value,res);
+   return res;
+}
+
+// std::string doubleToString(double value)
+// {
+//    std::ostringstream ss;
+
+//    ss << std::setprecision(
+//       std::numeric_limits<double>::max_digits10
+//    ) << value;
+
+//    return ss.str();
+// }
+
+// std::string floatToString(float value)
+// {
+//    std::ostringstream ss;
+
+//    ss << std::setprecision(
+//       std::numeric_limits<float>::max_digits10
+//    ) << value;
+
+//    return ss.str();
+// }
 
 /** @}*/
 

@@ -438,7 +438,7 @@ protected:
 
                      if (self->_parser.totalParsedBytes() == 0)
                      {
-                        // TODO_JEFRI: FIX this: restart stopwatch in very beginning of receiving data
+                        // TODO_JEFRI: restart stopwatch in very beginning of receiving data
                         //self->_processingStopWatch.start();
                      }
 

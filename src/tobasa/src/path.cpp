@@ -274,15 +274,17 @@ std::string fileExtension(const std::string& fileName)
 /// Get file extension from full path
 std::string getExtension(const std::string& path)
 {
-   std::size_t lastSlashPos = path.find_last_of("/");
-   std::size_t lastDotPos   = path.find_last_of(".");
-   if (lastDotPos != std::string::npos && lastDotPos > lastSlashPos) 
-   {
-      std::string ext = path.substr(lastDotPos + 1);
-      return ext;
-   }
+   namespace fs = std::filesystem;
+   fs::path filePath(path);
+   std::string ext = filePath.extension().string();
 
-   return std::string();
+   if (ext.empty())
+      return std::string();
+
+   if (ext.front() == '.')
+      return ext.substr(1);
+
+   return ext;
 }
 
 bool isDirectory(const std::string& path)
@@ -377,19 +379,15 @@ bool removeFile(const std::string& path, std::string& errorMessage)
 bool isSubPath(const std::string& path, const std::string& base)
 {
    namespace fs = std::filesystem;
-   fs::path _path = path;
-   fs::path _base = base;
+   const auto fullPath = fs::weakly_canonical(fs::path(path)).lexically_normal();
+   const auto basePath = fs::weakly_canonical(fs::path(base)).lexically_normal();
 
-   auto p = _path.lexically_normal();
-   auto b = _base.lexically_normal();
+   const auto relative = fullPath.lexically_relative(basePath);
+   if (relative.empty())
+      return true;
 
-   auto mismatch = std::mismatch(
-      b.begin(), b.end(),
-      p.begin(), p.end()
-   );
-
-   // If we reached the end of base, then base is a prefix of path
-   return mismatch.first == b.end();
+   const auto relativeStr = relative.generic_string();
+   return relativeStr != ".." && relativeStr.find("../") != 0;
 }
 
 std::string convertToOsPath(const std::string& path)
@@ -471,14 +469,13 @@ std::string resolveExecutableRelativePath(const std::string& path)
       return p.make_preferred().string();
    }
 
-   // Resolve relative to executable directory
-   fs::path base = path::executableDir();
+   fs::path base = fs::weakly_canonical(path::executableDir());
    fs::path full = fs::weakly_canonical(base / p);
    if (!path::isSubPath(full.string(), base.string()))
    {
       return "";
    }
-   
+
    return full.make_preferred().string();
 }
 

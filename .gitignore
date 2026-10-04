@@ -33,6 +33,9 @@
 
 *.aps
 
+# Environment variables file
+.env
+
 .vs/
 .vscode/tasks.json
 .vscode/settings.json

@@ -8,7 +8,7 @@
 #include "tobasasql/column_info.h"
 #include "tobasasql/column_lookup_info.h"
 #include "tobasasql/column_map.h"
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 
 namespace tbs {
 namespace sql {
@@ -73,20 +73,17 @@ template <typename SqlDriverType>
 class SqlTable : public SelfCounter
 {
 public:
-   using ResultImpl      = typename SqlDriverType::ResultImpl;
-   using LoggerImpl      = typename SqlDriverType::Logger;
-   using SqlResult       = sql::SqlResult<SqlDriverType>;
-   using SqlConnection   = sql::SqlConnection<SqlDriverType>;
-   using TableHelperImpl = typename SqlDriverType::TableHelperImpl;
-   using VariantType     = typename SqlDriverType::VariantType;
-   using VectorVariant   = std::vector<VariantType>;
-   using VariantHelper   = typename SqlDriverType::VariantHelper;
-   using Navigator       = typename SqlDriverType::TableNavigator;
-   using Helper          = typename SqlDriverType::HelperImpl;
-
-   /// Alias SqlParameter.
-   using SqlParameter = typename SqlDriverType::SqlParameter;
-   /// Alias SqlParameterCollection.
+   using ResultImpl             = typename SqlDriverType::ResultImpl;
+   using LoggerImpl             = typename SqlDriverType::Logger;
+   using SqlResult              = sql::SqlResult<SqlDriverType>;
+   using SqlConnection          = sql::SqlConnection<SqlDriverType>;
+   using TableHelperImpl        = typename SqlDriverType::TableHelperImpl;
+   using VariantType            = typename SqlDriverType::VariantType;
+   using VectorVariant          = std::vector<VariantType>;
+   using VariantHelper          = typename SqlDriverType::VariantHelper;
+   using Navigator              = typename SqlDriverType::TableNavigator;
+   using Helper                 = typename SqlDriverType::HelperImpl;
+   using SqlParameter           = typename SqlDriverType::SqlParameter;
    using SqlParameterCollection = typename SqlDriverType::SqlParameterCollection;
 
 protected:
@@ -110,7 +107,7 @@ protected:
       /// Generate sql select query and return the generated query.
       std::string getSelectQuery()
       {
-         std::string selectQuery = "SELECT * FROM " + util::quoteIdent(_tableName);
+         std::string selectQuery = "SELECT * FROM " + quoteIdent(_tableName);
 
          if (_parameters.size() > 0)
             selectQuery += " WHERE " + getWhereClause();
@@ -136,7 +133,7 @@ protected:
                conditionClause += " AND ";
 
             size_t paramPosition = i+1;  // pgsql parameter use 1 based index
-            conditionClause += util::quoteIdent(param->name()) + " = :param" + std::to_string(static_cast<int>(paramPosition));
+            conditionClause += quoteIdent(param->name()) + " = :param" + std::to_string(static_cast<int>(paramPosition));
          }
 
          return conditionClause;
@@ -499,7 +496,7 @@ private:
                      valList += " , ";
                   }
 
-                  valList += util::quoteIdent(columnInfo.getName());
+                  valList += quoteIdent(columnInfo.getName());
                   valList += " = :param" + std::to_string(paramPosition);
 
                   std::string columnName = columnInfo.getName();
@@ -534,7 +531,7 @@ private:
                _logger.debug("[sql] [SqlTable:{}] doUpdate, table {}", selfId(), _tableName);
 
                std::string whereClause;
-               std::string sqlUpdate = "UPDATE " + util::quoteIdent(_tableName)
+               std::string sqlUpdate = "UPDATE " + quoteIdent(_tableName)
                                        + " SET " + valList + " WHERE ";
 
                // pass updateParameters collection since we are going to append more parameter(s)
@@ -610,7 +607,7 @@ private:
                   colList += ", ";
                }
 
-               colList += util::quoteIdent(columnName);
+               colList += quoteIdent(columnName);
                valList += ":param" + std::to_string(paramPosition);
 
                // Some dbms uses tinyint as boolean (e.g. mysql)
@@ -640,7 +637,7 @@ private:
          _logger.debug("[sql] [SqlTable:{}] doInsert, table {}", selfId(), _tableName);
 
          std::string sqlquery =
-            "INSERT INTO " + util::quoteIdent(_tableName)
+            "INSERT INTO " + quoteIdent(_tableName)
             + "(" + colList
             + ") VALUES (" + valList
             + ")";
@@ -921,7 +918,7 @@ public:
                if ( parameters.size() > 0 )
                {
                   std::string selectCommand;
-                  selectCommand = "SELECT * FROM " + util::quoteIdent(_tableName) + " WHERE ";
+                  selectCommand = "SELECT * FROM " + quoteIdent(_tableName) + " WHERE ";
 
                   //SqlApplyLogInternal applyLogRule(&_conn); // disable log temporarily
 
@@ -1024,7 +1021,7 @@ public:
          {
             SqlParameterCollection parameters;
             std::string primaryKeyClause = createPrimaryKeyParameter(i, parameters);
-            std::string sqlDelete = "DELETE FROM " + util::quoteIdent(_tableName) + " WHERE ";
+            std::string sqlDelete = "DELETE FROM " + quoteIdent(_tableName) + " WHERE ";
 
             if (parameters.size() > 0)
             {
@@ -1580,7 +1577,7 @@ public:
          return false;
 
       std::string sql;
-      sql = "SELECT * FROM " + util::quoteIdent(referencedTable);
+      sql = "SELECT * FROM " + quoteIdent(referencedTable);
 
       if (!orderBy.empty())
          sql += " ORDER BY " + orderBy;
@@ -1657,8 +1654,8 @@ public:
    {
       std::string sql;
 
-      sql += "SELECT " + util::quoteIdent(refdColKey) + ", ";
-      sql += util::quoteIdent(refdColVal) + " FROM " + util::quoteIdent(referencedTable);
+      sql += "SELECT " + quoteIdent(refdColKey) + ", ";
+      sql += quoteIdent(refdColVal) + " FROM " + quoteIdent(referencedTable);
 
       if (!whereClause.empty())
          sql += " WHERE " + whereClause;
@@ -1732,7 +1729,7 @@ public:
 
             // set param position, calculating from parameters collection size
             size_t paramPosition = parameters.size();
-            conditionClause += util::quoteIdent(columnName) + " = :param" + std::to_string(static_cast<int>(paramPosition)+1);
+            conditionClause += quoteIdent(columnName) + " = :param" + std::to_string(static_cast<int>(paramPosition)+1);
 
             auto parameter = std::make_shared<SqlParameter>(columnName, dataType, rawValue, size, 0, false, sql::ParameterDirection::input);
             parameters.push_back(parameter);

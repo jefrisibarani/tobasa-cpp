@@ -1,10 +1,12 @@
 #include <iostream>
 #include <tobasa/variant_helper.h>
+#include <tobasa/bin_encode.h>
 #include "tobasasql/sql_dataset.h"
 #include "tobasasql/mysql_util.h"
+#include "tobasasql/mysql_connection.h"
+#include "tobasasql/mysql_result.h"
 #include "tobasasql/mysql_command.h"
-#include "tobasasql/util.h"
-#include <tobasa/bin_encode.h>
+#include "tobasasql/sql_util.h"
 
 namespace tbs {
 namespace sql {
@@ -12,46 +14,71 @@ namespace sql {
 constexpr int32_t MEDIUMINT_MIN = -8388608;   // -2^23
 constexpr int32_t MEDIUMINT_MAX =  8388607;   //  2^23 - 1
 
-MysqlCommand::MysqlCommand(MYSQL *conn)
+MysqlCommand::MysqlCommand(MysqlConnection* conn)
    : _pConn(conn)
+   , _pMYConn(nullptr)
    , _pStmt(nullptr)
    , _pResultMetadata(nullptr)
    , _affectedRows(UINT64_MAX)
    , _pResultContext(nullptr)
-{}
-
-bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& parameters)
 {
+   if (_pConn)
+      _pMYConn = _pConn->nativeConnection();
+   
+   notifierSource = "MysqlCommand";
+}
+
+bool MysqlCommand::query(const std::string& sql, const MysqlParameterCollection& parameters)
+{
+   if (!prepare(sql))
+      return false;
+
+   return bind(parameters);
+}
+
+bool MysqlCommand::prepare(const std::string& sql)
+{
+  // Note:
+  // https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-execute.html
+  // https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-fetch.html
+  // https://dev.mysql.com/doc/c-api/8.0/en/c-api-prepared-statement-type-codes.html
+
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
+
+   close();
+
+   _sql = sql;
+
+   _pStmt = mysql_stmt_init(_pMYConn);
+   if (!_pStmt)
+      throw SqlException(lastBackendError(), "MysqlCommand");
+
+   if (mysql_stmt_prepare(_pStmt, sql.c_str(), static_cast<unsigned long>(sql.length())) != 0)
+      throw SqlException(lastBackendError(), "MysqlCommand");
+
+   return true;
+}
+
+bool MysqlCommand::bind(const MysqlParameterCollection& parameters)
+{
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
+      
+   if (_pStmt == nullptr)
+      throw SqlException("Invalid statement object", "MysqlCommand");
+
    try
    {
-      // Note:
-      // https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-execute.html
-      // https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-fetch.html
-      // https://dev.mysql.com/doc/c-api/8.0/en/c-api-prepared-statement-type-codes.html
+      onNotifyTrace(_pConn->logId() + "MysqlCommand, Binding paramaters" );
 
-      if (_pConn == nullptr)
-         return false;
-
-      _pStmt = mysql_stmt_init(_pConn);
-      if (!_pStmt)
-         throw SqlException(lastBackendError());
-
-      if (mysql_stmt_prepare(_pStmt, sql.c_str(), static_cast<unsigned long>(sql.length()) ) != 0)
-         throw SqlException(lastBackendError());
-
-      // TODO_JEFRI: Validate parameter count
-      // Get the parameter count from the statement
-      //int paramCount = mysql_stmt_param_count(_pStmt);
-      //if (paramCount == 0)
-      //   throw SqlException("invalid parameter count returned by MySQL");
-
-      int totalParam = (int)parameters.size();
+      int totalParam = static_cast<int>(parameters.size());
       _paramContext = ParameterContext(totalParam);
 
       // -------------------------------------------------------
       // Bind the parameters
       // -------------------------------------------------------
-      // Bind the data for all parameters
+      // Bind the data for all parameters      
       for (unsigned int i = 0; i < parameters.size(); i++)
       {
          auto& param = parameters.at(i);
@@ -97,31 +124,30 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                         // get and reset value for boolean parameter
                         bool value = std::get<bool>(param->value());
                         int8_t realVal = value ? (int8_t)1 : (int8_t)0;
-                        param->value( (int8_t)realVal );
-
+                        param->value((int8_t)realVal);
                         _paramContext.binds[i].buffer = (void*) &(std::get<int8_t>(param->value()));
                      }
-                     else if (std::holds_alternative<int8_t>(param->value())) 
+                     else if (std::holds_alternative<int8_t>(param->value()))
                      {
-                        _paramContext.binds[i].buffer = (void*) &(std::get<int8_t>(param->value())) ;
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int8_t>(param->value()));
                      }
                      else if (std::holds_alternative<int16_t>(param->value()))
                      {
                         auto currentVal = std::get<int16_t>(param->value());
-                        param->value( static_cast<int8_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int8_t>(param->value()) );
+                        param->value(static_cast<int8_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int8_t>(param->value()));
                      }
                      else if (std::holds_alternative<int32_t>(param->value()))
                      {
                         auto currentVal = std::get<int32_t>(param->value());
-                        param->value( static_cast<int8_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int8_t>(param->value()) );
+                        param->value(static_cast<int8_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int8_t>(param->value()));
                      }
                      else if (std::holds_alternative<int64_t>(param->value()))
                      {
                         auto currentVal = std::get<int64_t>(param->value());
-                        param->value( static_cast<int8_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int8_t>(param->value()) );
+                        param->value(static_cast<int8_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int8_t>(param->value()));
                      }
                      else
                         throw SqlException(errMsg, "MysqlCommand");
@@ -139,32 +165,31 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   }
                   else
                   {
-                     if (std::holds_alternative<int8_t>(param->value())) 
+                     if (std::holds_alternative<int8_t>(param->value()))
                      {
                         auto currentVal = std::get<int8_t>(param->value());
-                        param->value( static_cast<int16_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int16_t>(param->value()) );
+                        param->value(static_cast<int16_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int16_t>(param->value()));
                      }
                      else if (std::holds_alternative<int16_t>(param->value()))
                      {
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int16_t>(param->value()) );
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int16_t>(param->value()));
                      }
                      else if (std::holds_alternative<int32_t>(param->value()))
                      {
                         auto currentVal = std::get<int32_t>(param->value());
-                        param->value( static_cast<int16_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int16_t>(param->value()) );
+                        param->value(static_cast<int16_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int16_t>(param->value()));
                      }
                      else if (std::holds_alternative<int64_t>(param->value()))
                      {
                         auto currentVal = std::get<int64_t>(param->value());
-                        param->value( static_cast<int16_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int16_t>(param->value()) );
+                        param->value(static_cast<int16_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int16_t>(param->value()));
                      }
                      else
                         throw SqlException(errMsg, "MysqlCommand");
                   }
-                  
                   break;
                }
                case MYSQL_TYPE_YEAR:
@@ -180,43 +205,40 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   }
                   else
                   {
-                     if (std::holds_alternative<int8_t>(param->value())) 
+                     if (std::holds_alternative<int8_t>(param->value()))
                      {
                         auto currentVal = std::get<int8_t>(param->value());
-                        param->value( static_cast<int32_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int32_t>(param->value()) );
+                        param->value(static_cast<int32_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int32_t>(param->value()));
                      }
                      else if (std::holds_alternative<int16_t>(param->value()))
                      {
                         auto currentVal = std::get<int16_t>(param->value());
-                        param->value( static_cast<int32_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int32_t>(param->value()) );
+                        param->value(static_cast<int32_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int32_t>(param->value()));
                      }
                      else if (std::holds_alternative<int32_t>(param->value()))
                      {
                         auto currentVal = std::get<int32_t>(param->value());
                         // Range check before binding
-                        if (parameterType == MYSQL_TYPE_INT24 && (currentVal < MEDIUMINT_MIN || currentVal > MEDIUMINT_MAX) ) {
+                        if (parameterType == MYSQL_TYPE_INT24 && (currentVal < MEDIUMINT_MIN || currentVal > MEDIUMINT_MAX))
                            throw std::out_of_range("Value out of range for MySQL MEDIUMINT");
-                        }
 
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int32_t>(param->value()) );
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int32_t>(param->value()));
                      }
                      else if (std::holds_alternative<int64_t>(param->value()))
                      {
                         auto currentVal = std::get<int64_t>(param->value());
                         // Range check before binding
-                        if (parameterType == MYSQL_TYPE_INT24 && (currentVal < MEDIUMINT_MIN || currentVal > MEDIUMINT_MAX) ) {
+                        if (parameterType == MYSQL_TYPE_INT24 && (currentVal < MEDIUMINT_MIN || currentVal > MEDIUMINT_MAX))
                            throw std::out_of_range("Value out of range for MySQL MEDIUMINT");
-                        }
 
-                        param->value( static_cast<int32_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int32_t>(param->value()) );
+                        param->value(static_cast<int32_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int32_t>(param->value()));
                      }
                      else
                         throw SqlException(errMsg, "MysqlCommand");
                   }
-
                   break;
                }
                case MYSQL_TYPE_LONGLONG:
@@ -230,32 +252,31 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   }
                   else
                   {
-                     if (std::holds_alternative<int8_t>(param->value())) 
+                     if (std::holds_alternative<int8_t>(param->value()))
                      {
                         auto currentVal = std::get<int8_t>(param->value());
-                        param->value( static_cast<int64_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int64_t>(param->value()) );
+                        param->value(static_cast<int64_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int64_t>(param->value()));
                      }
                      else if (std::holds_alternative<int16_t>(param->value()))
                      {
                         auto currentVal = std::get<int16_t>(param->value());
-                        param->value( static_cast<int64_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int64_t>(param->value()) );
+                        param->value(static_cast<int64_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int64_t>(param->value()));
                      }
                      else if (std::holds_alternative<int32_t>(param->value()))
                      {
                         auto currentVal = std::get<int32_t>(param->value());
-                        param->value( static_cast<int64_t>(currentVal) );
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int64_t>(param->value()) );
+                        param->value(static_cast<int64_t>(currentVal));
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int64_t>(param->value()));
                      }
                      else if (std::holds_alternative<int64_t>(param->value()))
                      {
-                        _paramContext.binds[i].buffer = (void*) &( std::get<int64_t>(param->value()) );
+                        _paramContext.binds[i].buffer = (void*) &(std::get<int64_t>(param->value()));
                      }
                      else
                         throw SqlException(errMsg, "MysqlCommand");
                   }
-
                   break;
                }
                case MYSQL_TYPE_FLOAT:
@@ -270,9 +291,9 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_STRING:
                case MYSQL_TYPE_VAR_STRING:
                {
-                  const std::string& strValue   = VariantHelper::value<std::string>(param->value(), errMsg);
-                  unsigned long strValueLen     = static_cast<unsigned long>(strValue.length());
-                  _paramContext.lengths[i]      = strValueLen;
+                  const std::string& strValue = VariantHelper::value<std::string>(param->value(), errMsg);
+                  unsigned long strValueLen = static_cast<unsigned long>(strValue.length());
+                  _paramContext.lengths[i] = strValueLen;
                   _paramContext.binds[i].buffer = (void*) strValue.data();
                   _paramContext.binds[i].length = &_paramContext.lengths[i];
                   break;
@@ -282,15 +303,14 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_DATETIME:
                case MYSQL_TYPE_TIMESTAMP:
                {
-                  if (std::holds_alternative<std::string>(param->value()) )
+                  if (std::holds_alternative<std::string>(param->value()))
                   {
                      // we use MYSQL_TIME as datetime value source
                      // convert datetime string value to MysqlTime 
                      MysqlTime mt = VariantHelper::toMysqlTime(param->value());
                      // save back MysqlTime value
-                     param->value( mt );
-                     // use the MYSQL_TIME pointer as bind's buffer source
-                     _paramContext.binds[i].buffer = (void*) &( std::get<MysqlTime>(param->value()) ).myTime;
+                     param->value(mt);
+                     _paramContext.binds[i].buffer = (void*) &(std::get<MysqlTime>(param->value())).myTime;
                      //_paramContext.lengths[i]      = sizeof(MYSQL_TIME);
                      //_paramContext.binds[i].length = &_paramContext.lengths[i];
                   }
@@ -305,13 +325,13 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                   //    // because we use string buffer as datetime value source , we must set buffer_type to MYSQL_TYPE_STRING
                   //    _paramContext.binds[i].buffer_type = MYSQL_TYPE_STRING;   
                   // }
-                  else if (std::holds_alternative<MysqlTime>(param->value()) )
+
+                  else if (std::holds_alternative<MysqlTime>(param->value()))
                   {
-                     _paramContext.binds[i].buffer = (void*) &( std::get<MysqlTime>(param->value()) ).myTime;
+                     _paramContext.binds[i].buffer = (void*) &(std::get<MysqlTime>(param->value())).myTime;
                   }
-                  else 
+                  else
                      throw tbs::SqlException(errMsg, "MysqlCommand");
-                  
                   break;
                }
                case MYSQL_TYPE_TINY_BLOB:
@@ -319,7 +339,7 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                case MYSQL_TYPE_LONG_BLOB:
                case MYSQL_TYPE_BLOB:
                {
-                  _paramContext.lengths[i]      = static_cast<unsigned long>(param->size());
+                  _paramContext.lengths[i] = static_cast<unsigned long>(param->size());
                   _paramContext.binds[i].buffer = (void*) *(param->valueBinaryPtr());
                   _paramContext.binds[i].length = &_paramContext.lengths[i];
                   break;
@@ -328,29 +348,21 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
                {
                   // MariaDB does not support MYSQL_TYPE_BIT in prepared-statement parameter binding
                   _paramContext.binds[i].buffer_type = MYSQL_TYPE_VAR_STRING;
-
-                  _paramContext.lengths[i]      = static_cast<unsigned long>(param->dataSize());
+                  _paramContext.lengths[i] = static_cast<unsigned long>(param->dataSize());
                   _paramContext.binds[i].buffer = (void*) *(param->valueBinaryPtr());
                   _paramContext.binds[i].length = &_paramContext.lengths[i];
                   break;
                }
                default:
                   throw tbs::SqlException("Unsupported Mysql data type for parameter ", "MysqlCommand");
-                  break;
-            } // switch
-         } // else
-      } // for
-      // -------------------------------------------------------
+            }
+         }
+      }
 
       // Bind the buffers
       auto rc = mysql_stmt_bind_param(_pStmt, _paramContext.binds.data());
       if (rc != 0)
-      {
-         //auto errNo  = mysql_stmt_errno(_pStmt);
-         auto errMsg = statementError();
-
-         throw SqlException(errMsg, "MysqlCommand");
-      }
+         throw SqlException(statementError(), "MysqlCommand");
    }
    catch (const std::bad_variant_access&)
    {
@@ -368,12 +380,45 @@ bool MysqlCommand::init(const std::string& sql, const MysqlParameterCollection& 
    return true;
 }
 
-MysqlCommand::~MysqlCommand()
+void MysqlCommand::reset()
 {
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
+
+   if (_pStmt == nullptr)
+      throw SqlException("Invalid statement object", "MysqlCommand");
+
    if (_pResultMetadata != nullptr)
    {
       mysql_free_result(_pResultMetadata);
       _pResultMetadata = nullptr;
+   }
+
+   if (_pResultContext != nullptr)
+   {
+      delete _pResultContext;
+      _pResultContext = nullptr;
+   }
+
+   mysql_stmt_free_result(_pStmt);
+   mysql_stmt_reset(_pStmt);
+   _affectedRows = UINT64_MAX;
+}
+
+void MysqlCommand::close()
+{
+   _sql.clear();
+
+   if (_pResultMetadata != nullptr)
+   {
+      mysql_free_result(_pResultMetadata);
+      _pResultMetadata = nullptr;
+   }
+
+   if (_pResultContext != nullptr)
+   {
+      delete _pResultContext;
+      _pResultContext = nullptr;
    }
 
    if (_pStmt != nullptr)
@@ -382,18 +427,28 @@ MysqlCommand::~MysqlCommand()
       mysql_stmt_close(_pStmt);
       _pStmt = nullptr;
    }
+}
 
-   if (_pResultContext != nullptr)
-      delete _pResultContext;
+MysqlCommand::~MysqlCommand()
+{
+   close();
 }
 
 int MysqlCommand::execute()
 {
    // Note:
    // https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-fetch.html#:~:text=mysql_stmt_fetch%20%28%29%20returns%20row%20data%20using%20the%20buffers,by%20the%20application%20before%20it%20calls%20mysql_stmt_fetch%20%28%29.
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
+
+   if (_pStmt == nullptr)
+      throw SqlException("Invalid statement object", "MysqlCommand");
 
    if (mysql_stmt_execute(_pStmt) != 0)
       throw SqlException(statementError(), "MysqlCommand");
+
+   if (_pConn->logSqlQuery())
+      onNotifyDebug(_pConn->logId() + tbsfmt::format("execute: {}", _sql));
 
    _pResultMetadata = mysql_stmt_result_metadata(_pStmt);
    if (_pResultMetadata)
@@ -421,17 +476,63 @@ int MysqlCommand::execute()
          throw SqlException(statementError(), "MysqlCommand");
    }
 
+   if (_pConn->logExecuteStatus()) 
+      onNotifyDebug(_pConn->logId() + tbsfmt::format("SQL command executed successfully, affectedRows: {}", _affectedRows));
+
    if (_affectedRows >= 0)
       return static_cast<int>(_affectedRows);
    else 
       return -1;
 }
 
+std::string MysqlCommand::executeScalar()
+{
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
 
-std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
+   if (_pStmt == nullptr)
+      throw SqlException("Invalid statement object", "MysqlCommand");
+
+   if (_pConn->logSqlQuery())
+      onNotifyDebug(_pConn->logId() + tbsfmt::format("executeScalar: {}", _sql));
+
+   auto dbresult = executeResult();
+   if (dbresult == nullptr)
+      return "";
+
+   if (_pConn->logExecuteStatus())
+   {
+      std::string message = "Scalar query executed successfully";
+      if (dbresult->totalColumns() == 0)
+         message = "Scalar query executed successfully with affected row: " + std::to_string(affectedRows());
+      if (dbresult->totalColumns() > 0 && dbresult->totalRows() == 0)
+         message = "Scalar query returned fields but no row found";
+      onNotifyDebug(_pConn->logId() + message);
+   }
+
+   if (dbresult->empty())
+      return "";
+
+   auto variant = dbresult->data().at(0).at(0);
+   auto result = MysqlVariantHelper::toString(variant);
+   if (result == sql::NULLSTR && _pConn->logExecuteStatus() )
+      onNotifyDebug(_pConn->logId() + "Scalar query returned SQL NULL");
+
+   return result;
+}
+
+MysqlCommand::DataSetPtr MysqlCommand::executeResult()
 {
    // Note::
    // https://dev.mysql.com/doc/c-api/8.0/en/mysql-stmt-fetch.html#:~:text=mysql_stmt_fetch%20%28%29%20returns%20row%20data%20using%20the%20buffers,by%20the%20application%20before%20it%20calls%20mysql_stmt_fetch%20%28%29.
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
+
+   if (_pStmt == nullptr)
+      throw SqlException("Invalid statement object", "MysqlCommand");
+
+   if (_pConn->logSqlQuery())
+      onNotifyDebug(_pConn->logId() + tbsfmt::format("executeResult: {}", _sql));
 
    if (mysql_stmt_execute(_pStmt) != 0)
       throw SqlException(statementError());
@@ -450,6 +551,9 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
          _affectedRows = 0;
       }
 
+      if (_pConn->logExecuteStatus()) 
+         onNotifyDebug(_pConn->logId() + tbsfmt::format("SQL command executed successfully, affectedRows: {}", _affectedRows));
+
       if (_affectedRows == UINT64_MAX)
          throw SqlException(statementError(), "MysqlCommand");
       else if (_affectedRows == (uint64_t)-1)
@@ -466,7 +570,7 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
    if (totalColumns == 0)
       throw SqlException("result metadata does not have field", "MysqlCommand");
 
-   dbResult->totalColumns = totalColumns;
+   dbResult->totalColumns(totalColumns);
 
    // Init row/fields information
    _pResultContext = new ResultContext(totalColumns);
@@ -502,7 +606,6 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
       }
    }
 
-
    // get bind datas
    // rowInfo's pLengths, pIsNulls, pErrors  initialized after this call
    // Note: rowInfo's pLengths contains the REAL LENGTH
@@ -515,7 +618,7 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
    //}
 
    // Fetch result set row by row
-   int currentRow = 0;
+   int rowsRetrieved = 0;
    int status;
    while (1)
    {
@@ -588,7 +691,7 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                      //resbind.buffer_length = realLength;
                      //std::vector<char> val(realLength);
                      //resbind.buffer = (char*)val.data();
-                     //mysql_stmt_fetch_column(_pStmt, _pResultContext->binds.data(), col, currentRow);
+                     //mysql_stmt_fetch_column(_pStmt, _pResultContext->binds.data(), col, rowsRetrieved);
 
                      bool isBinary = _pResultContext->fields[col]->flags & BINARY_FLAG;
                      VariantType value;
@@ -699,17 +802,14 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
                   }
                   default:
                      throw tbs::SqlException("Unsupported Mysql result data type received from backend", "MysqlCommand");
-                     break;
                }
             }
          }
       }
 
-      currentRow++;
-      dbResult->data.emplace_back(std::move(results));
+      rowsRetrieved++;
+      dbResult->data().emplace_back(std::move(results));
    }
-
-   dbResult->totalRows = currentRow;
 
    // cleanup
    mysql_free_result(_pResultMetadata);
@@ -718,32 +818,44 @@ std::shared_ptr<DataSet<MysqlVariantType>> MysqlCommand::executeResult()
    return dbResult;
 }
 
+MysqlResult MysqlCommand::executeSqlResult()
+{
+   if (_pMYConn == nullptr)
+      throw SqlException("Invalid connection object", "MysqlCommand");
+      
+   MysqlResult result;
+   result.connection(_pConn);
+   result.runPreparedQuery(*this);
+
+   return std::move(result);
+}
 
 std::string MysqlCommand::lastBackendError()
 {
-   std::string errmsg;
-   if (_pConn)
+   if (_pMYConn == nullptr)
    {
-      const char* err = mysql_error(_pConn);
-      if (err)
-         return std::string(err);
+      onNotifyError("lastBackendError, invalid connection object", "MysqlCommand");
+      return "invalid connection object";
    }
 
-   return {};
+   const char* err = mysql_error(_pMYConn);
+   if (err != nullptr && err[0] != '\0')
+      return std::string(err);
+
+   return "Unknown MySQL backend error";
 }
 
 std::string MysqlCommand::statementError()
 {
-   if (_pStmt)
-   {
-      const char* err = mysql_stmt_error(_pStmt);
-      if (err[0])
-         return std::string(err);
-   }
+   if (_pStmt == nullptr)
+      throw SqlException("Invalid statement object", "MysqlCommand");
 
-   return {};
+   const char* err = mysql_stmt_error(_pStmt);
+   if (err != nullptr && err[0] != '\0')
+      return std::string(err);
+
+   return "Unknown MySQL statement error";
 }
-
 
 MysqlCommand::ResultContext::ResultContext(int columnsCount)
    : totalColumns(columnsCount)

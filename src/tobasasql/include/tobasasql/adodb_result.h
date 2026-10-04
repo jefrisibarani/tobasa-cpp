@@ -8,6 +8,7 @@
 #include "tobasasql/adodb_connection.h"
 #include "tobasasql/com_variant_helper.h"
 #include "tobasasql/adodb_navigator.h"
+#include "tobasasql/adodb_command.h"
 
 namespace tbs {
 namespace sql {
@@ -31,10 +32,18 @@ public:
 
    using VariantType   = ComVariantType;
    using VariantHelper = ComVariantHelper;
-   using VectorVariant = std::vector<ComVariantType>;
+   using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
+   using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;
 
    AdodbResult(AdodbConnection* pconn = nullptr);
+
+   AdodbResult(const AdodbResult&) = delete;
+   AdodbResult& operator=(const AdodbResult&) = delete;
+
+   AdodbResult(AdodbResult&& other) noexcept;
+   AdodbResult& operator=(AdodbResult&& other) noexcept;
+
    ~AdodbResult();
 
    // -------------------------------------------------------
@@ -113,7 +122,10 @@ public:
     */
    bool runQuery(
       const std::string& sql,
-      const AdoParameterCollection& parameters = AdoParameterCollection());
+      const AdoParameterCollection& parameters = {},
+      ParameterStyle paramStyle = ParameterStyle::named );
+
+   bool runPreparedQuery(AdodbCommand& command);
 
    /// Set specific driver sql connection class implementation
    void connection(AdodbConnection* conn);
@@ -193,7 +205,7 @@ private:
     * varchar        adVarChar      (200)
     * 
     * To send back sql data type to ADO,
-    * \see AdoCommand::createParameter
+    * \see AdodbCommand::createParameter
     */
    void setupColumnsProperties();
 
@@ -207,6 +219,10 @@ private:
     * Throws SqlException.
     */
    _variant_t getNativeVariant(const int columnIndex) const;
+
+   bool getData(ADODB::_RecordsetPtr recordSet);
+
+   void releaseRecordSet(ADODB::_RecordsetPtr recordSet);
 
    /// Sql driver native result object.
    ADODB::_RecordsetPtr _pResult;

@@ -11,7 +11,7 @@ namespace sql {
  * @{
  */
 template <typename VariantTypeImplemented>
-struct DataSet;
+class DataSet;
 
 /**
  * \brief SQLite SQL Connection class.
@@ -23,6 +23,12 @@ class SqliteConnection : public ConnectionCommon
 public:
    SqliteConnection();
    ~SqliteConnection();
+
+   SqliteConnection(const SqliteConnection&) = delete;
+   SqliteConnection& operator=(const SqliteConnection&) = delete;
+
+   SqliteConnection(SqliteConnection&& other) noexcept;
+   SqliteConnection& operator=(SqliteConnection&& other) noexcept;
 
    std::string name();
    bool connect(const std::string& connString);
@@ -79,7 +85,7 @@ public:
    // -------------------------------------------------------
 
    /// Get pointer to native driver's connection object.
-   sqlite3* nativeConn() const;
+   sqlite3* nativeConnection() const;
 
    // Open database with encryption key.
    bool keyDatabase(const std::string& key);
@@ -89,21 +95,6 @@ public:
 
    /// Get last backend error.
    std::string lastBackendError() const;
-
-   sqlite3_stmt* createStatement(const std::string& sql, const SqlParameterCollection& parameters);
-
-
-   /** 
-    * \brief Execute query, and retrieve simple result set.
-    * \param sql         Sql command or table name
-    * \param parameters  SqlParameter collection
-    * 
-    * On error, SqlException thrown
-    * On bad connection status, nullptr
-    */
-   std::shared_ptr<DataSet<DefaultVariantType>> executeResult(
-      const std::string& sql,
-      const SqlParameterCollection& parameters = SqlParameterCollection());
 
    // Is table or view exists.
    bool tableOrViewExists(const std::string& tableName, bool checkTable);

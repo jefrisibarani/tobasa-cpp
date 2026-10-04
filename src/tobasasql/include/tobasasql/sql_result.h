@@ -20,6 +20,9 @@ namespace sql {
 template < typename SqlDriverType >
 class SqlConnection;
 
+template < typename SqlDriverType >
+class SqlQuery;
+
 /**
  * \brief Generic SQL result wrapper.
  * \details 
@@ -40,26 +43,29 @@ template < typename SqlDriverType >
 class SqlResult
 {
 public:
-   using ResultImpl                = typename SqlDriverType::ResultImpl;
-   using LoggerImpl                = typename SqlDriverType::Logger;
-   using SqlConnection             = sql::SqlConnection<SqlDriverType>;
-   using VariantType               = typename SqlDriverType::VariantType;
-
-   /// Alias for sql parameter implemented.
-   using SqlParameter              = typename SqlDriverType::SqlParameter;
-
-   /// Alias for SqlParameter Collection.
-   using SqlParameterCollection    = typename SqlDriverType::SqlParameterCollection;
-
-   /// Alias for SqlParameterImpl shared_ptr.
-   using SqlParameterCollectionPtr = typename SqlDriverType::SqlParameterCollectionPtr;
-
-   using ResultNavigator           = typename SqlDriverType::ResultNavigator;
+   using ResultImpl             = typename SqlDriverType::ResultImpl;
+   using LoggerImpl             = typename SqlDriverType::Logger;
+   using SqlConnection          = sql::SqlConnection<SqlDriverType>;
+   using VariantType            = typename SqlDriverType::VariantType;
+   using SqlQuery               = sql::SqlQuery<SqlDriverType>;
+   using SqlParameter           = typename SqlDriverType::SqlParameter;
+   using SqlParameterCollection = typename SqlDriverType::SqlParameterCollection;
+   using ResultNavigator        = typename SqlDriverType::ResultNavigator;
 
    SqlResult(SqlConnection& conn)
       : _conn(conn)
    {
       _resultImpl.connection( &(_conn.connImpl()) );
+      _resultImpl.notificationHandler =
+         std::bind(&SqlResult::result_onNotification, this, std::placeholders::_1);
+   }
+
+   // TODO_JEFRI:
+   SqlResult(ResultImpl&& result, SqlConnection& conn) noexcept
+      : _resultImpl(std::move(result))
+      : _conn(conn)
+   {
+      //_resultImpl.connection( &(_conn.connImpl()) );
       _resultImpl.notificationHandler =
          std::bind(&SqlResult::result_onNotification, this, std::placeholders::_1);
    }
@@ -156,9 +162,10 @@ public:
                const SqlParameterCollection& parameters,
                ParameterStyle style = ParameterStyle::named)
    {
-      if (sql.empty()) throw SqlException("SQL query empty");
+      if (sql.empty()) 
+         throw SqlException("SQL query empty");
       
-      auto qry = _conn.expandNamedParams(sql, style, parameters);
+      auto qry = expandNamedParams(sql, style, parameters, _conn.backendType());
       return _resultImpl.runQuery(qry, parameters);
    }
 
@@ -170,11 +177,16 @@ public:
     */
    bool runQuery(const std::string& sql)
    {
-      if (sql.empty()) throw SqlException("SQL query empty");
+      if (sql.empty()) 
+         throw SqlException("SQL query empty");
 
       return _resultImpl.runQuery(sql);
    }
 
+   bool runPreparedQuery(SqlQuery& query)
+   {
+      return _resultImpl.runPreparedQuery(query.queryImpl());
+   }
 
    ResultStatus resultStatus() const
    {
@@ -309,7 +321,7 @@ public:
    {
       auto res = _resultImpl.getStringValue(columnIndex);
       
-      if (res == sql::NULLSTR)
+      if (res == sql::NULLSTR) // TODO_JEFRI: isNullField(columnIndex)
          return valueIfNull;
       else
          return res;
@@ -323,7 +335,16 @@ public:
 
    long getLongValue(const int columnIndex) const
    {
-      return std::stol(getStringValue(columnIndex));
+      // TODO_JEFRI: check integral limit
+
+      auto var = getVariantValue(columnIndex);
+
+      if (std::holds_alternative<int32_t>(var))
+         return std::get<int32_t>(var);
+      else if (std::holds_alternative<int64_t>(var))
+         return static_cast<long>( std::get<int64_t>(var) );
+      else
+         return std::stol(getStringValue(columnIndex));
    }
    long getLongValue(const std::string& columnName) const
    {
@@ -332,19 +353,44 @@ public:
 
    bool getBoolValue(const int columnIndex) const
    {
-      return util::strToBool(getStringValue(columnIndex));
-   }
+      auto var = getVariantValue(columnIndex);
 
+      if (std::holds_alternative<bool>(var))
+         return std::get<bool>(var);
+      else
+         return util::strToBool(getStringValue(columnIndex));
+   }
    bool getBoolValue(const std::string& columnName) const
    {
       return getBoolValue(columnNumber(columnName));
    }
 
-   double getDoubleValue(const int columnIndex) const
+   float getFloatValue(const int columnIndex) const
    {
-      return std::stod(getStringValue(columnIndex));
+      auto var = getVariantValue(columnIndex);
+
+      if (std::holds_alternative<float>(var))
+         return std::get<float>(var);
+      else
+         return std::stof(getStringValue(columnIndex));
+   }
+   float getFloatValue(const std::string& columnName) const
+   {
+      return getFloatValue(columnNumber(columnName));
    }
 
+
+   double getDoubleValue(const int columnIndex) const
+   {
+      auto var = getVariantValue(columnIndex);
+
+      if (std::holds_alternative<double>(var))
+         return std::get<double>(var);
+      else if (std::holds_alternative<float>(var))
+         return std::get<float>(var);
+      else
+         return std::stod(getStringValue(columnIndex));
+   }
    double getDoubleValue(const std::string& columnName) const
    {
       return getDoubleValue(columnNumber(columnName));
@@ -352,9 +398,15 @@ public:
 
    long long getLongLongValue(const int columnIndex) const
    {
-      return std::stoll(getStringValue(columnIndex));
-   }
+      auto var = getVariantValue(columnIndex);
 
+      if (std::holds_alternative<int64_t>(var))
+         return std::get<int64_t>(var);
+      else if (std::holds_alternative<int32_t>(var))
+         return std::get<int32_t>(var);
+      else
+         return std::stoll(getStringValue(columnIndex));
+   }
    long long getLongLongValue(const std::string& columnName) const
    {
       return getLongLongValue(columnNumber(columnName));
@@ -379,21 +431,7 @@ public:
          else if (datetime.parse(dateTimeStr, "%m/%d/%Y"))
             return datetime;
       }
-      else if (dataType == DataType::timestamp)
-      {
-         if (datetime.parse(dateTimeStr, "%Y-%m-%d %H:%M:%S"))
-            return datetime;
-         else if (datetime.parse(dateTimeStr, "%Y-%m-%d"))
-            return datetime;
-         else if (datetime.parse(dateTimeStr, "%d/%m/%Y %H:%M:%S"))
-         {
-            // date time string from sql server (ADO driver, come in format dd/mm/yyy hh:mm:ss)
-            return datetime;
-         }
-         else if (datetime.parse(dateTimeStr, "%d/%m/%Y"))
-            return datetime;
-      }
-      else if (dataType == DataType::varchar)
+      else if (dataType == DataType::timestamp || dataType == DataType::varchar)
       {
          // Note: 
          // https://stackoverflow.com/questions/38662438/using-sql-server-datetime2-with-tadoquery-open
@@ -465,7 +503,7 @@ private:
    void result_onNotification(const NotifyEventArgs& arg)
    {
       if (arg.type == NotificationType::trace)
-         _logger.info(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+         _logger.trace(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
 
       if (arg.type == NotificationType::debug)
          _logger.debug(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));

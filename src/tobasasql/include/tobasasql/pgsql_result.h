@@ -7,6 +7,7 @@
 #include <tobasa/navigator.h>
 #include "tobasasql/sql_result_common.h"
 #include "tobasasql/pgsql_connection.h"
+#include "tobasasql/pgsql_command.h"
 
 namespace tbs {
 namespace sql {
@@ -26,12 +27,24 @@ namespace sql {
 class PgsqlResult : public ResultCommon
 {
 public:
-   using VariantType   = tbs::DefaultVariantType;
+   using VariantType   = DefaultVariantType;
+   using VariantHelper = VariantHelper<VariantType>;
    using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
+   using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;
 
    /// Constructor.
    PgsqlResult(PgsqlConnection* pconn = nullptr);
+
+   /// Copying is disabled because the owning subclass manages a raw native result handle.
+   PgsqlResult(const PgsqlResult&) = delete;
+   PgsqlResult& operator=(const PgsqlResult&) = delete;
+
+   /// Move constructor.
+   PgsqlResult(PgsqlResult&& other) noexcept;
+
+   /// Move assignment.
+   PgsqlResult& operator=(PgsqlResult&& other) noexcept;
 
    /// Destructor.
    ~PgsqlResult();
@@ -63,7 +76,10 @@ public:
     */
    virtual bool runQuery(
       const std::string& sql,
-      const SqlParameterCollection& parameters = SqlParameterCollection());
+      const SqlParameterCollection& parameters = {},
+      ParameterStyle paramStyle = ParameterStyle::named );
+
+   bool runPreparedQuery(PgsqlCommand& command);
 
    /// Set specific driver sql connection class implementation.
    void connection(PgsqlConnection* conn);
@@ -116,6 +132,8 @@ public:
    virtual bool isNullField(const int columnIndex) const;
 
 private:
+
+   bool getData(PGresult* _pPGresult);
 
    void throwIfPgResultInvalid() const;
 

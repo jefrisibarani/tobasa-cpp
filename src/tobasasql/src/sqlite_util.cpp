@@ -2,22 +2,23 @@
 #include <tobasa/format.h>
 #include <tobasa/exception.h>
 #include <tobasa/util_string.h>
+#include <tobasasql/sql_util.h>
 #include "tobasasql/sqlite_util.h"
 
 namespace tbs {
 namespace sql {
 
-SqliteType sqliteTypeFromString(const std::string& ftype)
+SqliteType sqliteTypeFromString(const std::string& type)
 {
-   if (ftype == "null")
+   if (type == "null")
       return SqliteType::null;
-   else if (ftype == "integer")
+   else if (type == "integer")
       return SqliteType::integer;
-   else if (ftype == "real")
+   else if (type == "real")
       return SqliteType::real;
-   else if (ftype == "text")
+   else if (type == "text")
       return SqliteType::text;
-   else if (ftype == "blob")
+   else if (type == "blob")
       return SqliteType::blob;
    else
       throw TypeException("Invalid SQLite data type conversion from string", "SQLiteUtil");
@@ -25,8 +26,6 @@ SqliteType sqliteTypeFromString(const std::string& ftype)
 
 std::string sqliteTypeToString(SqliteType type)
 {
-   std::string retVal;
-
    switch (type)
    {
    case SqliteType::null:
@@ -42,14 +41,10 @@ std::string sqliteTypeToString(SqliteType type)
    default:
       throw TypeException("Invalid SQLite data type conversion to string", "SQLiteUtil");
    }
-
-   return retVal;
 }
 
 SqliteType sqliteTypeFromDataType(DataType type)
 {
-   SqliteType retVal;
-
    switch (type)
    {
    case DataType::tinyint:
@@ -58,10 +53,10 @@ SqliteType sqliteTypeFromDataType(DataType type)
    case DataType::bigint:
    case DataType::boolean:
       return SqliteType::integer;
-   case DataType::numeric:
    case DataType::float4:
    case DataType::float8:
       return SqliteType::real;
+   case DataType::numeric:
    case DataType::character:
    case DataType::varchar:
    case DataType::text:
@@ -75,15 +70,11 @@ SqliteType sqliteTypeFromDataType(DataType type)
    default:
       throw TypeException("Invalid DataType conversion to SQLite data type", "SQLiteUtil");
    }
-
-   return retVal;
 }
 
-DataType sqliteTypeToDataType(SqliteType ftype)
+DataType sqliteTypeToDataType(SqliteType type)
 {
-   DataType retVal;
-
-   switch (ftype)
+   switch (type)
    {
    case SqliteType::null:
       return DataType::varchar;
@@ -98,104 +89,41 @@ DataType sqliteTypeToDataType(SqliteType ftype)
    default:
       throw TypeException("Invalid SQLite data type conversion to DataType", "SQLiteUtil");
    }
-
-   return retVal;
 }
 
-std::string sqliteColumnDeclaredType(std::string ftype)
+std::string sqliteColumnDeclaredType(sqlite3_stmt* stmt, int pos)
 {
-   std::string columnTypeString = util::toUpper(ftype);
+   // Note: https://www.sqlite.org/c3ref/column_decltype.html
+   // The first parameter is a prepared statement. If this statement is a SELECT statement 
+   // and the Nth column of the returned result set of that SELECT is a table column 
+   // (not an expression or subquery) then the declared type of the table column is returned. 
+   // If the Nth column of the result set is an expression or subquery, 
+   // then a NULL pointer is returned. The returned string is always UTF-8 encoded.
 
-   if (  columnTypeString == "TINYINT"
-      || columnTypeString == "SMALLINT"
-      || columnTypeString == "MEDIUMINT"
-      || columnTypeString == "BIGINT"
-      || columnTypeString == "INT"
-      || columnTypeString == "INTEGER") 
-   {
-      return "Integer";
+   const char* colTypStr = sqlite3_column_decltype(stmt, pos);
+   if (!colTypStr) {
+      return "DECLTYPE_UNKNOWN";
    }
-   else if (columnTypeString == "BOOL" || columnTypeString == "BOOLEAN")
-      return "Bool";
-   else if (util::startsWith(columnTypeString, "CHAR") || util::startsWith(columnTypeString, "CHARACTER"))
-      return "Char";
-   else if (util::startsWith(columnTypeString, "CHARACTER VARYING")
-         || util::startsWith(columnTypeString, "VARCHAR")
-         || util::startsWith(columnTypeString, "STRING")) 
-   {
-      return "VarChar";
-   }
-   else if (columnTypeString == "TEXT")
-      return "Text";
-   else if (util::startsWith(columnTypeString, "DOUBLE") || util::startsWith(columnTypeString, "DOUBLE PRECISION"))
-      return "Double";
-   else if (util::startsWith(columnTypeString, "FLOAT"))
-      return "Float";
-   else if (columnTypeString == "SINGLE" || columnTypeString == "REAL")
-      return "Real";
-   else if (util::startsWith(columnTypeString, "NUMERIC") || util::startsWith(columnTypeString, "DECIMAL"))
-      return "Numeric";
-   else if (columnTypeString == "BLOB")
-      return "Blob";
-   else if (columnTypeString == "DATE")
-      return "Date";
-   else if (columnTypeString == "DATETIME")
-      return "DateTime";
-   else if (columnTypeString == "TIMESTAMP")
-      return "TimeStamp";
-   else {
-      // SQLite very flexible for declared data type
-      // For other types, treat as text
-      return "Text";
-   }
+
+   return colTypStr;
 }
 
-SqliteType sqliteTypeFromDeclaredType(const std::string& ftype)
+DataType sqliteDeclaredTypeToDataType(sqlite3_stmt* stmt, int pos)
 {
-   std::string columnTypeString = util::toUpper(ftype);
-
-   if (  columnTypeString == "INTEGER" || columnTypeString == "BOOL")
-      return SqliteType::integer;
-   else if (columnTypeString == "TEXT"
-         || columnTypeString == "CHAR"
-         || columnTypeString == "VARCHAR"
-         || columnTypeString == "DATE"
-         || columnTypeString == "DATETIME"
-         || columnTypeString == "TIMESTAMP"
-         || columnTypeString == "NUMERIC") 
-   {
-      return SqliteType::text;
-   }
-   else if (columnTypeString == "DOUBLE" || columnTypeString == "FLOAT"|| columnTypeString == "REAL")
-      return SqliteType::real;
-   else if (columnTypeString == "BLOB")
-      return SqliteType::blob;
-   else if (columnTypeString == "NULL")
-      return SqliteType::null;
-   else
-      throw TypeException(tbsfmt::format("Invalid SQLite data type constructed from declared type: {}", ftype ), "SQLiteUtil");
+   auto declaredType = sqliteColumnDeclaredType(stmt,pos);
+   return dataTypeFromDeclaredType(declaredType);
 }
 
-TypeClass typeClassFromSqliteDeclaredType(std::string colType)
+SqliteType sqliteTypeFromDeclaredType(const std::string& type)
 {
-   if (  colType == "Integer"
-      || colType == "Double"
-      || colType == "Float"
-      || colType == "Real"
-      || colType == "Numeric") 
-   {
-      return TypeClass::numeric;
-   }
-   else if (colType == "Blob")
-      return TypeClass::blob;
-   else if (colType == "Bool")
-      return TypeClass::boolean;
-   else if (colType == "Char" || colType == "VarChar" || colType == "Text")
-      return TypeClass::string;
-   else if (colType == "Date" || colType == "DateTime" || colType == "TimeStamp")
-      return TypeClass::date;
-   else
-      throw TypeException(tbsfmt::format("Invalid SQLite data type conversion to TypeClass: {}", colType), "SQLiteUtil");
+   DataType dataType = dataTypeFromDeclaredType(type);
+   return sqliteTypeFromDataType(dataType);
+}
+
+TypeClass typeClassFromSqliteDeclaredType(const std::string& type)
+{
+   DataType dataType = dataTypeFromDeclaredType(type);
+   return typeClassFromDataType(dataType);
 }
 
 

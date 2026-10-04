@@ -7,16 +7,51 @@ namespace sql {
 OdbcResult::OdbcResult(OdbcConnection* pconn)
     : ResultCommon()
 {
-   _pStatement    = nullptr;
    _pConn         = pconn;
+   _pDataset      = nullptr;
    notifierSource = "OdbcResult";
    _navigator.init(std::bind(&OdbcResult::totalRows, this));
 }
 
+OdbcResult::OdbcResult(OdbcResult&& other) noexcept
+   : ResultCommon( std::move(other))
+   , _pConn(       other._pConn)
+   , _pDataset(    std::move(other._pDataset))
+   , _navigator(   std::move(other._navigator))
+{
+   other._pConn         = nullptr;
+   other._pDataset      = nullptr;
+   other._nRows         = 0;
+   other._nColumns      = 0;
+   other._affectedRows  = 0;
+   other._resultStatus  = ResultStatus::unknown;
+   other._columnInfoCollection.clear();
+   other._qryStr.clear();
+}
+
+OdbcResult& OdbcResult::operator=(OdbcResult&& other) noexcept
+{
+   if (this != &other)
+   {
+      ResultCommon::operator=(std::move(other));
+      _pConn      = other._pConn;
+      _pDataset   = std::move(other._pDataset);
+      _navigator  = std::move(other._navigator);
+
+      other._pConn         = nullptr;
+      other._pDataset      = nullptr;
+      other._nRows         = 0;
+      other._nColumns      = 0;
+      other._affectedRows  = 0;
+      other._resultStatus  = ResultStatus::unknown;
+      other._columnInfoCollection.clear();
+      other._qryStr.clear();
+   }
+   return *this;
+}
+
 OdbcResult::~OdbcResult()
 {
-   if (_pStatement != nullptr)
-      _pStatement = nullptr;
 }
 
 // -------------------------------------------------------
@@ -28,7 +63,9 @@ std::string OdbcResult::name() const
    return "Odbc Result";
 }
 
-bool OdbcResult::runQuery(const std::string& sql, const SqlParameterCollection& parameters)
+bool OdbcResult::runQuery(const std::string& sql,
+                          const SqlParameterCollection& parameters,
+                          ParameterStyle paramStyle)
 {
    if (_pConn == nullptr)
       return false;
@@ -41,122 +78,30 @@ bool OdbcResult::runQuery(const std::string& sql, const SqlParameterCollection& 
    else
       _qryStr = sql;
 
-   if (_pConn->logSqlQuery())
-      onNotifyDebug(_pConn->logId() + tbsfmt::format("runQuery: {}", _qryStr));
-
-   SQLRETURN rc;
-   _pStatement = _pConn->allocateStatement();
-
-   // Convert SqlParameter to OdbcParameter
-   OdbcParameterCollection odbcParams(_pStatement, static_cast<short>(parameters.size()));
-   if (parameters.size() > 0)
+   OdbcCommand command(_pConn);
+   if (command.query(_qryStr, parameters))
    {
-      odbcParams.prepare(_qryStr, parameters);
-      odbcParams.bindParameter();
-      rc = SQLExecute(_pStatement);
+      auto dataSet  = command.executeResult();
+      if (dataSet==nullptr)
+         throw SqlException("runQuery, Invalid DataSet pointer", "SqliteResult"); 
+      
+      _affectedRows = command.affectedRows();
+      return getData(std::move(dataSet), command.statement());
    }
-   else
-   {
-      auto sqlcmd = tbs::util::utf8_to_odbcString(_qryStr);
-      rc = SQLExecDirect(_pStatement, (SQLTCHAR*)sqlcmd.c_str(), SQL_NTS);
-   }
-
-
-   if (rc == SQL_NEED_DATA)
-   {
-      // process data-at-execution parameters
-      rc = _pConn->sqlPutData(_pStatement, parameters);
-   }
-
-   if (SQL_SUCCEEDED(rc) || rc == SQL_NO_DATA)
-   {
-      std::string notitymsg("SQL command executed successfully");
-      OdbcDiagRecord diag;
-
-      if (rc == SQL_SUCCESS_WITH_INFO)
-         diag = statementDiagRecord(_pStatement, rc);
-
-      // get affected rows
-      SQLLEN affectedRow;
-      rc = SQLRowCount(_pStatement, (SQLLEN*)&affectedRow);
-      statementDiagRecord(_pStatement, rc).throwOnNotSucceeded(this);
-
-      if (SQL_SUCCEEDED(rc))
-      {
-         _affectedRows = static_cast<int>( (affectedRow < 0) ? 0 : affectedRow );
-
-         if (diag.message().empty())
-            notitymsg = tbsfmt::format("SQL command executed successfully, affectedRows: {}", _affectedRows);
-         else {
-            notitymsg = tbsfmt::format("SQL command executed successfully, affectedRows: {}, code: {}, info: {}",
-                           _affectedRows, diag.code(), diag.message());
-         }
-      }
-
-      if (_pConn->logExecuteStatus()) 
-         onNotifyTrace(_pConn->logId() + notitymsg);
-
-      // Get columns count
-      SQLSMALLINT ncol = 0;
-      rc = SQLNumResultCols(_pStatement, &ncol);
-      statementDiagRecord(_pStatement, rc).throwOnNotSucceeded(this);
-
-      if (SQL_SUCCEEDED(rc))
-      {
-         _nColumns = (int)ncol;
-         setupColumnProperties();
-      }
-
-      // retrieve all rows
-      int rowsRetrieved = 0;
-
-      // SQL command returning no result, has 0 column
-      // we got "Invalid cursor state" error if we do SQLFetch(_pStatement) on zero column
-      if (_nColumns > 0)
-      {
-         // Loop through the rows in the result-set
-         while (true)
-         {
-            rc = SQLFetch(_pStatement);
-            statementDiagRecord(_pStatement, rc).throwOnError(this);
-
-            if (SQL_SUCCEEDED(rc))
-            {
-               VectorVariant recordVariant;
-               recordVariant.reserve(_nColumns);
-               // Loop through the columns
-               for (SQLUSMALLINT i = 1; i <= _nColumns; i++)
-               {
-                  VariantType vdata = _pConn->getFieldData(_pStatement, i);
-                  recordVariant.emplace_back(vdata);
-               }
-
-               _dataVariant.emplace_back(recordVariant);
-               rowsRetrieved++;
-            }
-            else
-               break;
-         }
-      }
-
-      _nRows = rowsRetrieved;
-      if (_nRows > 0)
-         _resultStatus = ResultStatus::tuplesOk;
-      else
-         _resultStatus = ResultStatus::commandOk;
-
-      _navigator.moveFirst();
-
-      // clean statement
-      SQLFreeHandle(SQL_HANDLE_STMT, _pStatement);
-      _pStatement = nullptr;
-
-      return true;
-   }
-   else
-      statementDiagRecord(_pStatement, rc).throwOnNotSucceeded(this);
 
    return false;
+}
+
+bool OdbcResult::runPreparedQuery(OdbcCommand& command)
+{
+   _qryStr = command.sqlCommandText();
+   auto dataSet  = command.executeResult();
+   if (dataSet == nullptr)
+      throw SqlException("runPreparedQuery, Invalid DataSet pointer", "OdbcResult"); 
+
+   _affectedRows = command.affectedRows();
+
+   return getData(std::move(dataSet), command.statement());
 }
 
 void OdbcResult::connection(OdbcConnection* conn)
@@ -188,8 +133,10 @@ OdbcResult::VariantType OdbcResult::getVariantValue(const int columnIndex) const
    throwIfColumnIndexInvalid(columnIndex);
    throwIfRowIndexInvalid(row);
 
-   VariantType value = _dataVariant[row][columnIndex];
-   return value;
+   if (_pDataset == nullptr)
+      throw std::runtime_error("getVariantValue, Invalid DataSet pointer");
+
+   return _pDataset->data().at(row).at(columnIndex);
 }
 
 OdbcResult::VariantType OdbcResult::getVariantValue(const std::string& columnName) const
@@ -203,8 +150,11 @@ std::string OdbcResult::getStringValue(const int columnIndex) const
    throwIfColumnIndexInvalid(columnIndex);
    throwIfRowIndexInvalid(row);
 
-   auto& value = _dataVariant[row][columnIndex];
-   return VariantHelper<>::toString(value);
+   if (_pDataset == nullptr)
+      throw std::runtime_error("getVariantValue, Invalid DataSet pointer");
+
+   auto& value = _pDataset->data().at(row).at(columnIndex);
+   return VariantHelper::toString(value);
 }
 
 std::string OdbcResult::getStringValue(const std::string& columnName) const
@@ -218,7 +168,7 @@ bool OdbcResult::isNullField(const int columnIndex) const
    return getStringValue(columnIndex) == sql::NULLSTR;
 }
 
-void OdbcResult::setupColumnProperties()
+void OdbcResult::setupColumnProperties(SQLHSTMT stmt)
 {
    if (_nColumns <= 0)
       return;
@@ -247,11 +197,10 @@ void OdbcResult::setupColumnProperties()
          SQLSMALLINT colNullable;
          SQLLEN      colIdentity = 0;
 
-         // TODO_JEFRI : check col_decimal_digits
-
+         // ODBC column indexing is 1-based, not 0-based.
          SQLRETURN rc;
          rc = SQLDescribeCol(
-                  _pStatement,         // SQLHSTMT       StatementHandle
+                  stmt,                // SQLHSTMT       StatementHandle
                   i + 1,               // SQLUSMALLINT   ColumnNumber
                   colName,             // SQLCHAR *      ColumnName
                   sizeof(colName),     // SQLSMALLINT    BufferLength
@@ -273,10 +222,11 @@ void OdbcResult::setupColumnProperties()
             // save column defined size
             _columnInfoCollection[i].definedSize = static_cast<long>(colSize);
 
-            if (colDataType == SQL_FLOAT) // what about SQL_REAL ?
+            if (colDataType == SQL_FLOAT || colDataType == SQL_REAL || colDataType == SQL_DOUBLE)
             {
-               if ( colSize>=1 && colSize <=24 )
+               if ( colSize>=1 && colSize <=24 ) {
                   colDataTypeFinal = SQL_FLOAT;
+               }
                else if (colSize>=25 && colSize <=53)
                {
                   // double in SQL server is float 53
@@ -299,12 +249,12 @@ void OdbcResult::setupColumnProperties()
          else
          {
             _columnInfoCollection[i].nativeTypeStr = "Unknown";
-            tbs::statementDiagRecord(_pStatement, rc).throwOnNotSucceeded(this);
+            tbs::statementDiagRecord(stmt, rc).throwOnNotSucceeded(this);
          }
 
          // Get auto increment field info
          rc = SQLColAttribute(
-                  _pStatement,
+                  stmt,
                   i + 1,                        // ColumnNumber
                   SQL_DESC_AUTO_UNIQUE_VALUE,   // FieldIdentifier
                   NULL,                         // CharacterAttributePtr
@@ -312,7 +262,7 @@ void OdbcResult::setupColumnProperties()
                   NULL,                         // StringLengthPtr
                   &colIdentity);                // NumericAttributePtr
 
-         tbs::statementDiagRecord(_pStatement, rc).throwOnNotSucceeded(this);
+         tbs::statementDiagRecord(stmt, rc).throwOnNotSucceeded(this);
 
          if (colIdentity == 1)
             _columnInfoCollection[i].autoIncrement = true;
@@ -323,6 +273,31 @@ void OdbcResult::setupColumnProperties()
       onNotifyError(_pConn->logId() + ex.what());
       throw tbs::SqlException(tbsfmt::format("setupColumnProperties, {}", ex.what()), "OdbcResult");
    }
+}
+
+bool OdbcResult::getData(DataSetPtr dataSet, SQLHSTMT stmt)
+{
+   if (dataSet == nullptr || stmt == SQL_NULL_HSTMT)
+      throw tbs::SqlException("getData, invalid DataSet or statement object", "OdbcResult");
+
+   _pDataset = std::move(dataSet);
+   _nRows    = _pDataset->totalRows();
+   _nColumns = _pDataset->totalColumns();
+
+   if (_nColumns > 0)
+   {
+      // we have total columns, now set up columns info
+      setupColumnProperties(stmt);
+   }
+
+   if (_nRows > 0)
+      _resultStatus = ResultStatus::tuplesOk;
+   else
+      _resultStatus = ResultStatus::commandOk;
+
+   _navigator.moveFirst();
+
+   return true;
 }
 
 } // namespace sql

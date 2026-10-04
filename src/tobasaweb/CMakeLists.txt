@@ -45,6 +45,10 @@ target_include_directories( tobasaweb
    PUBLIC ${PROJECT_SOURCE_DIR}/include
    PUBLIC ${PROJECT_SOURCE_DIR}/src )
 
+if(TOBASA_BUILD_TESTS)
+   add_subdirectory(tests)
+endif()
+
 if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
    target_link_libraries( tobasaweb PUBLIC spdlog::spdlog )
 else()

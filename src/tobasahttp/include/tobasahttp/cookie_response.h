@@ -19,18 +19,18 @@ class ResponseCookie
 private:
    std::string _name;
    std::string _value;
-   std::string _path          = "/";
+   std::string _path          {"/"};
    std::string _domain;
-   bool        _httpOnly      = false;
-   bool        _secure        = false;
-   std::string _sameSite      = "Lax";    // Default to "Lax"
-   int         _maxAge        = 3600;     // Default to 3600 seconds
+   bool        _httpOnly      {false};
+   bool        _secure        {false};
+   std::string _sameSite      {"Lax"};    // Default to "Lax"
+   int         _maxAge        {3600};     // Default to 3600 seconds
    std::string _expires;
-   std::string _priority      = "Medium"; // Default to "Medium"
-   bool        _sameParty     = false;
-   bool        _partitioned   = false;
+   std::string _priority      {"Medium"}; // Default to "Medium"
+   bool        _sameParty     {false};
+   bool        _partitioned   {false};
+   bool        _reset         {false};
 
-   bool        _reset         = false;
    std::string generateExpires(int secondsFromNow) const;
 
 public:

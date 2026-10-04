@@ -5,6 +5,7 @@
 #include <tobasa/notifier.h>
 #include <tobasa/self_counter.h>
 #include "tobasasql/exception.h"
+#include "tobasasql/sql_util.h"
 #include "tobasasql/sql_result.h"
 #include "tobasasql/sql_parameter_rewriter.h"
 
@@ -32,47 +33,27 @@ template < typename SqlDriverType >
 class SqlConnection
 {
 public:
-   /// Alias for implementation sql connection class.
-   using ConnectionImpl    = typename SqlDriverType::ConnectionImpl;
-
-   /// Alias for implementation sql connection class's shared_ptr.
-   using ConnectionImplPtr = std::shared_ptr<ConnectionImpl>;
-
-   /// Alias for implementation sql result class.
-   using ResultImpl        = typename SqlDriverType::ResultImpl;
-
-   /// Alias for implementation sql result class's shared_ptr.
-   using ResultImplPtr     = std::shared_ptr<ResultImpl>;
-
-   /// Alias for implementation logger class.
-   using LoggerImpl        = typename SqlDriverType::Logger;
-
-   /// Alias for sql result template class.
-   using SqlResult         = sql::SqlResult<SqlDriverType>;
-
-   /// Alias for sql result template class's shared_ptr.
-   using SqlResultPtr      = std::shared_ptr< SqlResult >;
-
-   /// Alias for sql parameter implemented.
-   using SqlParameter      = typename SqlDriverType::SqlParameter;
-
-   /// Alias for SqlParameter Collection.
+   using ConnectionImpl         = typename SqlDriverType::ConnectionImpl;
+   using ConnectionImplPtr      = std::shared_ptr<ConnectionImpl>;
+   using LoggerImpl             = typename SqlDriverType::Logger;
+   using SqlParameter           = typename SqlDriverType::SqlParameter;
    using SqlParameterCollection = typename SqlDriverType::SqlParameterCollection;
+   using VariantType            = typename SqlDriverType::VariantType;
+   using VariantHelper          = typename SqlDriverType::VariantHelper;
 
-   /// Alias for SqlParameterImpl shared_ptr.
-   using SqlParameterCollectionPtr = typename SqlDriverType::SqlParameterCollectionPtr;
-
-   using VariantType    = typename SqlDriverType::VariantType;
-   using VariantHelper  = typename SqlDriverType::VariantHelper;
-
-   /// Constructor.
    SqlConnection()
    {
       _connImpl.notificationHandler
          = std::bind(&SqlConnection::conn_onNotification, this, std::placeholders::_1);
    }
 
-   /// Destructor.
+   SqlConnection(ConnectionImpl&& conn) noexcept
+      : _connImpl(std::move(conn))
+   {
+      _connImpl.notificationHandler
+         = std::bind(&SqlConnection::conn_onNotification, this, std::placeholders::_1);
+   }
+
    ~SqlConnection()
    {
       if (status() == ConnectionStatus::ok) {
@@ -130,7 +111,7 @@ public:
    {
       if (sql.empty()) throw SqlException("SQL query empty");
 
-      auto qry = expandNamedParams(sql, style, parameters);
+      auto qry = expandNamedParams(sql, style, parameters, backendType());
       return _connImpl.execute(qry, parameters);
    }
 
@@ -172,7 +153,7 @@ public:
    {
       if (sql.empty()) throw SqlException("SQL query empty");
 
-      auto qry = expandNamedParams(sql, style, parameters);
+      auto qry = expandNamedParams(sql, style, parameters, backendType());
       int rc = _connImpl.execute(qry, parameters);
       return rc >= 0;
    }
@@ -209,7 +190,7 @@ public:
    {
       if (sql.empty()) throw SqlException("SQL query empty");
 
-      auto qry = expandNamedParams(sql, style, parameters);
+      auto qry = expandNamedParams(sql, style, parameters, backendType());
       return _connImpl.executeScalar(qry, parameters);
    }
 
@@ -374,23 +355,13 @@ public:
       return _connImpl.databaseName();
    }
 
-   std::string expandNamedParams(const std::string& sql, ParameterStyle style, const SqlParameterCollection& parameters ) 
-   {
-      if ( style == ParameterStyle::named && parameters.size()>0)
-      {
-         SqlParameterRewriter writer( backendType() );
-         return writer.rewrite(sql);
-      }
-      return sql;
-   }
-
 private:
 
    /// Handler for notification from Implementation class.
    void conn_onNotification(const NotifyEventArgs& arg)
    {
       if (arg.type == NotificationType::trace)
-         _logger.info(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+         _logger.trace(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
 
       if (arg.type == NotificationType::debug)
          _logger.debug(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));

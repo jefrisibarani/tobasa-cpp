@@ -37,6 +37,8 @@ public:
    static NativeVariant toNativeVariant(const VariantType& variantVal);
 
    static VariantType fromNativeVariant(const _variant_t& vSource);
+
+   static std::string time2ToString(const _variant_t& value);
 };
 
 } // namespace tbs

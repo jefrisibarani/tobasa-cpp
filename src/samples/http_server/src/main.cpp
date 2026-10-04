@@ -448,8 +448,8 @@ void runHttpServer()
       .privateKeyFile( "localhost.key" )
       .tmpDhFile( "dh2048.pem" )
 #ifdef TOBASA_HTTP_USE_HTTP2
-      .http2Enabled(true)
-      .logVerboseHttp2(false)
+      .http2Enabled(false)
+      .logVerboseHttp2(true)
 #endif
       .logVerbose(true)
       .port(8085)

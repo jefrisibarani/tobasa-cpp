@@ -16,6 +16,24 @@ AdodbConnection::AdodbConnection()
    notifierSource = "AdodbConnection";
 }
 
+AdodbConnection::AdodbConnection(AdodbConnection&& other) noexcept
+   : ConnectionCommon(std::move(other))
+   , _pConn(std::move(other._pConn))
+{
+   // _pConn is a COM smart pointer; moving it transfers ownership safely.
+}
+
+AdodbConnection& AdodbConnection::operator=(AdodbConnection&& other) noexcept
+{
+   if (this != &other)
+   {
+      disconnect();
+      ConnectionCommon::operator=(std::move(other));
+      _pConn = std::move(other._pConn);
+   }
+   return *this;
+}
+
 AdodbConnection::~AdodbConnection()
 {
    disconnect();
@@ -127,17 +145,13 @@ int AdodbConnection::execute(const std::string& sql, const AdoParameterCollectio
 
    if (success)
    {
-      if (affectedRows == -1)
-         return 0;
-      else
-         return affectedRows;
+      return affectedRows;
    }
 
    return -1;
 }
 
-
-bool AdodbConnection::execute(const std::string& sql, int& affectedRows,
+bool AdodbConnection::execute(const std::string& sql, int& outAffectedRows,
    const AdoParameterCollection& parameters)
 {
    // Note: https://docs.microsoft.com/en-us/sql/ado/reference/ado-api/execute-method-ado-command?view=sql-server-2017
@@ -153,52 +167,59 @@ bool AdodbConnection::execute(const std::string& sql, int& affectedRows,
    if (status() != ConnectionStatus::ok)
       return false;
 
-   try
+   _pConn->CursorLocation = ADODB::adUseClient;
+
+   if (parameters.size() > 0)
+   {
+      AdodbCommand cmd(this);
+      if (!cmd.query(sql, parameters))
+         return false;
+
+      int result = cmd.execute();
+      if (result < 0)
+         return false;
+
+      outAffectedRows = result;
+      return true;
+   }
+   else
    {
       if (logSqlQuery())
          onNotifyDebug(logId() + tbsfmt::format("execute : {}", sql));
 
-      _pConn->CursorLocation = ADODB::adUseClient;
-
-      if (parameters.size() > 0)
+      try
       {
-         AdoCommand command(_pConn);
-         bool success = command.execute(sql, affectedRows, parameters);
-         if (!success)
-            return false;
+         _bstr_t sqlCmdBW = sql::utf8_to_bstr_t(sql);
+         _variant_t recordsAffected;
+
+         _pConn->Execute(sqlCmdBW, 
+                         &recordsAffected,
+                        ADODB::adCmdText | ADODB::adExecuteNoRecords);
+
+         if (recordsAffected.vt == VT_I4 || recordsAffected.vt == VT_INT)
+            outAffectedRows = recordsAffected.iVal < 0 ? 0 : recordsAffected.iVal;
+         else
+            outAffectedRows = 0;
+
+         std::string message = tbsfmt::format("SQL command executed successfully, affected rows: {}", outAffectedRows);
+         if (logExecuteStatus()) 
+            onNotifyDebug(logId() + message);
+
+         return true;
       }
-      else
+      catch (_com_error& e)
       {
-         _bstr_t sqlCmdBW = util::utf8_to_bstr_t(sql);
-         _variant_t vRecords;
-         _pConn->Execute( sqlCmdBW, &vRecords,
-                     ADODB::adCmdText | ADODB::adExecuteNoRecords);
-
-         affectedRows = vRecords.iVal;
+         ComError comErr(e /*, __FILE__, __LINE__*/ );
+         std::string errMsg = tbsfmt::format("Error on execute: {}", comErr.fullMessage);
+         onNotifyError(logId() + errMsg);
+         throw tbs::SqlException(comErr.description, "adoconn");
       }
-
-      int rowsRpt = (affectedRows == -1) ? 0 : affectedRows;
-      std::string message = tbsfmt::format("SQL command executed successfully, affected rows: {}", rowsRpt);
-      
-      if (logExecuteStatus()) 
-         onNotifyTrace(logId() + message);
-
-      return true;
-   }
-   catch (_com_error& e)
-   {
-      ComError comErr(e/*, __FILE__, __LINE__*/);
-      std::string errMsg = tbsfmt::format("Error on execute: {}", comErr.fullMessage);
-      onNotifyTrace(logId() + errMsg);
-
-      throw tbs::SqlException(comErr.description, "adoconn");
-   }
-   catch (const std::exception& e)
-   {
-      std::string errMsg = tbsfmt::format("Error on execute: {}", e.what());
-      onNotifyError(logId() + errMsg);
-
-      throw tbs::SqlException(errMsg, "adoconn");
+      catch (const std::exception& e)
+      {
+         std::string errMsg = tbsfmt::format("Error on execute: {}", e.what());
+         onNotifyError(logId() + errMsg);
+         throw tbs::SqlException(errMsg, "adoconn");
+      }
    }
 
    return false;
@@ -207,23 +228,23 @@ bool AdodbConnection::execute(const std::string& sql, int& affectedRows,
 std::string AdodbConnection::executeScalar(const std::string& sql, const AdoParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
-      throw tbs::SqlException("Invalid connection status", "AdodbConnection");
+      return "";
 
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("executeScalar: {}", sql));
-
-   long nRows = 0;
-   ADODB::_RecordsetPtr pRec = nullptr;
-
-   try
+   if (parameters.size() > 0)
    {
-      if (parameters.size() > 0)
-      {
-         AdoCommand command(_pConn);
-         pRec = command.executeResult(sql, parameters);
-         nRows = pRec->GetRecordCount();
-      }
-      else
+      AdodbCommand cmd(this);
+      if (!cmd.query(sql,parameters))
+         return "";
+
+      return cmd.executeScalar();
+   }
+   else
+   {
+      if (logSqlQuery())
+         onNotifyDebug(logId() + tbsfmt::format("executeScalar: {}", sql));
+
+      ADODB::_RecordsetPtr pRec = nullptr;
+      try 
       {
          // No Sql parameters given, execute query using Recordset::Open
          // Here we open Recordset with  ADODB::adOpenStatic, so pRec->GetRecordCount()
@@ -242,84 +263,54 @@ std::string AdodbConnection::executeScalar(const std::string& sql, const AdoPara
          // If fAddRef is false, this constructor takes ownership of the supplied interface pointer;
          // do not call Release on the supplied interface pointer.
 
-         _bstr_t sqlCmdBW = util::utf8_to_bstr_t(sql);
+         //_variant_t activeConnection((IDispatch*)_pConn, true);
+         IDispatch* pDisp = _pConn.GetInterfacePtr();
+         _variant_t activeConnection(pDisp, true);
+
+         _bstr_t sqlCmdBW = sql::utf8_to_bstr_t(sql);
 
          pRec->CursorLocation = ADODB::adUseClient;
          pRec->Open(sqlCmdBW,
-                  _variant_t((IDispatch*)_pConn, true),  // see note copy_conn_to_variant
-                  ADODB::adOpenStatic,
-                  ADODB::adLockOptimistic,
-                  ADODB::adCmdText);
+                    activeConnection,
+                    ADODB::adOpenForwardOnly,
+                    ADODB::adLockReadOnly,
+                    ADODB::adCmdText);
 
-         nRows = pRec->GetRecordCount();
+         long nRows0 = 0;
+         std::string result = AdodbCommand::getScalarResult(pRec, nRows0);
+
+         // Cleaning up COM Object
+         if (pRec && pRec->State == ADODB::adStateOpen)
+            pRec->Close();
+
+         pRec = nullptr;
+
+         return result;
       }
-
-      std::string result;
-
-      // nRows value may not correct(-1), so recalculate inside while loop
-      nRows = 0; // reset nRows
-      while (!pRec->EndOfFile)
+      catch(_com_error& e)
       {
-         if (nRows == 0)
-         {
-            // We only interested on first record
-            ADODB::FieldsPtr pFldLoop = nullptr;
-            _variant_t vtIndex;
-            vtIndex.vt = VT_I2;           // set vtIndex to save 2 byte int
-            pFldLoop = pRec->GetFields(); // get Fields pointer
-            vtIndex.iVal = 0;
+         // Cleaning up COM Object
+         if (pRec && pRec->State == ADODB::adStateOpen)
+            pRec->Close();
 
-            _variant_t fieldValue = pFldLoop->GetItem(vtIndex)->Value;
-            if (fieldValue.vt == VT_NULL)
-            {
-               onNotifyDebug(logId() + "Scalar query returned SQL NULL");
-               result = sql::NULLSTR;
-            }
-            else
-            {
-               _bstr_t result_ = (_bstr_t) fieldValue;
-               result = util::utf8_from_bstr_t(result_);
-            }
-         }
-         nRows++;
-         pRec->MoveNext();
+         pRec = nullptr;
+         ComError comErr(e/*, __FILE__, __LINE__*/);
+         std::string errMsg = tbsfmt::format("Error on executeScalar: {}", comErr.fullMessage);
+         onNotifyError(logId() + errMsg);
+         throw tbs::SqlException(comErr.description, "adoconn");
       }
+      catch(const std::exception& e)
+      {
+         // Cleaning up COM Object
+         if (pRec && pRec->State == ADODB::adStateOpen)
+            pRec->Close();
 
-      if (nRows < 0)
-         onNotifyInfo(logId() + "Could not determine the number of records");
-      else if (nRows == 0)
-         onNotifyInfo(logId() + "Scalar query returned no row");
-      else if (nRows > 1)
-         onNotifyInfo(logId() + "Scalar query returned more than one row");
-
-      // Cleaning up COM Object
-      if (pRec->State == ADODB::adStateOpen) {
-         pRec->Close();
+         pRec = nullptr;
+         std::string errMsg = tbsfmt::format("Error on executeScalar: {}", e.what());
+         onNotifyError(logId() + errMsg);
+         throw tbs::SqlException(e, "adoconn");
       }
-
-      pRec = nullptr;
-      return result;
    }
-   catch(_com_error& e)
-   {
-      pRec = nullptr;
-
-      ComError comErr(e/*, __FILE__, __LINE__*/);
-      std::string errMsg = tbsfmt::format("Error on executeScalar: {}", comErr.fullMessage);
-      onNotifyTrace(logId() + errMsg);
-
-      throw tbs::SqlException(comErr.description, "adoconn");
-   }
-   catch(const std::exception& e)
-   {
-      pRec = nullptr;
-
-      std::string errMsg = tbsfmt::format("Error on executeScalar: {}", e.what());
-      onNotifyError(logId() + errMsg);
-
-      throw tbs::SqlException(e, "adoconn");
-   }
-
    return "";
 }
 
@@ -348,7 +339,7 @@ std::string AdodbConnection::versionString()
    {
       ComError comErr(e/*, __FILE__, __LINE__*/);
       std::string errMsg = tbsfmt::format("Error on versionString: {}", comErr.fullMessage);
-      onNotifyTrace(logId() + errMsg);
+      onNotifyError(logId() + errMsg);
    }
    catch(const std::exception& e)
    {
@@ -410,7 +401,7 @@ int64_t AdodbConnection::lastInsertRowid()
    return std::stoll( rowId );
 }
 
-ADODB::_ConnectionPtr AdodbConnection::nativeConn() const 
+ADODB::_ConnectionPtr AdodbConnection::nativeConnection() const 
 { 
    return _pConn; 
 }
@@ -795,7 +786,6 @@ bool AdodbConnection::getPrimaryKeyColumns(std::vector<std::string>& primaryKeyC
    return false;
 }
 
-
 bool AdodbConnection::getAutoIncrementColumns(std::vector<std::string>& autoIncrCols, const std::string& tableName)
 {
    // check if column is auto increment
@@ -835,7 +825,6 @@ bool AdodbConnection::getAutoIncrementColumns(std::vector<std::string>& autoIncr
 
    return false;
 }
-
 
 } // namespace sql
 } // namespace tbs

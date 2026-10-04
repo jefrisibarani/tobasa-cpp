@@ -20,6 +20,49 @@ PgsqlResult::PgsqlResult(PgsqlConnection* pconn)
    _navigator.init( std::bind(&PgsqlResult::totalRows, this) );
 }
 
+PgsqlResult::PgsqlResult(PgsqlResult&& other) noexcept
+   : ResultCommon(std::move(other))
+   , _pPGresult(  other._pPGresult)
+   , _pConn(      other._pConn)
+   , _navigator(  std::move(other._navigator))
+{
+   other._pPGresult     = nullptr;
+   other._pConn         = nullptr;
+   other._nRows         = 0;
+   other._nColumns      = 0;
+   other._affectedRows  = 0;
+   other._resultStatus  = ResultStatus::unknown;
+   other._columnInfoCollection.clear();
+   other._qryStr.clear();
+}
+
+PgsqlResult& PgsqlResult::operator=(PgsqlResult&& other) noexcept
+{
+   if (this != &other)
+   {
+      if (_pPGresult != nullptr)
+      {
+         PQclear(_pPGresult);
+         _pPGresult = nullptr;
+      }
+
+      ResultCommon::operator=(std::move(other));
+      _pPGresult  = other._pPGresult;
+      _pConn      = other._pConn;
+      _navigator  = std::move(other._navigator);
+
+      other._pPGresult     = nullptr;
+      other._pConn         = nullptr;
+      other._nRows         = 0;
+      other._nColumns      = 0;
+      other._affectedRows  = 0;
+      other._resultStatus  = ResultStatus::unknown;
+      other._columnInfoCollection.clear();
+      other._qryStr.clear();
+   }
+   return *this;
+}
+
 PgsqlResult::~PgsqlResult()
 {
    if (_pPGresult != nullptr)
@@ -38,7 +81,9 @@ std::string PgsqlResult::name() const
    return "Postgresql Result";
 }
 
-bool PgsqlResult::runQuery(const std::string& sql, const SqlParameterCollection& parameters)
+bool PgsqlResult::runQuery(const std::string& sql, 
+                           const SqlParameterCollection& parameters,
+                           ParameterStyle paramStyle)
 {
    if (_pConn == nullptr)
       return false;
@@ -48,95 +93,44 @@ bool PgsqlResult::runQuery(const std::string& sql, const SqlParameterCollection&
 
    if (_optionOpenTable)
       _qryStr = "SELECT * FROM " + sql;
-   else
+   else 
       _qryStr = sql;
 
-   if (_pConn->logSqlQuery())
-      onNotifyDebug(_pConn->logId() + tbsfmt::format("runQuery: {}", _qryStr));
-
-   ExecStatusType status;
-
+   PGresult* qryRes = nullptr;
    if (parameters.size() > 0)
-      _pPGresult = _pConn->executeParams(_qryStr, parameters);
-   else
-      _pPGresult = PQexec(_pConn->nativeConn(), _qryStr.c_str());
-
-
-   if (_pPGresult == nullptr)
    {
-      std::string errmsg = tbsfmt::format("execute, {}", _pConn->lastBackendError());
+      PgsqlCommand command(_pConn);
+      if (command.query(_qryStr, parameters))
+         qryRes = command.executePgResult();
+   }
+   else {
+      qryRes = PQexec(_pConn->nativeConnection(), _qryStr.c_str());
+   }
+
+   if (qryRes == nullptr)
+   {
+      std::string errmsg = tbsfmt::format("runQuery, {}", _pConn->lastBackendError());
       onNotifyError(_pConn->logId() + errmsg);
-      throw tbs::SqlException(errmsg, "PgsqlResult");
+      throw tbs::SqlException(errmsg, "runQueryPgsqlResult");
    }
 
-   status = PQresultStatus(_pPGresult);
+   return getData(qryRes);
+}
 
-   if ((status == PGRES_TUPLES_OK) || (status == PGRES_COMMAND_OK))
-   {
-      // PGRES_COMMAND_OK is for commands that can never return rows (INSERT or UPDATE without a RETURNING clause, etc.)
-      // successfull SELECT query returning no row result status from backend is PGRES_TUPLES_OK
+bool PgsqlResult::runPreparedQuery(PgsqlCommand& command)
+{
+   _qryStr = command.sqlCommandText();
 
-      // SELECT, CREATE TABLE AS, INSERT, UPDATE, DELETE, MOVE, FETCH, or COPY statement,
-      // or an EXECUTE of a prepared query that contains an INSERT, UPDATE, or DELETE statement
-      char* affRow = PQcmdTuples(_pPGresult);
-      if (*affRow)
-      {
-         int affRowI = atoi(affRow);
-         _affectedRows = (affRowI < 0) ? 0 : affRowI;
-      }
+   PGresult* qryRes = command.executePgResult();
+   if (qryRes == nullptr)
+      throw tbs::SqlException("runPreparedQuery, invalid PGresult pointer", "PgsqlResult");
 
-      if (status != PGRES_TUPLES_OK)
-      {
-         _nColumns = 0;
-         _nRows = 0;
-         _navigator.moveFirst();
-
-         if (_pConn->logExecuteStatus()) 
-            onNotifyTrace(_pConn->logId() + tbsfmt::format("SQL command executed successfully, affectedRows: {}", _affectedRows));
-      }
-      else
-      {
-         // get total columns and rows
-         _nRows    = PQntuples(_pPGresult);
-         _nColumns = PQnfields(_pPGresult);
-
-         if (_pConn->logExecuteStatus()) 
-            onNotifyTrace(_pConn->logId() + tbsfmt::format("SQL command executed successfully, row: {} column: {}, affectedRows: {}", _nRows, _nColumns, _affectedRows));
-
-         // we have total columns, now set up columns info
-         setupColumnProperties();
-      }
-
-      if (_nRows > 0)
-         _resultStatus = ResultStatus::tuplesOk;
-      else
-         _resultStatus = ResultStatus::commandOk;
-
-
-      _navigator.moveFirst();
-
-      return true;
-   }
-   else
-   {
-      // PGRES_EMPTY_QUERY, PGRES_COPY_OUT, PGRES_COPY_IN, PGRES_BAD_RESPONSE,
-      // PGRES_FATAL_ERROR, PGRES_COPY_BOTH
-
-      // clear the result
-      PQclear(_pPGresult);
-      _pPGresult = nullptr;
-
-      std::string errmsg = tbsfmt::format("execute, {}", _pConn->lastBackendError());
-      onNotifyError(_pConn->logId() + errmsg);
-      throw tbs::SqlException(errmsg, "PgsqlResult");
-   }
-
-   return false;
+   return getData(qryRes);
 }
 
 void PgsqlResult::connection(PgsqlConnection* conn)
 {
-   _pConn = conn;
+  _pConn = conn;
 }
 
 PgsqlConnection* PgsqlResult::connection() const { return _pConn; }
@@ -181,7 +175,7 @@ PgsqlResult::VariantType PgsqlResult::getVariantValue(const int columnIndex) con
       return std::monostate{};
 
    if (rawVal == nullptr)
-      throw std::runtime_error("invalid result received from backend");
+      throw SqlException("getVariantValue, invalid result received from backend", "PgsqlResult");
 
    try
    {
@@ -257,7 +251,16 @@ std::string PgsqlResult::getStringValue(const int columnIndex) const
       throw tbs::SqlException("getStringValue, invalid result received from backend", "PgsqlResult");
 
    DataType dataType = _columnInfoCollection[columnIndex].dataType;
-   if (dataType == DataType::varbinary)
+   if (dataType == DataType::boolean)
+   {
+      if (strcmp(rawVal, "t") == 0)
+         return "true";
+      if (strcmp(rawVal, "f") == 0)
+         return "false";
+
+      return std::string(rawVal); // fallback for any other backend text
+   }
+   else if (dataType == DataType::varbinary)
    {
       // skip \x
       if (strlen(rawVal) > 3)
@@ -286,6 +289,69 @@ bool PgsqlResult::isNullField(const int columnIndex) const
    return PQgetisnull(_pPGresult, _navigator.position(), columnIndex) != 0;
 }
 
+bool PgsqlResult::getData(PGresult* result)
+{
+   if (result == nullptr)   
+      throw tbs::SqlException("getData, invalid PGresult pointer", "PgsqlResult");
+
+   _pPGresult = result;
+
+   ExecStatusType status = PQresultStatus(_pPGresult);
+
+   if ((status == PGRES_TUPLES_OK) || (status == PGRES_COMMAND_OK))
+   {
+      // PGRES_COMMAND_OK is for commands that can never return rows (INSERT or UPDATE without a RETURNING clause, etc.)
+      // successfull SELECT query returning no row result status from backend is PGRES_TUPLES_OK
+
+      // SELECT, CREATE TABLE AS, INSERT, UPDATE, DELETE, MOVE, FETCH, or COPY statement,
+      // or an EXECUTE of a prepared query that contains an INSERT, UPDATE, or DELETE statement
+
+      if (status == PGRES_COMMAND_OK)
+      {
+         _affectedRows = PgsqlCommand::getAffectedRows(_pPGresult);
+         _nRows        = 0;
+         _nColumns     = 0;
+         _navigator.moveFirst();
+
+         if (_pConn->logExecuteStatus()) 
+            onNotifyDebug(_pConn->logId() + tbsfmt::format("SQL command executed successfully, affectedRows: {}", _affectedRows));
+      }
+      if (status == PGRES_TUPLES_OK)
+      {
+         _affectedRows = 0;
+         _nRows        = PQntuples(_pPGresult);
+         _nColumns     = PQnfields(_pPGresult);
+
+         if (_pConn->logExecuteStatus()) 
+            onNotifyDebug(_pConn->logId() + tbsfmt::format("SQL command executed successfully, row: {} column: {}, affectedRows: {}", _nRows, _nColumns, _affectedRows));
+
+         // we have total columns, now set up columns info
+         setupColumnProperties();
+      }
+
+      if (_nRows > 0)
+         _resultStatus = ResultStatus::tuplesOk;
+      else
+         _resultStatus = ResultStatus::commandOk;
+
+      _navigator.moveFirst();
+
+      return true;
+   }
+   else
+   {
+      // PGRES_EMPTY_QUERY, PGRES_COPY_OUT, PGRES_COPY_IN, PGRES_BAD_RESPONSE,
+      // PGRES_FATAL_ERROR, PGRES_COPY_BOTH
+      std::string errmsg = PQresultErrorMessage(_pPGresult);
+      PQclear(_pPGresult); // clear the result
+      errmsg = tbsfmt::format("getData, {}", errmsg );
+      onNotifyError(_pConn->logId() + errmsg);
+      throw SqlException(errmsg, "PgsqlResult");
+   }
+
+   return false;
+}
+
 void PgsqlResult::throwIfPgResultInvalid() const
 {
    if (_pPGresult == nullptr)
@@ -302,7 +368,8 @@ void PgsqlResult::setupColumnProperties()
    {
       _columnInfoCollection.emplace_back(ColumnInfo());
    }
-
+   
+   // temporarily disable sql processing log if possible
    SqlApplyLogInternal applyLogRule(_pConn);
 
    try

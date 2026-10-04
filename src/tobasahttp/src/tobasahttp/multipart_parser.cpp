@@ -193,8 +193,29 @@ MultipartParser::MultipartParser(const std::string& temporaryDir)
    _multipartBody = std::make_unique<MultipartBody>();
 }
 
-MultipartParser::~MultipartParser() 
-{}
+MultipartParser::~MultipartParser()
+{
+   cleanupTemporaryFiles();
+}
+
+void MultipartParser::cleanupTemporaryFiles()
+{
+   auto part = _multipartCtx.part;
+   if (part && part->isFile)
+   {
+      if (part->ofs.is_open())
+         part->ofs.close();
+
+      if (!part->location.empty())
+      {
+         std::error_code error;
+         fs::remove(part->location, error);
+      }
+   }
+
+   if (_multipartBody)
+      _multipartBody->cleanup(true);
+}
 
 MultipartBodyUPtr MultipartParser::multipartBody()
 {
@@ -209,6 +230,7 @@ bool MultipartParser::applyBoundary(std::string_view rawBoundary)
 
 void MultipartParser::prepareForNextMessage()
 {
+   cleanupTemporaryFiles();
    _contentDone      = false;
    _contentLength    = 0;
    _multipartCtx     = {};
@@ -261,8 +283,14 @@ void MultipartParser::temporaryDir(const std::string& path)
 //  If the boundary is Last Boundary, parsing completed.
 //  If not, We repeat parsing part's header (step 2)
 //
-Info MultipartParser::parse(const uint8_t *data, size_t totalData)
+Info MultipartParser::parse(const uint8_t *data, size_t totalData) try
 {
+   auto fail = [this](Info info)
+   {
+      cleanupTemporaryFiles();
+      return info;
+   };
+
    size_t lastIndex   = 0;
    size_t currentIdx  = 0;
    for (currentIdx = 0; currentIdx < totalData; ++currentIdx) 
@@ -390,7 +418,7 @@ Info MultipartParser::parse(const uint8_t *data, size_t totalData)
             // We finish when we received bytes equal to content-length
 
             if ( _multipartCtx.bytesDone == _contentLength && !_multipartCtx.lastBdry )
-               return withError("Multipart closing boundary not found", currentIdx);
+               return fail(withError("Multipart closing boundary not found", currentIdx));
 
             // One part finished, transfer the data from _multipartCtx to multipart content
             if ( _multipartCtx.bodyCompleted )
@@ -405,7 +433,7 @@ Info MultipartParser::parse(const uint8_t *data, size_t totalData)
             if ( _multipartCtx.bytesDone > _contentLength && _multipartCtx.lastBdry )
             {
                // we finished here.
-               return withError("Received more data than content-length", currentIdx);
+               return fail(withError("Received more data than content-length", currentIdx));
             }
          }
 
@@ -434,7 +462,7 @@ Info MultipartParser::parse(const uint8_t *data, size_t totalData)
             if (info.success())
               continue;
             else
-               return info;
+               return fail(std::move(info));
          }
       }
       else
@@ -472,12 +500,17 @@ Info MultipartParser::parse(const uint8_t *data, size_t totalData)
          else
          {
             // Invalid data in incoming buffer
-            return withError("Invalid data for multipart", currentIdx);
+            return fail(withError("Invalid data for multipart", currentIdx));
          }
       } // End read part's boundary
    }
 
    return withSuccess(lastIndex, _multipartCtx.bytesDone);
+}
+catch (...)
+{
+   cleanupTemporaryFiles();
+   throw;
 }
 
 } // namespace parser

@@ -2,12 +2,15 @@
 
 #include <algorithm>
 #include <functional>
+#include <charconv>
 #include <tobasa/logger.h>
 #include <tobasa/datetime.h>
 #include <tobasa/exception.h>
 #include <tobasa/bin_encode.h>
+#include <tobasa/util_string.h>
 #include <atlsafe.h>
 #include "tobasasql/adodb_util.h"
+#include "tobasasql/adodb_types.h"
 #include "tobasasql/com_variant_helper.h"
 
 /*
@@ -114,19 +117,14 @@ void ComVariantHelper::nativeVariantToString(const _variant_t& vSource, std::str
    {
       switch (vSource.vt)
       {
-         case VT_BOOL:     // True=-1, False=0
-            outStr = util::boolToStr(vSource.boolVal != 0);
+         case VT_BOOL:     // True = -1 (VARIANT_TRUE), False = 0
+            outStr = util::boolToStr(vSource.boolVal == VARIANT_TRUE);
             break;
          case VT_I1:       // signed char
-         {
-            char ch = (char)vSource.cVal;
-            outStr.append(1, ch);
-         }
+            outStr = std::to_string(static_cast<int>(vSource.cVal));
+            break;
          case VT_UI1:      // unsigned char
-         {
-            char ch = (char)vSource.bVal;
-            outStr.append(1, ch);
-         }
+            outStr = std::to_string(static_cast<unsigned int>(vSource.bVal));
             break;
          case VT_UI2:      // unsigned short             => uint16_t
             outStr = std::to_string(vSource.uiVal);
@@ -153,51 +151,64 @@ void ComVariantHelper::nativeVariantToString(const _variant_t& vSource, std::str
             outStr = std::to_string(vSource.llVal);
             break;
          case VT_R4:       // 4 byte real => Float
-            outStr = std::to_string(vSource.fltVal);
+         {
+            outStr = util::floatToString(vSource.fltVal);
             break;
+         }
          case VT_R8:       // 8 byte real => Double
-            outStr = std::to_string(vSource.dblVal);
+         {
+            outStr = util::doubleToString(vSource.dblVal);
             break;
-         case VT_DECIMAL:  // 16 byte fixed point
-         case VT_DATE:     // date
+         }
+         case VT_DECIMAL:  // 16 byte fixed point / numeric sql column / bigint
+         {
+            outStr = sql::decimalToString(vSource.decVal);
+            break;
+         }
          case VT_CY:       // currency
          case VT_BSTR:     // OLE Automation string => String
          {
             // Note: https://docs.microsoft.com/en-us/cpp/text/how-to-convert-between-various-string-types?view=msvc-160
             // note cast to char*, to correctly convert from _bstr_t
             //outStr = static_cast<const char*>(_bstr_t(vSource));
-            outStr = util::utf8_from_bstr_t(_bstr_t(vSource));
-            
+            outStr = sql::utf8_from_bstr_t(_bstr_t(vSource));
+            break;
+         }
+         case VT_DATE:
+         {
+            outStr = sql::utf8_from_bstr_t(_bstr_t(vSource));
             // for data type DATE, or adDbTimestamp,
             // data string format we get from ado is dd/mm/yyyy hh:mm:ss
-            if (vSource.vt == VT_DATE)
-            {
-               tbs::DateTime dt;
-               bool success = dt.parse(outStr, "%d/%m/%Y %H:%M:%S");
-               if (success)
-                  outStr = dt.isoDateTimeString();
-            }
-         }
+            tbs::DateTime dt;
+            if ( dt.parse(outStr, "%d/%m/%Y %H:%M:%S") )
+               outStr = dt.isoDateTimeString();
+            else if ( dt.parse(outStr, "%d/%m/%Y") )
+               outStr = dt.isoDateString();
+
             break;
+         }
          case VT_EMPTY:    // nothing
             outStr = "";
             break;
          case VT_NULL:     // SQL style null
             outStr = sql::NULLSTR;
             break;
+
          // 8209 _variant_t vt 8209 sql server binary data type
          // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
          // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+         // 
+         // When Driver={ODBC Driver 17 for SQL Server}, SQL TIME arrive as  
+         // binary array with size 12 Bytes
          case VT_ARRAY | VT_UI1:
          {
-            //#include <atlsafe.h>
             try
             {
                // Attach a safe array of int's
                CComSafeArray<BYTE> saData;
                saData.Attach(vSource.parray);
 
-               // Pull out some data...
+               auto arrSize = saData.GetCount();
                for(ULONG i = 0; i < saData.GetCount(); ++i)
                {
                   BYTE b = saData.GetAt(i);
@@ -205,14 +216,13 @@ void ComVariantHelper::nativeVariantToString(const _variant_t& vSource, std::str
                }
                // Release
                saData.Detach();
-
             }
             catch (const CAtlException)
             {
-                  throw std::exception("error converting CComSafeArray");
+               throw std::exception("error converting CComSafeArray");
             }
+            break;
          }
-         break;
          default:
             throw AppException("Unsupported COM variant type");
          break;
@@ -242,7 +252,7 @@ ComVariantHelper::NativeVariant ComVariantHelper::toNativeVariant(const VariantT
       {
          bool boolVal = std::get<bool>(variantVal);
          nativeVariant.vt = VT_BOOL;
-         nativeVariant.boolVal = boolVal;
+         nativeVariant.boolVal = boolVal ? VARIANT_TRUE : VARIANT_FALSE;
       }
       else if (std::holds_alternative<int8_t>(variantVal))
       {
@@ -330,7 +340,7 @@ ComVariantHelper::NativeVariant ComVariantHelper::toNativeVariant(const VariantT
           */
          // just assign the variant. nativeVariant may contain incorrect value
          // and lead to memory leak if we set its vt and bstrVal property manually
-         nativeVariant = util::utf8_to_bstr_t(strVal);
+         nativeVariant = sql::utf8_to_bstr_t(strVal);
       }
       else if (std::holds_alternative<std::wstring>(variantVal))
       {
@@ -358,6 +368,7 @@ ComVariantHelper::NativeVariant ComVariantHelper::toNativeVariant(const VariantT
          // 8209 _variant_t vt 8209 sql server binary data type
          // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
          // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+         
          nativeVariant.vt = VT_ARRAY | VT_UI1;
       }
       else if (std::holds_alternative<std::vector<char>>(variantVal))
@@ -392,100 +403,109 @@ ComVariantHelper::VariantType ComVariantHelper::fromNativeVariant(const _variant
    {
       switch (vSource.vt)
       {
-      case VT_BOOL:     // True=-1, False=0
-         return (vSource.boolVal == 1);
-      case VT_I1:       // signed char
-      {
-         std::string retVal;
-         char ch = (char)vSource.cVal;
-         retVal.append(1, ch);
-         return retVal;
-      }      
-      case VT_UI1:      // unsigned char
-      {
-         std::string retVal;
-         char ch = (char) vSource.bVal;
-         retVal.append(1, ch);
-         return retVal;
-      }
-      case VT_UI2:
-         return (uint16_t) vSource.uiVal;
-      case VT_I2:       // 2 byte signed int          => short
-         return (int16_t) vSource.iVal;
-      case VT_UINT:
-         return (uint32_t) vSource.uintVal;         
-      case VT_INT:      // 4 byte signed machine int  => int
-         return (int32_t) vSource.intVal;
-      case VT_UI4:
-         return (uint32_t) vSource.ulVal;
-      case VT_I4:       // 4 byte signed int          => long
-         return (int32_t) vSource.lVal;
-      case VT_UI8:
-         return (uint64_t) vSource.ullVal;
-      case VT_I8:       // 8 byte signed int          => long long
-         return (int64_t) vSource.llVal;
-      case VT_R4:       // 4 byte real => Float
-         return (float) vSource.fltVal;
-      case VT_R8:       // 8 byte real => Double
-         return (double) vSource.dblVal;
-      case VT_DECIMAL:  // 16 byte fixed point
-      case VT_DATE:     // date
-      case VT_CY:       // currency
-      case VT_BSTR:     // OLE Automation string => String
+         case VT_BOOL:     // True = -1, False=0
+            return (vSource.boolVal == VARIANT_TRUE);
+         case VT_I1:       // signed char
+         {
+            std::string retVal;
+            char ch = (char)vSource.cVal;
+            retVal.append(1, ch);
+            return retVal;
+         }
+         case VT_UI1:      // unsigned char
+         {
+            std::string retVal;
+            char ch = (char) vSource.bVal;
+            retVal.append(1, ch);
+            return retVal;
+         }
+         case VT_UI2:
+            return (uint16_t) vSource.uiVal;
+         case VT_I2:       // 2 byte signed int          => short
+            return (int16_t) vSource.iVal;
+         case VT_UINT:
+            return (uint32_t) vSource.uintVal;         
+         case VT_INT:      // 4 byte signed machine int  => int
+            return (int32_t) vSource.intVal;
+         case VT_UI4:
+            return (uint32_t) vSource.ulVal;
+         case VT_I4:       // 4 byte signed int          => long
+            return (int32_t) vSource.lVal;
+         case VT_UI8:
+            return (uint64_t) vSource.ullVal;
+         case VT_I8:       // 8 byte signed int          => long long
+            return (int64_t) vSource.llVal;
+         case VT_R4:       // 4 byte real => Float
+            return (float) vSource.fltVal;
+         case VT_R8:       // 8 byte real => Double
+            return (double) vSource.dblVal;
+         case VT_DECIMAL:  // 16 byte fixed point
+         {
+            return sql::utf8_from_bstr_t(_bstr_t(vSource));
+         }
+         case VT_DATE:     // date
+         case VT_CY:       // currency
+         case VT_BSTR:     // OLE Automation string => String
          {
             // Note: https://docs.microsoft.com/en-us/cpp/text/how-to-convert-between-various-string-types?view=msvc-160
             // note cast to char*, to correctly convert from _bstr_t
             //outStr = static_cast<const char*>(_bstr_t(vSource));
-            return util::utf8_from_bstr_t(_bstr_t(vSource));
+            return sql::utf8_from_bstr_t(_bstr_t(vSource));
          }
-      case VT_EMPTY:          // nothing
-         return std::string("");
-      case VT_NULL:           // SQL style null
-         return std::monostate{};
-      // 8209 _variant_t vt 8209 sql server binary data type
-      // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
-      // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
-      case VT_ARRAY | VT_UI1:
-      {
-         SAFEARRAY* safeArray = vSource.parray;
-         if (safeArray == nullptr || SafeArrayGetDim(safeArray) != 1)
-            throw AppException("Invalid COM byte array");
+         case VT_EMPTY:          // nothing
+            return std::string("");
+         case VT_NULL:           // SQL style null
+            return std::monostate{};
 
-         LONG lowerBound = 0;
-         LONG upperBound = -1;
-
-         if (FAILED(SafeArrayGetLBound(safeArray, 1, &lowerBound)) ||
-            FAILED(SafeArrayGetUBound(safeArray, 1, &upperBound)))
+         // 8209 _variant_t vt 8209 sql server binary data type
+         // Note: VT_ARRAY | VT_UI1 = 0x2000 | 0x0011 = 0x2011 = 8209
+         // One-dimensional SAFEARRAY whose element type is VT_UI1 (BYTE)
+         //
+         // Convert to std::vector<uint8_t>
+         //
+         case VT_ARRAY | VT_UI1:
          {
-            throw AppException("Could not determine COM byte array bounds");
-         }
+            SAFEARRAY* safeArray = vSource.parray;
+            if (safeArray == nullptr || SafeArrayGetDim(safeArray) != 1)
+               throw AppException("Invalid COM byte array");
 
-         const size_t count = static_cast<size_t>(upperBound - lowerBound + 1);
-         
-         //std::vector<uint8_t> resultVector(count);
-         std::string resultString;
-         if (count > 0)
-         {
-            BYTE* data = nullptr;
-            if (FAILED(SafeArrayAccessData(safeArray, reinterpret_cast<void**>(&data)))) {
-               throw AppException("Could not access COM byte array");
-            }
+            LONG lowerBound = 0;
+            LONG upperBound = -1;
 
-            //std::copy(data, data + count, resultVector.begin());
-            for (size_t i = 0; i < count; ++i)
+            if (FAILED(SafeArrayGetLBound(safeArray, 1, &lowerBound)) ||
+               FAILED(SafeArrayGetUBound(safeArray, 1, &upperBound)))
             {
-               tbs::byte_t b = data[i];
-               resultString += conv::decToHex(b);
+               throw AppException("Could not determine COM byte array bounds");
             }
 
-            SafeArrayUnaccessData(safeArray);
-         }
+            const size_t count = static_cast<size_t>(upperBound - lowerBound + 1);
 
-         //return resultVector;
-         return resultString;
-      }
-      default:
-         throw AppException("Unsupported COM variant type");
+            
+            std::vector<uint8_t> resultVector(count);
+            // std::string resultString;
+            if (count > 0)
+            {
+               BYTE* data = nullptr;
+               if (FAILED(SafeArrayAccessData(safeArray, reinterpret_cast<void**>(&data)))) {
+                  throw AppException("Could not access COM byte array");
+               }
+
+               std::copy(data, data + count, resultVector.begin());
+
+               // for (size_t i = 0; i < count; ++i)
+               // {
+               //    tbs::byte_t b = data[i];
+               //    resultString += conv::decToHex(b);
+               // }
+
+               SafeArrayUnaccessData(safeArray);
+            }
+
+            return resultVector;
+            // return resultString;
+         }
+         default:
+            throw AppException("Unsupported COM variant type");
       }
    }
    catch (_com_error& e)
@@ -498,6 +518,59 @@ ComVariantHelper::VariantType ComVariantHelper::fromNativeVariant(const _variant
       throw AppException(e);
    }
 }
+
+
+std::string ComVariantHelper::time2ToString(const _variant_t& value)
+{
+   if (value.vt != (VT_ARRAY | VT_UI1))
+      throw AppException("Expected VT_ARRAY | VT_UI1");
+
+   SAFEARRAY* sa = value.parray;
+
+   if (sa == nullptr)
+      throw AppException("TIME value has null SAFEARRAY");
+
+   if (sa->cDims != 1)
+      throw AppException("TIME value must be a one-dimensional SAFEARRAY");
+
+   if (sa->cbElements != sizeof(BYTE))
+      throw AppException("TIME SAFEARRAY must contain bytes");
+
+   LONG lower = 0;
+   LONG upper = -1;
+
+   HRESULT hr = SafeArrayGetLBound(sa, 1, &lower);
+
+   if (FAILED(hr))
+      throw AppException("Failed to get SAFEARRAY lower bound");
+
+   hr = SafeArrayGetUBound(sa, 1, &upper);
+
+   if (FAILED(hr))
+      throw AppException("Failed to get SAFEARRAY upper bound");
+
+   const LONG size = upper - lower + 1;
+
+   if (size != sizeof(sql::AdoDbTime2))
+      throw AppException("Invalid DBTIME2 size");
+
+   sql::AdoDbTime2 time{};
+
+   for (LONG i = lower; i <= upper; ++i)
+   {
+      BYTE b = 0;
+
+      hr = SafeArrayGetElement(sa, &i, &b);
+
+      if (FAILED(hr))
+         throw AppException("Failed to read DBTIME2");
+
+      reinterpret_cast<BYTE*>(&time)[i - lower] = b;
+   }
+
+   return sql::adoDbTime2ToString(time);
+}
+
 
 } // namespace tbs
 

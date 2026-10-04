@@ -118,10 +118,10 @@ private:
    bool     _streaming                 { false };
 
    // gzip compression buffer/state used when Response requests gzip encoding
-   void*    _gzipState                 {nullptr};
-   bool     _gzipStreamingActive       {false};
+   void*    _gzipState                 { nullptr };
+   bool     _gzipStreamingActive       { false };
 
-   bool     _preparedForCompression    {false};
+   bool     _preparedForCompression    { false };
 public:
    Response(HttpVersion httpVersion);
    ~Response();
@@ -166,8 +166,8 @@ public:
    bool useChunkedEncoding() const          { return _useChunkedEncoding; }
    void useChunkedEncoding(bool val)        { _useChunkedEncoding = val; }
 
-   bool streaming() const                  { return _streaming; }
-   void streaming(bool val)                { _streaming = val; }
+   bool streaming() const                   { return _streaming; }
+   void streaming(bool val)                 { _streaming = val; }
 
    void isHeadRequest(bool value)           { _isHeadRequest = value; }
    bool isHeadRequest() const               { return _isHeadRequest; } 

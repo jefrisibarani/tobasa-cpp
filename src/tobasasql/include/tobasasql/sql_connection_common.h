@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <tobasa/self_counter.h>
 #include <tobasa/notifier.h>
 #include "tobasasql/common_types.h"
@@ -19,7 +20,17 @@ class ConnectionCommon : public Notifier
 {
 public:
    /// Constructor.
-   ConnectionCommon();
+   ConnectionCommon() noexcept;
+
+   /// Copying is disabled because the owning subclasses manage raw native handles.
+   ConnectionCommon(const ConnectionCommon&) = delete;
+   ConnectionCommon& operator=(const ConnectionCommon&) = delete;
+
+   /// Move constructor.
+   ConnectionCommon(ConnectionCommon&& other) noexcept;
+
+   /// Move assignment.
+   ConnectionCommon& operator=(ConnectionCommon&& other) noexcept;
 
    /// Destructor.
    ~ConnectionCommon();

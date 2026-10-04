@@ -35,13 +35,13 @@ struct MultipartContext
    bool           bodyCompleted   {false};
    
    // temporary folder to store uploaded file
-   std::string    temporaryDir       {};
+   std::string    temporaryDir    {};
    
    // Tail buffer from last data chunk.
    // size is bdryTokenEndLen
-   std::vector<uint8_t> tailBuffer  {};
+   std::vector<uint8_t> tailBuffer {};
 
-   MultipartBody::PartPtr part    {nullptr};
+   MultipartBody::PartPtr part     {nullptr};
 
    MultipartContext();
    
@@ -68,10 +68,12 @@ private:
    MultipartBodyUPtr _multipartBody    {nullptr};
 
    // Multipart with Chunked Transfer Encoding
-   bool              _chunkedMultipart  {false};
+   bool              _chunkedMultipart {false};
    
    std::string       _tmpDir           {};
    std::string       _id               {0}; // for debugging
+
+   void cleanupTemporaryFiles();
 
 public:
    MultipartParser(const std::string& temporaryDir="");

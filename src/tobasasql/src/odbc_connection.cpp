@@ -1,5 +1,6 @@
 #include <tobasa/variant_helper.h>
 #include "tobasasql/odbc_util.h"
+#include "tobasasql/odbc_command.h"
 #include "tobasasql/odbc_connection.h"
 
 namespace tbs {
@@ -7,10 +8,43 @@ namespace sql {
 
 OdbcConnection::OdbcConnection()
    : ConnectionCommon()
+   , _pDbc(nullptr)
+   , _pEnv(nullptr)
 {
-   _pDbc          = nullptr;
-   _pEnv          = nullptr;
    notifierSource = "OdbcConnection";
+}
+
+OdbcConnection::OdbcConnection(OdbcConnection&& other) noexcept
+   : ConnectionCommon(std::move(other))
+   , _dbmsName(    std::move(other._dbmsName))
+   , _dbmsVersion( std::move(other._dbmsVersion))
+   , _pEnv(        other._pEnv)
+   , _pDbc(        other._pDbc)
+{
+   other._dbmsName.clear();
+   other._dbmsVersion.clear();
+   other._pEnv = nullptr;
+   other._pDbc = nullptr;
+}
+
+OdbcConnection& OdbcConnection::operator=(OdbcConnection&& other) noexcept
+{
+   if (this != &other)
+   {
+      disconnect();
+      ConnectionCommon::operator=(std::move(other));
+
+      _dbmsName    = std::move(other._dbmsName);
+      _dbmsVersion = std::move(other._dbmsVersion);
+      _pEnv        = other._pEnv;
+      _pDbc        = other._pDbc;
+
+      other._dbmsName.clear();
+      other._dbmsVersion.clear();
+      other._pEnv = nullptr;
+      other._pDbc = nullptr;
+   }
+   return *this;
 }
 
 OdbcConnection::~OdbcConnection()
@@ -140,8 +174,14 @@ ConnectionStatus OdbcConnection::status()
 int OdbcConnection::execute(const std::string& sql, const SqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
-      throw tbs::SqlException("Invalid connection status", "OdbcConnection");
+      return -1;
 
+   OdbcCommand cmd(this);
+   if (cmd.query(sql, parameters))
+      return cmd.execute();
+   else
+      return -1;
+   /*
    if (logSqlQuery())
       onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
 
@@ -165,7 +205,7 @@ int OdbcConnection::execute(const std::string& sql, const SqlParameterCollection
    if (rc == SQL_NEED_DATA)
    {
       // process data-at-execution parameters
-      rc = sqlPutData(pStmt, parameters);
+      rc = OdbcCommand::sqlPutData(this, pStmt, parameters);
    }
 
    if (SQL_SUCCEEDED(rc) || rc == SQL_NO_DATA)
@@ -207,13 +247,20 @@ int OdbcConnection::execute(const std::string& sql, const SqlParameterCollection
       statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
 
    return -1;
+   */
 }
 
 std::string OdbcConnection::executeScalar(const std::string& sql, const SqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
-      throw tbs::SqlException("Invalid connection status", "OdbcConnection");
+      return "";
 
+   OdbcCommand cmd(this);
+   if (cmd.query(sql, parameters))
+      return cmd.executeScalar();
+   else 
+      return "";
+/*
    if (logSqlQuery())
       onNotifyDebug(logId() + tbsfmt::format("executeScalar: {}", sql));
 
@@ -237,7 +284,7 @@ std::string OdbcConnection::executeScalar(const std::string& sql, const SqlParam
    if (rc == SQL_NEED_DATA)
    {
       // process data-at-execution parameters
-      rc = sqlPutData(pStmt, parameters);
+      rc = OdbcCommand::sqlPutData(this, pStmt, parameters);
    }
 
    if (SQL_SUCCEEDED(rc) || rc == SQL_NO_DATA)
@@ -276,7 +323,7 @@ std::string OdbcConnection::executeScalar(const std::string& sql, const SqlParam
       if (SQL_SUCCEEDED(rc))
       {
          // column index start from 1
-         VariantType vdata = getFieldData(pStmt, 1);
+         VariantType vdata = OdbcCommand::getFieldData(this, pStmt, 1);
 
          // clean statement
          SQLFreeHandle(SQL_HANDLE_STMT, pStmt);
@@ -289,6 +336,7 @@ std::string OdbcConnection::executeScalar(const std::string& sql, const SqlParam
       statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
 
    return "";
+   */
 }
 
 std::string OdbcConnection::versionString()
@@ -360,212 +408,9 @@ SQLHSTMT OdbcConnection::allocateStatement()
    return pStmt;
 }
 
-OdbcConnection::VariantType OdbcConnection::getFieldData(SQLHSTMT pStmt, int col)
+SQLHDBC OdbcConnection::nativeConnection() const
 {
-   if (col < 0)
-      throw tbs::SqlException("Invalid column index in getFieldData", "OdbcConnection");
-
-   SQLRETURN   rc;
-   SQLSMALLINT buflen;
-   SQLLEN      colType = 0;
-
-   rc = SQLColAttribute(
-         pStmt,               // SQLHSTMT        StatementHandle,
-         col,                 // SQLUSMALLINT    ColumnNumber
-         SQL_DESC_TYPE,       // SQLUSMALLINT    FieldIdentifier
-         NULL,                // SQLPOINTER      CharacterAttributePtr
-         0,                   // SQLSMALLINT     BufferLength
-         &buflen,             // SQLSMALLINT *   StringLengthPtr
-         (SQLLEN*)&colType);  // SQLLEN *        NumericAttributePtr
-
-   statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-   switch (colType)
-   {
-      case SQL_FLOAT:
-      case SQL_REAL:
-      {
-         float  ret;
-         SQLLEN sqlPtr;
-
-         rc = SQLGetData(
-            pStmt,               // SQLHSTMT       StatementHandle
-            col,                 // SQLUSMALLINT   Col_or_Param_Num
-            SQL_C_FLOAT,         // SQLSMALLINT    TargetType
-            &ret,                // SQLPOINTER     TargetValuePtr
-            0,                   // SQLLEN         BufferLength
-            (SQLLEN*)&sqlPtr);   // SQLLEN *       StrLen_or_IndPtr
-
-         statementDiagRecord(pStmt, rc).throwOnError(this);
-
-         if (sqlPtr == SQL_NULL_DATA)
-            return std::monostate{};
-         else
-            return ret;
-      }
-      break;
-
-      case SQL_DOUBLE:
-      {
-         double ret;
-         SQLLEN sqlPtr;
-
-         rc = SQLGetData(
-            pStmt,               // SQLHSTMT       StatementHandle
-            col,                 // SQLUSMALLINT   Col_or_Param_Num
-            SQL_C_DOUBLE,        // SQLSMALLINT    TargetType
-            &ret,                // SQLPOINTER     TargetValuePtr
-            0,                   // SQLLEN         BufferLength
-            (SQLLEN*)&sqlPtr);   // SQLLEN *       StrLen_or_IndPtr
-
-         statementDiagRecord(pStmt, rc).throwOnError(this);
-
-         if (sqlPtr == SQL_NULL_DATA)
-            return std::monostate{};
-         else
-            return ret;
-      }
-      break;
-
-#if 0
-      case SQL_DATETIME:
-      {
-         TIMESTAMP_STRUCT  ret;
-         SQLLEN            sqlPtr;
-
-         rc = SQLGetData(
-            pStmt,
-            col,
-            SQL_C_TIMESTAMP,
-            &ret,
-            sizeof(ret),
-            &sqlPtr);
-
-         statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-         // Mark this field as retrieved
-         // Record whether this field is NULL
-         if (sqlPtr == SQL_NULL_DATA) {
-            return std::monostate{};
-         }
-         else
-         {
-            DateTime dt(ret.day, DateTime::Month(ret.month - 1), ret.year, ret.hour, ret.minute, ret.second, ret.fraction);
-            return dt;
-         }
-      }
-      break;
-#endif // if 0
-
-      default:
-      {
-         // Getting long/large size data
-         // https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/getting-long-data?view=sql-server-ver15
-
-         std::string strValue;
-         SQLLEN valueLenOrInd;
-         SQLLEN dataRetrieved = 0;
-
-         // allocate 512 void* pointer, on 64bit machine, sizeof pointer is 8 byte
-         // buffer will have 4096 bytes
-         SQLPOINTER  buffer[512] = { 0 };
-         SQLLEN      bufferLen = sizeof(buffer);
-
-         while (true)
-         {
-            rc = SQLGetData(
-                  pStmt,                    // SQLHSTMT       StatementHandle
-                  col,                      // SQLUSMALLINT   Col_or_Param_Num
-                  SQL_C_TCHAR,              // SQLSMALLINT    TargetType
-                  buffer,                   // SQLPOINTER     TargetValuePtr
-                  bufferLen,                // SQLLEN         BufferLength ( in bytes)
-                  (SQLLEN*)&valueLenOrInd); // SQLLEN *       StrLen_or_IndPtr
-
-            statementDiagRecord(pStmt, rc).throwOnError(this);
-
-            if (SQL_SUCCEEDED(rc))
-            {
-               /*
-               if (rc == SQL_SUCCESS_WITH_INFO)
-               {
-                  // we may got "[Microsoft][ODBC Driver 17 for SQL Server]String data, right truncation"  here
-                  //OdbcDiagRecord diag(pStmt, SQL_HANDLE_STMT, rc);
-                  onNotifyTrace(logId() + tbsfmt::format("[{}] {}", diag.state(), diag.message()));
-               }
-               */
-               dataRetrieved = (valueLenOrInd > bufferLen) || (valueLenOrInd == SQL_NO_TOTAL) ? bufferLen : valueLenOrInd;
-
-               if (dataRetrieved > 0)
-               {
-                  std::string tmp = tbs::util::odbcString_to_utf8((const SQLTCHAR*)buffer);
-                  strValue += tmp;
-               }
-               else if (valueLenOrInd == SQL_NULL_DATA)
-                  return std::monostate{};
-            }
-            else if (rc == SQL_SUCCESS || rc == SQL_NO_DATA) {
-               break;
-            }
-            else 
-            {
-               // TODO_JEFRI:
-               // SQL_STILL_EXECUTING
-               //statementDiagRecord(pStmt, rc).throwException(this);
-               break;
-            }
-         }
-
-         if (SQL_NO_DATA)
-         {
-            // TODO_JEFRI
-         }
-
-         // note colType=-3 (MySql VARBINARY)
-
-         switch (colType)
-         {
-            case SQL_CHAR:
-            case SQL_VARCHAR:
-            case SQL_LONGVARCHAR:
-            case SQL_WCHAR:
-            case SQL_WVARCHAR:
-            case SQL_WLONGVARCHAR:
-               return strValue;
-            case SQL_SMALLINT:
-            case SQL_TINYINT:
-               return std::stoi(strValue);
-            case SQL_INTEGER:
-               return std::stol(strValue);
-            case SQL_BIGINT:
-               return static_cast<int64_t>(std::stoll(strValue));
-            case SQL_FLOAT:
-            case SQL_REAL:
-               return std::stof(strValue);
-            case SQL_DOUBLE:
-               return std::stod(strValue);
-            case SQL_DATETIME:
-            case SQL_DECIMAL:
-            case SQL_NUMERIC:
-            case SQL_TYPE_DATE:
-               // Note; https://docs.microsoft.com/en-us/sql/relational-databases/native-client-odbc-date-time/data-type-support-for-odbc-date-and-time-improvements?view=sql-server-ver15
-            case -154:    // SQL_SS_TIME2	-154 (SQLNCLI.h)
-            case SQL_TYPE_TIME:
-            case -155:   // SQL_SS_TIMESTAMPOFFSET	-155 (SQLNCLI.h)
-            case SQL_TYPE_TIMESTAMP:
-               return strValue;
-            case SQL_BIT:
-               return util::strToBool(strValue);
-            case SQL_VARBINARY:
-            case SQL_LONGVARBINARY:
-               return strValue;
-            default:
-               return strValue;
-         }
-
-         return strValue;
-      }
-      break;
-   }
+   return _pDbc;
 }
 
 bool OdbcConnection::getColumns(std::vector<std::string>& columnNames, const std::string& table)
@@ -811,71 +656,6 @@ bool OdbcConnection::getPrimaryKeyColumns(std::vector<std::string>& primaryKeyCo
    pStmt = nullptr;
 
    return true;
-}
-
-SQLRETURN OdbcConnection::sqlPutData(SQLHSTMT pStmt, const SqlParameterCollection& parameters)
-{
-   // Supply data-at-execution
-   // Note: https://docs.microsoft.com/en-us/sql/odbc/reference/develop-app/sending-long-data?view=sql-server-ver15
-
-   SQLRETURN rc;
-
-   // find parameter
-   SQLPOINTER pParamPos;
-   rc = SQLParamData(pStmt, &pParamPos);
-
-   // for each parameters that need to send data in segments
-   while (rc == SQL_NEED_DATA)
-   {
-#if defined(_MSC_VER)
-      unsigned long paramPos = PtrToUlong(pParamPos);
-#else
-      unsigned long paramPos = (unsigned long)(unsigned long*) pParamPos;
-#endif
-      // we need SqlParameter object not OdbcParameter, because SqlParameter holds actual data
-      auto& param = parameters[paramPos-1];
-
-      onNotifyTrace(logId() + tbsfmt::format("sqlPutData: Processing data-at-execution parameter no: {} name: {}", paramPos, param->name() ));
-
-      // the raw binary data pointer
-      SQLLEN   lbytes = (SQLLEN) param->size();
-      uint8_t* pBlob  = *(param->valueBinaryPtr());
-      constexpr SQLLEN PUTDATA_BUFFER = 512;
-
-      if (lbytes < PUTDATA_BUFFER) {
-         rc = SQLPutData(pStmt, (SQLPOINTER)pBlob, lbytes);
-      }
-      else
-      {
-         // Send data in segment
-         while (lbytes > PUTDATA_BUFFER)
-         {
-            rc = SQLPutData(pStmt, (SQLPOINTER)pBlob, PUTDATA_BUFFER);
-
-            onNotifyTrace(logId() + tbsfmt::format("sqlPutData: parameter no: {} name: {}, bytes remaining {}:", paramPos, param->name(), lbytes ));
-
-            if ((rc != SQL_SUCCESS) && (rc != SQL_SUCCESS_WITH_INFO)) {
-               statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-            }
-
-            pBlob  += PUTDATA_BUFFER;
-            lbytes -= PUTDATA_BUFFER;
-         }
-
-         // Put final segment
-         rc = SQLPutData(pStmt, (SQLPOINTER)pBlob, lbytes);
-         onNotifyTrace(tbsfmt::format("sqlPutData: parameter no: {} name: {}, final bytes {}:", paramPos, param->name(),lbytes ));
-      }
-
-      if ( (rc != SQL_SUCCESS) && (rc != SQL_SUCCESS_WITH_INFO) ) {
-         statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-      }
-
-      // ask for next parameter
-      rc = SQLParamData(pStmt, &pParamPos);
-   }
-
-   return rc;
 }
 
 bool OdbcConnection::environmentAndConnectionHandleAlive()

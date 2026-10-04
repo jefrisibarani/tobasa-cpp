@@ -4,10 +4,46 @@
 namespace tbs {
 namespace sql {
 
-ConnectionCommon::ConnectionCommon()
+ConnectionCommon::ConnectionCommon() noexcept
    : _connStatus { ConnectionStatus::bad }
+   , _logIdentifier()
+   , _logSqlQuery(true)
+   , _logExecuteStatus(true)
+   , _logSqlQueryInternal(false)
 {
-   _logIdentifier = "";
+}
+
+ConnectionCommon::ConnectionCommon(ConnectionCommon&& other) noexcept
+   : _connStatus(          other._connStatus)
+   , _logIdentifier(       std::move(other._logIdentifier))
+   , _logSqlQuery(         other._logSqlQuery)
+   , _logExecuteStatus(    other._logExecuteStatus)
+   , _logSqlQueryInternal( other._logSqlQueryInternal)
+{
+   other._connStatus          = ConnectionStatus::bad;
+   other._logIdentifier.clear();
+   other._logSqlQuery         = true;
+   other._logExecuteStatus    = true;
+   other._logSqlQueryInternal = false;
+}
+
+ConnectionCommon& ConnectionCommon::operator=(ConnectionCommon&& other) noexcept
+{
+   if (this != &other)
+   {
+      _connStatus          = other._connStatus;
+      _logIdentifier       = std::move(other._logIdentifier);
+      _logSqlQuery         = other._logSqlQuery;
+      _logExecuteStatus    = other._logExecuteStatus;
+      _logSqlQueryInternal = other._logSqlQueryInternal;
+
+      other._connStatus          = ConnectionStatus::bad;
+      other._logIdentifier.clear();
+      other._logSqlQuery         = true;
+      other._logExecuteStatus    = true;
+      other._logSqlQueryInternal = false;
+   }
+   return *this;
 }
 
 ConnectionCommon::~ConnectionCommon() {}

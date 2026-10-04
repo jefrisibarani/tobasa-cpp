@@ -157,12 +157,12 @@ public:
          else if (std::holds_alternative<float>(variantValue))
          {
             auto val = std::get<float>(variantValue);
-            return std::to_string(val);
+            return util::floatToString(val);
          }
          else if (std::holds_alternative<double>(variantValue))
          {
             auto val = std::get<double>(variantValue);
-            return std::to_string(val);
+            return util::doubleToString(val);
          }
          else if (std::holds_alternative<std::string>(variantValue))
          {

@@ -14,8 +14,9 @@ namespace sql {
  * Simple query result class
  */
 template <typename VariantTypeImplemented>
-struct DataSet
+class DataSet
 {
+public:   
    using VariantType   = VariantTypeImplemented;
    using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
@@ -23,9 +24,9 @@ struct DataSet
    VectorVariant& addRow()
    {
       VectorVariant row;
-      data.emplace_back( std::move(row) );
-      size_t count = data.size();
-      return data.at(count-1);
+      _data.emplace_back( std::move(row) );
+      size_t count = _data.size();
+      return _data.at(count-1);
    }
 
    VectorVariant& addRow(int totalColumns)
@@ -36,14 +37,21 @@ struct DataSet
          row.emplace_back( std::move( VariantType()) );
       }
 
-      data.emplace_back(std::move(row));
-      size_t count = data.size();
-      return data[count-1];   
+      _data.emplace_back(std::move(row));
+      size_t count = _data.size();
+      return _data[count-1];
    }
 
-   long totalRows;
-   int totalColumns;
-   RecordVariant data;
+   RecordVariant& data() { return _data; }
+
+   size_t empty() const { return _data.empty(); }
+   long totalRows() const { return static_cast<long>(_data.size()); }
+   int totalColumns() const { return _nCols;}
+   void totalColumns(long val) { _nCols = val;}
+
+private:
+   RecordVariant _data;
+   int _nCols  = 0;
 };
 
 /** @}*/

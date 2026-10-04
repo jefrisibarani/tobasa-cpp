@@ -60,7 +60,7 @@ private:
 
    /// Request id, incremented for each new request in the same connection
    /// we use Parser id as request id
-   uint32_t           _id            {0}; 
+   uint32_t           _id           {0}; 
 
 public:
 

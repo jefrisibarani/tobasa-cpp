@@ -87,6 +87,10 @@
             TBS.log('[EVT ] SSE connection ID: ' + eventMessage.data.sseConnIdentity);
             TBS.sseConnIdentity = eventMessage.data.sseConnIdentity;
          }
+         if (eventMessage.data && eventMessage.data.clientEventIdentity !== undefined) {
+            TBS.log('[EVT ] SSE connection ID: ' + eventMessage.data.clientEventIdentity);
+            TBS.sseConnIdentity = eventMessage.data.clientEventIdentity;
+         }
       }
 
       function handleNotificationEvent(eventMessage)

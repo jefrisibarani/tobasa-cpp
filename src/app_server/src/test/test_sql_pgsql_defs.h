@@ -4,8 +4,10 @@
 #include "util_u8.h"
 
 /*
+   NOTE: Save this file as UTF-8 with BOM so the Unicode text in this test is preserved correctly.
+
    Sample connection string:
-   "dbname=coba user=postgres password=xxxxx hostaddr=10.62.22.2 port=5412"
+   "dbname=coba user=tbs_user password=xxxxx hostaddr=127.0.0.1 port=5432"
 */
 
 namespace testpgsql {

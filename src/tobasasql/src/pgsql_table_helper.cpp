@@ -1,6 +1,6 @@
 #include <string>
 #include "tobasasql/column_info.h"
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 #include "tobasasql/pgsql_util.h"
 #include "tobasasql/pgsql_table_helper.h"
 

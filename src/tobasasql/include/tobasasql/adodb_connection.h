@@ -25,6 +25,12 @@ public:
    AdodbConnection();
    ~AdodbConnection();
 
+   AdodbConnection(const AdodbConnection&) = delete;
+   AdodbConnection& operator=(const AdodbConnection&) = delete;
+
+   AdodbConnection(AdodbConnection&& other) noexcept;
+   AdodbConnection& operator=(AdodbConnection&& other) noexcept;
+
    std::string name() const;
    bool connect(const std::string& connString);
    bool disconnect();
@@ -41,8 +47,7 @@ public:
     * \param sql         Sql command query
     * \param parameters  AdoParameter collection.
     */
-   int execute(
-      const std::string& sql,
+   int execute(const std::string& sql,
       const AdoParameterCollection& parameters = AdoParameterCollection());
 
    /** 
@@ -56,13 +61,11 @@ public:
     *  If the SQL command produces a result set (e.g. SELECT), the result is ignored
     *  and the affected row count is reported as 0.
     *
-    * \param      sql           SQL command query
-    * \param[out] affectedRows  Record(s) affected by executed sql command
-    * \param[in]  parameters    Collection of AdoParameter.
+    * \param      sql             SQL command query
+    * \param[out] outAffectedRows Record(s) affected by executed sql command
+    * \param[in]  parameters      Collection of AdoParameter.
     */
-   bool execute(
-      const std::string& sql,
-      int& affectedRows,
+   bool execute(const std::string& sql, int& outAffectedRows,
       const AdoParameterCollection& parameters = AdoParameterCollection());
 
    /** 
@@ -73,8 +76,7 @@ public:
     * \param sql        SQL command query with placeholders.
     * \param parameters Collection of parameters to bind to the query.
     */
-   std::string executeScalar(
-      const std::string& sql,
+   std::string executeScalar(const std::string& sql,
       const AdoParameterCollection& parameters = AdoParameterCollection());
 
    std::string versionString();
@@ -96,7 +98,7 @@ public:
    // -------------------------------------------------------
    
    /// Get pointer to native driver's connection object.
-   ADODB::_ConnectionPtr nativeConn() const;
+   ADODB::_ConnectionPtr nativeConnection() const;
 
    bool tableOrViewExists(const std::string& tableName, bool checkTable);
 

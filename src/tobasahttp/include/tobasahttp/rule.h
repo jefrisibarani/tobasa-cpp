@@ -48,6 +48,11 @@ inline bool isDelimiter(unsigned char c)
    return ("\"(),/:;<=>?@[\\]{}\t"sv.find_first_of(c) != std::string_view::npos);
 }
 
+inline bool isToken(unsigned char c)
+{
+   return c > 32 && c < 127 && !isDelimiter(c);
+}
+
 inline bool isChar(unsigned char c)
 {
    return (c >= 1 && c <= 126);
@@ -55,7 +60,7 @@ inline bool isChar(unsigned char c)
 
 inline bool isVchar(unsigned char c)
 {
-   return (c >= 21 && c <= 126);
+   return (c >= 33 && c <= 126);
 }
 
 inline bool isCtl(unsigned char c)

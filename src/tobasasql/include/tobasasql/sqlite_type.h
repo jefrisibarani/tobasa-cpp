@@ -16,7 +16,7 @@ enum class SqliteType
 {
    null     = SQLITE_NULL,
    integer  = SQLITE_INTEGER,
-   real     = SQLITE_FLOAT,
+   real     = SQLITE_FLOAT,     // Float, Double, Real
    text     = SQLITE3_TEXT,
    blob     = SQLITE_BLOB,
    unknown  = -1

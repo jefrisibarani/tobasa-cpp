@@ -25,12 +25,11 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
 {
    using namespace tbs::http;
 
-   const auto& req = context->request();
-
-   // pass request to next handler if we don't have body reader
-   if ( !context->request()->hasMultipart() && context->getBodyReader() == nullptr )
+   if (!context->request()->hasMultipart())
       return next(context);
 
+   if (!context->getBodyReader())
+      throw std::runtime_error("Missing MultipartBodyReader for multipart request");
 
    auto parser = std::make_shared<http::parser::MultipartParser>(_option.temporaryDir);
    // set id for debugging
@@ -54,7 +53,7 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
       {
          auto boundary = media.find("boundary");
          if ( boundary && boundary->valid() && parser->applyBoundary(boundary->value()) )
-            req->multipartBody(std::make_unique<MultipartBody>());
+            context->request()->multipartBody(std::make_unique<MultipartBody>());
          else 
             throw std::runtime_error("Invalid multipart boundary");
       }
@@ -67,9 +66,14 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
    //
    // The trick is to call next middleware and informing ServerConnection, after we got all data.
    // We also move parser into this callback
+   auto nextHandler = _nextHandler;
    auto dataHandler = 
-      [&, mparser=std::move(parser)](const uint8_t *data, size_t totalData) 
+      [weakContext = std::weak_ptr<http::Context>{context}, nextHandler = std::move(nextHandler), mparser=std::move(parser)](const uint8_t *data, size_t totalData) 
       {
+         auto context = weakContext.lock();
+         if (!context)
+            return http::parser::Info{false, "HTTP context is no longer available", 0, {}, 0};
+
          auto info = mparser->parse(data, totalData);
          if (info.success())
          {
@@ -77,12 +81,12 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
             {
                info.message("multipart-done");
 
-               req->multipartBody(std::move( mparser->multipartBody() ) );
+               context->request()->multipartBody(std::move( mparser->multipartBody() ) );
                context->getBodyReader()->done(true);
-               if (_nextHandler)
+               if (nextHandler)
                {
                   // resume pipeline
-                  auto nextStatus = _nextHandler(context);
+                  auto nextStatus = nextHandler(context);
                   context->complete(nextStatus);
                } 
                else

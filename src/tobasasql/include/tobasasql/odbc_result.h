@@ -4,7 +4,9 @@
 #include <memory>
 #include <tobasa/navigator.h>
 #include "tobasasql/sql_result_common.h"
+#include "tobasasql/sql_dataset.h"
 #include "tobasasql/odbc_connection.h"
+#include "tobasasql/odbc_command.h"
 
 namespace tbs {
 namespace sql {
@@ -25,11 +27,20 @@ class OdbcResult : public ResultCommon
 {
 public:
 
-   using VariantType   = tbs::DefaultVariantType;
+   using VariantType   = DefaultVariantType;
+   using VariantHelper = VariantHelper<VariantType>;
    using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
+   using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;
 
    OdbcResult(OdbcConnection* pconn = nullptr);
+
+   OdbcResult(const OdbcResult&) = delete;
+   OdbcResult& operator=(const OdbcResult&) = delete;
+
+   OdbcResult(OdbcResult&& other) noexcept;
+   OdbcResult& operator=(OdbcResult&& other) noexcept;
+
    ~OdbcResult();
 
    // -------------------------------------------------------
@@ -59,7 +70,10 @@ public:
     */
    virtual bool runQuery(
       const std::string& sql,
-      const SqlParameterCollection& parameters = SqlParameterCollection());
+      const SqlParameterCollection& parameters = {},
+      ParameterStyle paramStyle = ParameterStyle::named );
+
+   bool runPreparedQuery(OdbcCommand& command);
 
    /// Set specific driver sql connection class implementation.
    virtual void connection(OdbcConnection* conn);
@@ -88,16 +102,15 @@ public:
    // TODO_JEFRI : Fix this
    virtual bool isNullField(const int columnIndex) const;
 
+   bool getData(DataSetPtr dataSet, SQLHSTMT stmt);
+
 private:
 
    /// Setup column informations.
-   void setupColumnProperties();
+   void setupColumnProperties(SQLHSTMT stmt);
 
    /// Cached data from backend.
-   RecordVariant _dataVariant;
-
-   /// Odbc driver native statement pointer.
-   SQLHSTMT _pStatement;
+   DataSetPtr _pDataset;
 
    /// Implemented Odbc connection object.
    OdbcConnection* _pConn;

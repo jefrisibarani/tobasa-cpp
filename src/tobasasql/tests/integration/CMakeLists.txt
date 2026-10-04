@@ -1,0 +1,19 @@
+if(TOBASA_BUILD_SQLDB_INTEGRATION_TESTS AND TOBASA_SQL_USE_MYSQL)
+   add_subdirectory(mysql)
+endif()
+
+if(TOBASA_BUILD_SQLDB_INTEGRATION_TESTS AND TOBASA_SQL_USE_SQLITE)
+   add_subdirectory(sqlite)
+endif()
+
+if(TOBASA_BUILD_SQLDB_INTEGRATION_TESTS AND TOBASA_SQL_USE_PGSQL)
+   add_subdirectory(postgres)
+endif()
+
+if(TOBASA_BUILD_SQLDB_INTEGRATION_TESTS AND TOBASA_SQL_USE_ODBC)
+   add_subdirectory(odbc)
+endif()
+
+if(TOBASA_BUILD_SQLDB_INTEGRATION_TESTS AND TOBASA_SQL_USE_ADODB AND MSVC)
+   add_subdirectory(adodb)
+endif()

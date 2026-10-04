@@ -151,18 +151,19 @@ struct HeadersContext
  */
 struct ChunkedContext
 {
-   bool           sizeCR     {false};
-   bool           sizeLF     {false};
-   bool           dataCR     {false};
-   bool           dataLF     {false};
-   bool           lastCR     {false};
-   bool           lastLF     {false};
-   bool           finalChunk {false};
-   uint64_t       dataCount  {0};
-   std::string    rawSize    {};      // hexadecimal (no 0x prefix)
+   bool           sizeCR         {false};
+   bool           sizeLF         {false};
+   bool           sizeExtension  {false};
+   bool           dataCR         {false};
+   bool           dataLF         {false};
+   bool           lastCR         {false};
+   bool           lastLF         {false};
+   bool           finalChunk     {false};
+   uint64_t       dataCount      {0};
+   std::string    rawSize        {};      // hexadecimal (no 0x prefix)
    
-   bool           hasTrailer {false};
-   HeadersContext headersCtx {};
+   bool           hasTrailer     {false};
+   HeadersContext headersCtx     {};
 
    bool dataDone()  { return dataCR && dataLF; }
    bool sizeDone()  { return sizeCR && sizeLF; }
@@ -406,6 +407,10 @@ private:
    Info retrieveMultipartBody(size_t dataStart, size_t totalData);
    Info retrieveBody(size_t dataStart, size_t totalData);
    Info retrieveChunkedBody(size_t dataStart, size_t totalData);
+
+   Info parseContentLength(bool &outResult, size_t lastIndex);
+
+   bool parseChunkedEncoding();
 };
 
 /// Helper function for returning parsing status code

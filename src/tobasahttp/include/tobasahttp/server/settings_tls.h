@@ -39,7 +39,7 @@ private:
    std::string _tmpDhFile            {}; // dh2048.pem
 
    /// TLS in server mode
-   bool        _serverMode           { true };
+   bool        _serverMode           {true};
 
    std::vector<HostCertificate> _hosCertificates;
 
@@ -49,7 +49,7 @@ public:
    using BaseType::BaseType;
 
    SettingsTls(
-      std::string   address  = "localhost",
+      std::string   address  = "127.0.0.1",
       std::uint16_t port     = 8085,
       asio::ip::tcp protocol = asio::ip::tcp::v4() )
       : BaseType(address, port, protocol)

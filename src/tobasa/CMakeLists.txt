@@ -211,3 +211,7 @@ source_group(
    TREE ${PROJECT_SOURCE_DIR}/src
    PREFIX "Source Files"
    FILES ${MY_SOURCES_LIST} )
+
+if(TOBASA_BUILD_TESTS)
+   add_subdirectory(tests)
+endif()

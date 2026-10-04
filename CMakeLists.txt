@@ -69,6 +69,7 @@ elseif(TOBASA_BUILD_WITH_VCPKG)
 endif()
 
 include(cmake/tobasa_prepare.cmake NO_POLICY_SCOPE)
+include(cmake/tobasa_testing.cmake)
 
 set(TOBASA_FRAMEWORK_ROOTDIR     ${CMAKE_CURRENT_SOURCE_DIR} )
 set(TOBASA_FRAMEWORK_BINARY_DIR  ${CMAKE_BINARY_DIR} )

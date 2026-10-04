@@ -6,12 +6,12 @@ namespace sql {
 
 bool isStringOrBlobField(MySqlType type)
 {
-   return (type == MYSQL_TYPE_TINY_BLOB   || 
-           type == MYSQL_TYPE_MEDIUM_BLOB || 
-           type == MYSQL_TYPE_LONG_BLOB   || 
+   return (type == MYSQL_TYPE_TINY_BLOB   ||
+           type == MYSQL_TYPE_MEDIUM_BLOB ||
+           type == MYSQL_TYPE_LONG_BLOB   ||
            type == MYSQL_TYPE_BLOB        ||
-           type == MYSQL_TYPE_VARCHAR     || 
-           type == MYSQL_TYPE_VAR_STRING  || 
+           type == MYSQL_TYPE_VARCHAR     ||
+           type == MYSQL_TYPE_VAR_STRING  ||
            type == MYSQL_TYPE_STRING );
 }
 
@@ -21,6 +21,43 @@ MysqlResult::MysqlResult(MysqlConnection* pconn)
    _pConn = pconn;
    notifierSource = "MysqlResult";
    _navigator.init( std::bind(&MysqlResult::totalRows, this) );
+}
+
+MysqlResult::MysqlResult(MysqlResult&& other) noexcept
+   : ResultCommon(std::move(other))
+   , _metadataCollection(std::move(other._metadataCollection))
+   , _pDataset(std::move(other._pDataset))
+   , _pConn(other._pConn)
+   , _navigator(std::move(other._navigator))
+{
+   other._pConn = nullptr;
+   other._nRows = 0;
+   other._nColumns = 0;
+   other._affectedRows = 0;
+   other._resultStatus = ResultStatus::unknown;
+   other._columnInfoCollection.clear();
+   other._qryStr.clear();
+}
+
+MysqlResult& MysqlResult::operator=(MysqlResult&& other) noexcept
+{
+   if (this != &other)
+   {
+      ResultCommon::operator=(std::move(other));
+      _metadataCollection = std::move(other._metadataCollection);
+      _pDataset = std::move(other._pDataset);
+      _pConn = other._pConn;
+      _navigator = std::move(other._navigator);
+
+      other._pConn = nullptr;
+      other._nRows = 0;
+      other._nColumns = 0;
+      other._affectedRows = 0;
+      other._resultStatus = ResultStatus::unknown;
+      other._columnInfoCollection.clear();
+      other._qryStr.clear();
+   }
+   return *this;
 }
 
 MysqlResult::~MysqlResult() 
@@ -36,7 +73,9 @@ std::string MysqlResult::name() const
    return "Mysql Result";
 }
 
-bool MysqlResult::runQuery(const std::string& sql, const MysqlParameterCollection& parameters)
+bool MysqlResult::runQuery(const std::string& sql, 
+                           const MysqlParameterCollection& parameters,
+                           ParameterStyle paramStyle)
 {
    if (_pConn == nullptr)
       return false;
@@ -46,43 +85,37 @@ bool MysqlResult::runQuery(const std::string& sql, const MysqlParameterCollectio
 
    if (_optionOpenTable)
       _qryStr = "SELECT * FROM " + sql;
-   else
+   else 
       _qryStr = sql;
-
-   if (_pConn->logSqlQuery())
-      onNotifyDebug(_pConn->logId() + tbsfmt::format("runQuery: {}", _qryStr));
 
    _nRows = 0;
    _nColumns = 0;
-   MysqlCommand cmd(_pConn->nativeConnection());
-   cmd.init(_qryStr, parameters);
-   _pDataset = cmd.executeResult();
-   if (_pDataset)
+
+   MysqlCommand command(_pConn);
+   if (command.query(_qryStr, parameters))
    {
-      _affectedRows = static_cast<int>(cmd.affectedRows());
-      _nColumns     = _pDataset->totalColumns;
-      _nRows        = _pDataset->totalRows;
-      
-      if (_nColumns > 0)
-      {
-         // we have total columns, now set up columns info
-         setupColumnProperties(cmd._pResultContext->fields);
+      auto dataSet  = command.executeResult();
+      if (dataSet == nullptr)
+         throw SqlException("runQuery, Invalid DataSet pointer", "MysqlResult"); 
 
-         if (_pConn->logExecuteStatus()) 
-            onNotifyTrace(_pConn->logId() + tbsfmt::format("SQL command executed successfully, row: {} column: {}, affectedRows: {}", _nRows, _nColumns, _affectedRows));
-      }
-
-      if (_nRows > 0)
-         _resultStatus = ResultStatus::tuplesOk;
-      else
-         _resultStatus = ResultStatus::commandOk;
-
-      _navigator.moveFirst();
-
-      return true;
+      _affectedRows = command.affectedRows();
+      return getData(command.executeResult(), command.resultContext());
    }
 
    return false;
+}
+
+bool MysqlResult::runPreparedQuery(MysqlCommand& command)
+{
+   _qryStr = command.sqlCommandText();
+
+   auto dataSet  = command.executeResult();
+   if (dataSet == nullptr)
+      throw SqlException("runPreparedQuery, Invalid DataSet pointer", "MysqlResult"); 
+
+   _affectedRows = command.affectedRows();
+
+   return getData(std::move(dataSet),command.resultContext());
 }
 
 void MysqlResult::connection(MysqlConnection* conn)
@@ -126,8 +159,10 @@ MysqlResult::VariantType MysqlResult::getVariantValue(const int columnIndex) con
    throwIfColumnIndexInvalid(columnIndex);
    throwIfRowIndexInvalid(row);
 
-   VariantType value = _pDataset->data.at(row).at(columnIndex);
-   return value;
+   if (_pDataset == nullptr)
+      throw std::runtime_error("getVariantValue, Invalid DataSet pointer");
+
+   return _pDataset->data().at(row).at(columnIndex);
 }
 
 MysqlResult::VariantType MysqlResult::getVariantValue(const std::string& columnName) const
@@ -141,8 +176,11 @@ std::string MysqlResult::getStringValue(const int columnIndex) const
    throwIfColumnIndexInvalid(columnIndex);
    throwIfRowIndexInvalid(row);
 
-   auto& value = _pDataset->data.at(row).at(columnIndex);
-   return MysqlVariantHelper::toString(value);
+   if (_pDataset == nullptr)
+      throw std::runtime_error("getStringValue, Invalid DataSet pointer");
+
+   auto& value = _pDataset->data().at(row).at(columnIndex);
+   return VariantHelper::toString(value);
 }
 
 std::string MysqlResult::getStringValue(const std::string& columnName) const
@@ -156,6 +194,31 @@ bool MysqlResult::isNullField(const int columnIndex) const
    throwIfRowIndexInvalid(_navigator.position());
    // TODO_JEFRI : do with better way
    return getStringValue(columnIndex) == sql::NULLSTR;
+}
+
+bool MysqlResult::getData(DataSetPtr dataSet, MysqlCommand::ResultContext* context)
+{
+   if (dataSet == nullptr)
+      throw tbs::SqlException("getData, invalid DataSet object", "MysqlResult");
+
+   _pDataset = std::move(dataSet);
+   _nRows    = _pDataset->totalRows();
+   _nColumns = _pDataset->totalColumns();
+
+   if (_nColumns > 0)
+   {
+      // we have total columns, now set up columns info
+      setupColumnProperties(context->fields);
+   }
+
+   if (_nRows > 0)
+      _resultStatus = ResultStatus::tuplesOk;
+   else
+      _resultStatus = ResultStatus::commandOk;
+
+   _navigator.moveFirst();
+
+   return true;
 }
 
 void MysqlResult::setupColumnProperties(const std::vector<MYSQL_FIELD*>& fieldsInfo)

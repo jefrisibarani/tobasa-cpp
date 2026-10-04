@@ -20,6 +20,12 @@ public:
    PgsqlConnection();
    ~PgsqlConnection();
 
+   PgsqlConnection(const PgsqlConnection&) = delete;
+   PgsqlConnection& operator=(const PgsqlConnection&) = delete;
+
+   PgsqlConnection(PgsqlConnection&& other) noexcept;
+   PgsqlConnection& operator=(PgsqlConnection&& other) noexcept;
+
    std::string name() const;
    bool connect(const std::string& connString);
    bool disconnect();
@@ -79,15 +85,13 @@ public:
    std::string lastBackendError();
 
    /// Get pointer to native driver's connection object.
-   PGconn* nativeConn() const;
+   PGconn* nativeConnection() const;
 
    int transactionStatus();
 
    /// Callback for libpq' PQsetNoticeProcessor, to process notice from PostgreSQL.
    //  use registerNoticeProcessor() to register this callback in libpq
    static void pgNoticeProcessor(void* arg, const char* message);
-
-   PGresult* executeParams(const std::string& sql, const SqlParameterCollection& parameters);
 
 private:
 

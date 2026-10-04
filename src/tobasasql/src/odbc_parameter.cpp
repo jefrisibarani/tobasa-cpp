@@ -1,6 +1,7 @@
 
 #include <tobasa/variant_helper.h>
 #include <tobasa/logger.h>
+#include "tobasasql/sql_util.h"
 #include "tobasasql/odbc_util.h"
 #include "tobasasql/odbc_parameter.h"
 
@@ -182,10 +183,15 @@ void OdbcParameterCollection::prepare(const std::string& sql, const SqlParameter
                   odbcParam->pValue       = NULL;
                   odbcParam->columnSize   = 0;
                }
+               else if ( std::holds_alternative<float>( parameter->value() ) )
+               {
+                  odbcParam->value  = std::get<float>( parameter->value() );
+                  odbcParam->pValue = (SQLPOINTER) &(std::get<float>(odbcParam->value));
+               }
                else
                {
-                  odbcParam->value  = VariantHelper<>::value<float>(parameter->value(), errMsg);
-                  odbcParam->pValue = (SQLPOINTER) &(VariantHelper<>::value<float>(odbcParam->value), errMsg);
+                  odbcParam->value  = std::get<double>( parameter->value() );
+                  odbcParam->pValue = (SQLPOINTER) &( std::get<double>(odbcParam->value) );
                }
                break;
             }
@@ -377,7 +383,7 @@ void OdbcParameterCollection::bindParameter()
 
 std::shared_ptr<OdbcParameter> OdbcParameterCollection::getParam(int pos)
 {
-    return collection[pos];
+   return collection[pos];
 }
 
 

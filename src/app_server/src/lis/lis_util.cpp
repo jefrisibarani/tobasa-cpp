@@ -1,6 +1,6 @@
 #include <tobasa/config.h>
 #include <tobasalis/lis/settings.h>
-#include <tobasasql/common_types.h>
+#include <tobasasql/sql_util.h>
 #include "lis_util.h"
 
 namespace tbs {

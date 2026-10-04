@@ -16,6 +16,13 @@ class ResultCommon : public Notifier
 {
 public:
    ResultCommon();
+
+   ResultCommon(const ResultCommon&) = delete;
+   ResultCommon& operator=(const ResultCommon&) = delete;
+
+   ResultCommon(ResultCommon&& other) noexcept;
+   ResultCommon& operator=(ResultCommon&& other) noexcept;
+
    virtual ~ResultCommon() = default;
 
    // -------------------------------------------------------

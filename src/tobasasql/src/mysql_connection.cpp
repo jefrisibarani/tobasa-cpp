@@ -1,6 +1,6 @@
 #include "tobasasql/mysql_connection.h"
 #include "tobasasql/mysql_command.h"
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 #include <tobasa/bin_encode.h>
 
 namespace tbs {
@@ -8,9 +8,28 @@ namespace sql {
 
 MysqlConnection::MysqlConnection()
    : ConnectionCommon()
+   , _pMYcon(nullptr)
 {
-   _pMYcon        = nullptr;
    notifierSource = "MysqlConnection";
+}
+
+MysqlConnection::MysqlConnection(MysqlConnection&& other) noexcept
+   : ConnectionCommon(std::move(other))
+   , _pMYcon(other._pMYcon)
+{
+   other._pMYcon = nullptr;
+}
+
+MysqlConnection& MysqlConnection::operator=(MysqlConnection&& other) noexcept
+{
+   if (this != &other)
+   {
+      disconnect();
+      ConnectionCommon::operator=(std::move(other));
+      _pMYcon = other._pMYcon;
+      other._pMYcon = nullptr;
+   }
+   return *this;
 }
 
 MysqlConnection::~MysqlConnection()
@@ -132,11 +151,19 @@ int MysqlConnection::execute(const std::string& sql, const MysqlParameterCollect
    if (status() != ConnectionStatus::ok)
       return -1;
 
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
-
-   if (parameters.size() == 0)
+   if (parameters.size() > 0)
    {
+      MysqlCommand cmd(this);
+      if (!cmd.query(sql, parameters))
+         return -1;
+
+      return cmd.execute();
+   }
+   else
+   {
+      if (logSqlQuery())
+         onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
+
       if (mysql_real_query(_pMYcon, sql.c_str(), static_cast<unsigned long>(sql.length()) ) != 0)
          throwExceptionOnError();
 
@@ -159,21 +186,15 @@ int MysqlConnection::execute(const std::string& sql, const MysqlParameterCollect
             throwExceptionOnError();
       }
 
-      //auto affectedRows = mysql_affected_rows(_pMYcon);
       if (affectedRows == UINT64_MAX)
          throwExceptionOnError();
       else if (affectedRows >= 0)
-         return static_cast<int>(affectedRows);
-   }
-   else
-   {
-      MysqlCommand cmd(_pMYcon);
-      cmd.init(sql, parameters);
-      auto affectedRows = cmd.execute();
-      // affectedRows should same as cmd.affectedRows();
+      {
+         if (logExecuteStatus())
+            onNotifyDebug(logId() + tbsfmt::format("SQL command executed successfully, affectedRows: {}", affectedRows));
 
-      if (affectedRows >= 0)
-        return static_cast<int>(affectedRows);
+         return static_cast<int>(affectedRows);
+      }
    }
 
    return -1;
@@ -182,14 +203,21 @@ int MysqlConnection::execute(const std::string& sql, const MysqlParameterCollect
 std::string MysqlConnection::executeScalar(const std::string& sql, const MysqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
-      throw tbs::SqlException("Invalid connection status", "MysqlConnection");
+      return "";
 
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
-
-   //bool success = false;
-   if (parameters.size() == 0)
+   if (parameters.size() > 0)
    {
+      MysqlCommand cmd(this);
+      if (!cmd.query(sql, parameters))
+         return "";
+
+      return cmd.executeScalar();
+   }
+   else
+   {
+      if (logSqlQuery())
+         onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
+
       if (mysql_real_query(_pMYcon, sql.c_str(), static_cast<unsigned long>(sql.length()) ) != 0)
          throwExceptionOnError();
 
@@ -197,18 +225,23 @@ std::string MysqlConnection::executeScalar(const std::string& sql, const MysqlPa
       if (result)
       {
          MYSQL_ROW row = mysql_fetch_row(result);
-
          if (row == nullptr)
          {
             mysql_free_result(result);
-            onNotifyTrace(logId() + "Scalar query returned no row");
-            return {};
-         }
 
+            if (logExecuteStatus())
+               onNotifyDebug(logId() + "Scalar query returned no row");
+
+            return "";
+         }
+         // check for SQL NULL
          if (row[0] == nullptr)
          {
             mysql_free_result(result);
-            onNotifyTrace(logId() + "Scalar query returned SQL NULL");
+
+            if (logExecuteStatus())
+               onNotifyDebug(logId() + "Scalar query returned SQL NULL");
+
             return sql::NULLSTR;  // "null"
          }
 
@@ -225,15 +258,17 @@ std::string MysqlConnection::executeScalar(const std::string& sql, const MysqlPa
                // MySQL BIT is returned as raw bytes; convert each byte to an 8-bit textual bit string.
                value = conv::binaryBytesToString((byte_t*)row[0],lengths[0]);
             }
-            else {
+            else
                value.assign(row[0], row[0] + lengths[0]);
-            }
          }
          else
          {
-            onNotifyTrace(logId() + "Scalar query returned invalid or empty data length");
             mysql_free_result(result);
-            return {};
+
+            if (logExecuteStatus())
+               onNotifyDebug(logId() + "Scalar query returned invalid or empty data length");
+
+            return "";
          }
 
          mysql_free_result(result);
@@ -244,31 +279,11 @@ std::string MysqlConnection::executeScalar(const std::string& sql, const MysqlPa
          if (mysql_field_count(_pMYcon) == 0)
          {
             // Scalar query returned no record
-            onNotifyTrace(logId() + "Scalar query returned no record");
-            return {};
+            onNotifyDebug(logId() + "Scalar query returned no record");
+            return "";
          }   
          else // mysql_store_result() should have returned data
             throwExceptionOnError();
-      }
-   }
-   else
-   {
-      MysqlCommand cmd(_pMYcon);
-      cmd.init(sql, parameters);
-      auto dbresult = cmd.executeResult();
-      if (dbresult != nullptr)
-      {
-         if (dbresult->totalColumns == 0)
-            onNotifyTrace(logId() + "Scalar query executed successfully with affected row: " + std::to_string(cmd.affectedRows()));
-         
-         if (dbresult->totalColumns > 0 && dbresult->totalRows == 0)
-            onNotifyTrace(logId() + "Scalar query returned fields but no row found");
-         
-         if (dbresult->totalRows > 0)
-         {
-            auto variant = dbresult->data.at(0).at(0);
-            return MysqlVariantHelper::toString(variant);
-         }
       }
    }
 
@@ -341,17 +356,17 @@ int64_t MysqlConnection::lastInsertRowid()
 
 std::string MysqlConnection::lastBackendError()
 {
-   std::string errmsg;
-   const char* myErr = 0;
-
-   if (_pMYcon)
+   if (_pMYcon == nullptr)
    {
-      myErr = mysql_error(_pMYcon);
-      if (myErr)
-         errmsg = std::string(myErr);
+      onNotifyError("lastBackendError, invalid connection object", "MysqlConnection");
+      return "invalid connection object";
    }
 
-   return errmsg;
+   const char* err = mysql_error(_pMYcon);
+   if (err != nullptr && err[0] != '\0')
+      return std::string(err);
+
+   return "Unknown MySQL backend error";
 }
 
 void MysqlConnection::throwExceptionOnError()

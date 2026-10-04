@@ -2,7 +2,7 @@
 
 #include <tobasa/logger.h>
 #include "tobasasql/common_types.h"
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 
 namespace tbs {
 namespace sql {

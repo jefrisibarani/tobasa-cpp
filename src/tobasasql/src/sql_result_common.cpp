@@ -1,5 +1,5 @@
 #include "tobasasql/exception.h"
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 #include "tobasa/util_string.h"
 #include "tobasasql/sql_result_common.h"
 
@@ -8,6 +8,53 @@ namespace sql {
 
 ResultCommon::ResultCommon()
    : _resultStatus { ResultStatus::unknown } {}
+
+ResultCommon::ResultCommon(ResultCommon&& other) noexcept
+   : Notifier(              std::move(other))
+   , _resultStatus(         other._resultStatus)
+   , _qryStr(               std::move(other._qryStr))
+   , _nColumns(             other._nColumns)
+   , _nRows(                other._nRows)
+   , _columnInfoCollection( std::move(other._columnInfoCollection))
+   , _affectedRows(         other._affectedRows)
+   , _optionOpenTable(      other._optionOpenTable)
+   , _optionCacheData(      other._optionCacheData)
+{
+   other._resultStatus     = ResultStatus::unknown;
+   other._qryStr.clear();
+   other._nColumns         = 0;
+   other._nRows            = 0;
+   other._columnInfoCollection.clear();
+   other._affectedRows     = 0;
+   other._optionOpenTable  = false;
+   other._optionCacheData  = false;
+}
+
+ResultCommon& ResultCommon::operator=(ResultCommon&& other) noexcept
+{
+   if (this != &other)
+   {
+      Notifier::operator=(std::move(other));
+      _resultStatus         = other._resultStatus;
+      _qryStr               = std::move(other._qryStr);
+      _nColumns             = other._nColumns;
+      _nRows                = other._nRows;
+      _columnInfoCollection = std::move(other._columnInfoCollection);
+      _affectedRows         = other._affectedRows;
+      _optionOpenTable      = other._optionOpenTable;
+      _optionCacheData      = other._optionCacheData;
+
+      other._resultStatus    = ResultStatus::unknown;
+      other._qryStr.clear();
+      other._nColumns        = 0;
+      other._nRows           = 0;
+      other._columnInfoCollection.clear();
+      other._affectedRows    = 0;
+      other._optionOpenTable = false;
+      other._optionCacheData = false;
+   }
+   return *this;
+}
 
 int ResultCommon::affectedRows() const
 {

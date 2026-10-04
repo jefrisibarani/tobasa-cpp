@@ -14,39 +14,39 @@ namespace sql {
 class DatabaseConnector : public DatabaseConnectorBase
 {
 protected:
-   sql::SqlDriverVariant                     _sqlDriverVariant;
-   sql::SqlConnectionPtrVariant              _sqlConnPtrVariant;
+   SqlDriverVariant                _sqlDriverVariant;
+   SqlConnectionPtrVariant         _sqlConnPtrVariant;
 
 #if defined(TOBASA_SQL_USE_PGSQL)
-   sql::PgsqlDriver                          _pgsqlDriver;
-   sql::SqlConnectionPtr<sql::PgsqlDriver>   _pPgsqlConn;
+   PgsqlDriver                     _pgsqlDriver;
+   SqlConnectionPtr<PgsqlDriver>   _pPgsqlConn;
 #endif
 
 #if defined(TOBASA_SQL_USE_SQLITE)   
-   sql::SqliteDriver                         _sqliteDriver;
-   sql::SqlConnectionPtr<sql::SqliteDriver>  _pSqliteConn;
+   SqliteDriver                    _sqliteDriver;
+   SqlConnectionPtr<SqliteDriver>  _pSqliteConn;
 #endif
 
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-   sql::AdodbDriver                          _adodbDriver;
-   sql::SqlConnectionPtr<sql::AdodbDriver>   _pAdodbConn;
+   AdodbDriver                     _adodbDriver;
+   SqlConnectionPtr<AdodbDriver>   _pAdodbConn;
 #endif
 
 #if defined(TOBASA_SQL_USE_ODBC)
-   sql::OdbcDriver                           _odbcDriver;
-   sql::SqlConnectionPtr<sql::OdbcDriver>    _pOdbcConn;
+   OdbcDriver                      _odbcDriver;
+   SqlConnectionPtr<OdbcDriver>    _pOdbcConn;
 #endif
 
 #if defined(TOBASA_SQL_USE_MYSQL)
-   sql::MysqlDriver                          _mysqlDriver;
-   sql::SqlConnectionPtr<sql::MysqlDriver>   _pMysqlConn;   
+   MysqlDriver                     _mysqlDriver;
+   SqlConnectionPtr<MysqlDriver>   _pMysqlConn;
 #endif
 
-   sql::conf::ConnectorOption                _dbConnOption;
-   sql::conf::Database                       _dbOption;
+   conf::ConnectorOption           _dbConnOption;
+   conf::Database                  _dbOption;
 
    /// List of SqlService created with this connector;
-   std::vector<sql::SqlServiceInfo>          _services;
+   std::vector<SqlServiceInfo>     _services;
 
    void setSqlServiceCallbacks(SqlServicePtr svc)
    {
@@ -58,7 +58,7 @@ protected:
 
 public:
 
-   DatabaseConnector(const sql::conf::ConnectorOption& dbConnOption, const std::string& name);
+   DatabaseConnector(const conf::ConnectorOption& dbConnOption, const std::string& name);
    virtual ~DatabaseConnector();
 
    /// Connect to database using settings provided ConnectorOption object.
@@ -77,12 +77,12 @@ public:
    virtual bool testConnection();
 
    /// Get sql connection pointer variant.
-   virtual sql::SqlConnectionPtrVariant& sqlConnPtrVariant();
+   virtual SqlConnectionPtrVariant& sqlConnPtrVariant();
    
    /// Get sql driver variant.
-   virtual sql::SqlDriverVariant& getSqlDriverVariant();
+   virtual SqlDriverVariant& getSqlDriverVariant();
 
-   sql::conf::ConnectorOption option();
+   conf::ConnectorOption option();
 
    virtual bool beginTransaction();
    virtual bool commitTransaction();

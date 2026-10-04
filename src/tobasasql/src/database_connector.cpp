@@ -1,11 +1,11 @@
 #include <tobasa/crypt.h>
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 #include "tobasasql/database_connector.h"
 
 namespace tbs {
 namespace sql {
 
-DatabaseConnector::DatabaseConnector(const sql::conf::ConnectorOption& dbConnOption, const std::string& name)
+DatabaseConnector::DatabaseConnector(const conf::ConnectorOption& dbConnOption, const std::string& name)
    : DatabaseConnectorBase(name)
    , _dbConnOption(dbConnOption)
 {
@@ -16,7 +16,7 @@ DatabaseConnector::DatabaseConnector(const sql::conf::ConnectorOption& dbConnOpt
 
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
    // Initialize COM
-   if (_dbOption.dbDriver == sql::BackendType::adodb)
+   if (_dbOption.dbDriver == BackendType::adodb)
    {
       if ( FAILED(::CoInitializeEx(NULL, COINIT_MULTITHREADED)) )
          Logger::logD("[sql] Initializing ADODB COM library has failed");
@@ -52,7 +52,7 @@ DatabaseConnector::~DatabaseConnector()
 
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
    // Uninitialize COM
-   if (_dbOption.dbDriver == sql::BackendType::adodb)
+   if (_dbOption.dbDriver == BackendType::adodb)
    {
       Logger::logD("[sql] Uninitializing ADODB COM library");
       ::CoUninitialize();
@@ -64,7 +64,7 @@ DatabaseConnector::~DatabaseConnector()
 
 bool DatabaseConnector::connect()
 {
-   auto connString = util::getConnectionString(_dbOption, _dbConnOption.securitySalt);
+   auto connString = getConnectionString(_dbOption, _dbConnOption.securitySalt);
 
    return std::visit(
       [&](auto& conn)
@@ -115,7 +115,7 @@ bool DatabaseConnector::connected()
       {
          if (conn->backendType() == _dbOption.dbDriver)
          {
-            bool isOk = conn->status() == sql::ConnectionStatus::ok;
+            bool isOk = conn->status() == ConnectionStatus::ok;
             return isOk;
          }
          else
@@ -251,17 +251,17 @@ bool DatabaseConnector::rollbackTransaction()
    );
 }
 
-sql::SqlConnectionPtrVariant& DatabaseConnector::sqlConnPtrVariant()
+SqlConnectionPtrVariant& DatabaseConnector::sqlConnPtrVariant()
 {
    return _sqlConnPtrVariant;
 }
 
-sql::SqlDriverVariant& DatabaseConnector::getSqlDriverVariant()
+SqlDriverVariant& DatabaseConnector::getSqlDriverVariant()
 {
    return _sqlDriverVariant;
 }
 
-sql::conf::ConnectorOption DatabaseConnector::option()
+conf::ConnectorOption DatabaseConnector::option()
 {
    return _dbConnOption;
 }

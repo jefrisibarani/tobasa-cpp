@@ -1,8 +1,10 @@
 #pragma once
 
+#include <tobasa/util_string.h>
 #include <tobasa/self_counter.h>
+#include "tobasasql/exception.h"
 #include "tobasasql/sql_connection.h"
-#include "tobasasql/util.h"
+#include "tobasasql/sql_util.h"
 
 namespace tbs {
 namespace sql {
@@ -17,16 +19,14 @@ template <typename SqlDriverType>
 class SqlQuery
 {
 public:
-   using LoggerImpl        = typename SqlDriverType::Logger;
-   using SqlResult         = sql::SqlResult<SqlDriverType>;
-   using SqlConnection     = sql::SqlConnection<SqlDriverType>;
-   using VariantType       = typename SqlDriverType::VariantType;
-   using VectorVariant     = std::vector<VariantType>;
-   using VariantHelper     = typename SqlDriverType::VariantHelper;
-
-   /// Alias SqlParameter.
-   using SqlParameter      = typename SqlDriverType::SqlParameter;
-   /// Alias SqlParameterCollection.
+   using LoggerImpl             = typename SqlDriverType::Logger;
+   using SqlResult              = sql::SqlResult<SqlDriverType>;
+   using SqlConnection          = sql::SqlConnection<SqlDriverType>;
+   using CommandImpl            = typename SqlDriverType::CommandImpl;
+   using VariantType            = typename SqlDriverType::VariantType;
+   using VectorVariant          = std::vector<VariantType>;
+   using VariantHelper          = typename SqlDriverType::VariantHelper;
+   using SqlParameter           = typename SqlDriverType::SqlParameter;
    using SqlParameterCollection = typename SqlDriverType::SqlParameterCollection;
 
    /**
@@ -35,6 +35,7 @@ public:
     */
    SqlQuery(SqlConnection& conn)
       : _conn(conn)
+      , _cmdImpl(&conn.connImpl())
       , _parameterStyle(ParameterStyle::named)
    {
    }
@@ -53,30 +54,59 @@ public:
     * @param style Defines how parameters are written in the SQL string:
     *              - ParameterStyle::named : parse and expand ":name"
     *                placeholders into DB-native form.
-    *              - ParameterStyle::Native      : assume the query already uses
+    *              - ParameterStyle::native : assume the query already uses
     *                DB-native placeholders and leave the SQL unchanged.
     *
     * By default, the constructor assumes ParameterStyle::named.
     */
    SqlQuery(SqlConnection& conn, const std::string& sql, ParameterStyle style=ParameterStyle::named)
       : _conn(conn)
+      , _cmdImpl(&conn.connImpl())
       , _sqlQuery(sql)
       , _parameterStyle(style)
    {
+      _cmdImpl.notificationHandler
+         = std::bind(&SqlQuery::command_onNotification, this, std::placeholders::_1);
    }
 
-   ~SqlQuery() = default;
-
-   void setSql(const std::string& sql)
+   ~SqlQuery()
    {
-      _sqlQuery= sql;
+      _cmdImpl.notificationHandler = nullptr;
    }
 
-   void reset(const std::string& sql, ParameterStyle style=ParameterStyle::named)
+   /// Prepare for one-shot query execution
+   bool query(const std::string& sql, const SqlParameterCollection& parameters={})
+   {
+      _sqlQuery          = sql;
+      
+      if ( !parameters.empty() )
+         _parameters     = parameters;
+
+      auto finalSqlQuery = expandNamedParams(_sqlQuery, _parameterStyle, _parameters, _conn.backendType());
+      _prepared          = _cmdImpl.query(finalSqlQuery, _parameters);
+
+      return _prepared;
+   }
+
+   bool prepare(const std::string& sql)
+   {
+      _sqlQuery          = sql;
+      auto finalSqlQuery = expandNamedParams(_sqlQuery, _parameterStyle, _parameters, _conn.backendType());
+      _prepared          = _cmdImpl.prepare(finalSqlQuery);
+
+      return _prepared;
+   }
+
+   void reset()
    {
       _parameters = {};
-      _sqlQuery   = sql;
-      _parameterStyle = style;
+      _cmdImpl.reset();
+   }
+
+   void close()
+   {
+      _cmdImpl.close();
+      _prepared = false;
    }
 
    // Add parameter in the order they appear in the query
@@ -118,8 +148,13 @@ public:
     */
    int execute()
    {
-      return _conn.execute(_sqlQuery, _parameters, _parameterStyle);
+      std::string errorMessage;
+      if (!ensurePreparedAndBound(errorMessage))
+         throw SqlException(tbsfmt::format("SqlQuery failed. {}", errorMessage), "SqlQuery"); 
+
+      return _cmdImpl.execute();
    }
+
 
    /** 
     * \brief Execute sql command or stored procedure that does not return rows.
@@ -131,8 +166,13 @@ public:
     */
    bool executeVoid()
    {
-      return _conn.executeVoid(_sqlQuery, _parameters, _parameterStyle);
+      std::string errorMessage;
+      if (!ensurePreparedAndBound(errorMessage))
+         throw SqlException(tbsfmt::format("SqlQuery failed. {}", errorMessage), "SqlQuery"); 
+
+      return _cmdImpl.execute() >= 0;
    }
+
 
    /** 
     * \brief Execute query, and retrieve single string(may empty) result.
@@ -142,56 +182,119 @@ public:
     */
    std::string executeScalar()
    {
-      return _conn.executeScalar(_sqlQuery, _parameters, _parameterStyle);
+      std::string errorMessage;
+      if (!ensurePreparedAndBound(errorMessage))
+         throw SqlException(tbsfmt::format("SqlQuery failed. {}", errorMessage), "SqlQuery"); 
+
+      return _cmdImpl.executeScalar();
    }
 
-
+   /** 
+    * \brief Execute query, and retrieve the sql result set.
+    * \details On successfull execution, return std::shared_ptr<SqlResult>
+    * On error, SqlException thrown
+    */
    std::shared_ptr<SqlResult> executeResult(bool cacheData=true, bool openTable=false)
    {
+      std::string errorMessage;
+      if (!ensurePreparedAndBound(errorMessage))
+         throw SqlException(tbsfmt::format("SqlQuery failed. {}", errorMessage), "SqlQuery"); 
+
       std::shared_ptr<SqlResult> result = std::make_shared<SqlResult>(_conn);
       result->setOptionCacheData(cacheData);
       result->setOptionOpenTable(openTable);
-      result->runQuery(_sqlQuery, _parameters, _parameterStyle);
+
+      const bool ok = result->runPreparedQuery(*this);
+      if (!ok)
+         return nullptr;
 
       return result;
    }
+
 
    SqlParameterCollection& parameters()
    {
       return _parameters;
    }
 
-   // -------------------------------------------------------
-   // TODO_JEFRI:
-   void setBool(uint16_t paramPos, bool value) {}
-   void setBool(uint16_t paramPos, uint8_t value) {}
-   
-   void setInt8(uint16_t paramPos, int8_t value) {}
-   void setInt16(uint16_t paramPos, int16_t value) {}
-   void setInt32(uint16_t paramPos, int32_t value) {}
-   void setInt64(uint16_t paramPos, int64_t value) {}
-   void setInt(uint16_t paramPos, int value) {}
-   
-   void setUInt8(uint16_t paramPos, uint8_t value) {}
-   void setUInt16(uint16_t paramPos, uint16_t value) {}
-   void setUInt32(uint16_t paramPos, uint32_t value) {}
-   void setUInt64(uint16_t paramPos, uint64_t value) {}
-   void setInt(uint16_t paramPos, unsigned int value) {}
-   
-   void setFloat(uint16_t paramPos, float value) {}
-   void setDouble(uint16_t paramPos, double value) {}
-   void setString(uint16_t paramPos, const std::string& value) {}
-   void setWstring(uint16_t paramPos, const std::wstring& value) {}
-   void setBytes(uint16_t paramPos, const std::vector<uint8_t>& value) {}
-   void setChars(uint16_t paramPos, const std::vector<char>& value) {}
-   // -------------------------------------------------------
+   int affectedRows() { return static_cast<int>(_cmdImpl.affectedRows()); }
+
+   CommandImpl& queryImpl()
+   {
+      return _cmdImpl;
+   }
+
+
 
 protected:
 
+   bool ensurePreparedAndBound(std::string& outErrMessage)
+   {
+      try
+      {
+         if (_sqlQuery.empty())
+         {
+            outErrMessage = "empty sql query";
+            return false;
+         }
+
+         if (!_prepared)
+         {
+            auto finalSqlQuery = expandNamedParams(_sqlQuery, _parameterStyle, _parameters, _conn.backendType());
+            _prepared = _cmdImpl.prepare(finalSqlQuery);
+         }
+
+         return _cmdImpl.bind(_parameters);
+      }
+      catch(const SqlException& ex)
+      {
+         outErrMessage = ex.appError.message;
+         _logger.error("[sql] prepare failed. {}", ex.appError.message );
+      }
+      catch(const std::exception& ex)
+      {
+         outErrMessage = ex.what();
+         _logger.error("[sql] prepare failed. {}", ex.what() );
+      }
+      catch(...)
+      {
+         _logger.error("[sql] prepare failed.");
+      }
+
+      return false;
+   }
+
+
+   /// Handler for notification from Implementation class.
+   void command_onNotification(const NotifyEventArgs& arg)
+   {
+      if (arg.type == NotificationType::trace)
+         _logger.trace(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+
+      if (arg.type == NotificationType::debug)
+         _logger.debug(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+
+      if (arg.type == NotificationType::info)
+         _logger.info(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+
+      if (arg.type == NotificationType::warning)
+         _logger.warn(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+
+      if (arg.type == NotificationType::error)
+         _logger.error(tbsfmt::format("[sql] [{}] {}", arg.source, arg.message));
+   }
+
    SqlConnection& _conn;
-   std::string _sqlQuery;
-   ParameterStyle _parameterStyle;
+   CommandImpl    _cmdImpl;
+
+   /// Implementation logger class.
+   LoggerImpl     _logger;
+
+   // original sql query
+   std::string             _sqlQuery;
+   ParameterStyle          _parameterStyle;
    SqlParameterCollection  _parameters;
+   bool                    _prepared = false;
 };
 
 } // namespace sql

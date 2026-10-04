@@ -88,18 +88,23 @@ bool DateTime::usingInMemoryTZDB()
    return _usingInMemoryTZDB;
 }
 
+std::string DateTime::getCurrentTimezone()
+{
+   return tbsdate::current_zone()->name();
+}
+
 
 DateTime::DateTime()
 {
    if( !_timeZoneInitialized)
       throw std::runtime_error("Time zone not initialized");
 
-   // get System Time miliseconds
-   auto now = floor<std::chrono::milliseconds>(std::chrono::system_clock::now());
+   // get System Time nanoseconds
+   auto now = floor<std::chrono::nanoseconds>(std::chrono::system_clock::now());
 
    try
    {
-      // convet to Local Time miliseconds
+      // convet to Local Time nanoseconds
       _timepoint = tbsdate::current_zone()->to_local(now);
    }
    catch(const std::exception& ex)
@@ -110,11 +115,11 @@ DateTime::DateTime()
 
    /*
 #ifdef TOBASA_USE_STD_DATE
-   ZonedTimeMilis _zonedTime1 = { tbsdate::current_zone(), now };
-   ZonedTimeMilis _zonedTime2 = tbsdate::zoned_time{ tbsdate::current_zone(), _timepoint };
+   ZonedTime _zonedTime1 = { tbsdate::current_zone(), now };
+   ZonedTime _zonedTime2 = tbsdate::zoned_time{ tbsdate::current_zone(), _timepoint };
 #else
-   ZonedTimeMilis _zonedTime1 = tbsdate::make_zoned(tbsdate::current_zone(), now);
-   ZonedTimeMilis _zonedTime2 = tbsdate::make_zoned(tbsdate::current_zone(), _timepoint);
+   ZonedTime _zonedTime1 = tbsdate::make_zoned(tbsdate::current_zone(), now);
+   ZonedTime _zonedTime2 = tbsdate::make_zoned(tbsdate::current_zone(), _timepoint);
 #endif
    */
    /*
@@ -133,7 +138,7 @@ DateTime::DateTime(const std::chrono::system_clock::time_point& timePoint)
    init(timePoint);
 }
 
-DateTime::DateTime(const LocalTimeMilis& timePoint)
+DateTime::DateTime(const LocalTime& timePoint)
 {
    _timepoint = timePoint;
 }
@@ -143,7 +148,7 @@ DateTime::~DateTime()
 
 void DateTime::init(std::chrono::system_clock::time_point timePoint)
 {
-   auto tp = floor<std::chrono::milliseconds>(timePoint);
+   auto tp = floor<std::chrono::nanoseconds>(timePoint);
    auto tpLocal = tbsdate::current_zone()->to_local(tp);
    _timepoint = tpLocal;
 }
@@ -155,7 +160,7 @@ DateTime DateTime::now()
 
 bool DateTime::parse(const std::string& dateStr, const std::string& format)
 {
-   LocalTimeMilis tp;
+   LocalTime tp;
    std::istringstream ss{ dateStr };
    //ss.imbue(std::locale::classic());
    ss >> tbsdate::parse(format, tp);
@@ -176,7 +181,7 @@ bool DateTime::parse(const std::string& dateStr, const std::string& format)
 
 bool DateTime::parseTime(const std::string& timeStr, const std::string& format)
 {
-   std::string dateTimeStr = "1000-01-01 " + timeStr;
+   std::string dateTimeStr = "1970-01-01 " + timeStr;
    std::string fmtStr = "%Y-%m-%d " + format;
    return parse(dateTimeStr, fmtStr);
 }
@@ -273,7 +278,7 @@ std::string DateTime::isoDateTimeStringUTC(bool useSecondFraction)
    }
 }
 
-LocalTimeMilis& DateTime::timePoint()
+LocalTime& DateTime::timePoint()
 {
    return _timepoint;
 }
@@ -284,7 +289,7 @@ tbsdate::year_month_day DateTime::ymd()
    return tbsdate::year_month_day{ timePointDays };
 }
 
-tbsdate::hh_mm_ss<std::chrono::milliseconds> DateTime::hms()
+tbsdate::hh_mm_ss<std::chrono::nanoseconds> DateTime::hms()
 {
    auto timePointDays = floor<tbsdate::days>(_timepoint);
    return tbsdate::hh_mm_ss{ _timepoint - timePointDays };
@@ -302,7 +307,7 @@ long long DateTime::toUnixTimeMiliSeconds()
    //auto ut = st.time_since_epoch();
    //return ut.count();
 
-   return zt.get_sys_time().time_since_epoch().count();
+   return std::chrono::duration_cast<std::chrono::milliseconds>(zt.get_sys_time().time_since_epoch()).count();
 }
 
 long long DateTime::toUnixTimeSeconds()
@@ -317,7 +322,7 @@ long long DateTime::toUnixTimeSeconds()
    return s.count();
 }
 
-ZonedTimeMilis DateTime::zonedTime()
+ZonedTime DateTime::zonedTime()
 {
 #ifdef TOBASA_USE_STD_DATE
    return tbsdate::zoned_time{ tbsdate::current_zone(), _timepoint };
@@ -334,7 +339,7 @@ bool DateTime::isNullDateTime()
 void DateTime::setToNullDateTime() 
 {
    _setToNull = true;
-   _timepoint = LocalTimeMilis{};
+   _timepoint = LocalTime{};
 }
 
 } // namespace tbs

@@ -3,7 +3,9 @@
 #include <string>
 #include <tobasa/navigator.h>
 #include "tobasasql/sql_result_common.h"
+#include "tobasasql/sql_dataset.h"
 #include "tobasasql/sqlite_connection.h"
+#include "tobasasql/sqlite_command.h"
 
 namespace tbs {
 namespace sql {
@@ -23,11 +25,20 @@ namespace sql {
 class SqliteResult : public ResultCommon
 {
 public:
-   using VariantType   = tbs::DefaultVariantType;
+   using VariantType   = DefaultVariantType;
+   using VariantHelper = VariantHelper<VariantType>;
    using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
+   using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;
 
    SqliteResult(SqliteConnection* pconn = nullptr);
+
+   SqliteResult(const SqliteResult&) = delete;
+   SqliteResult& operator=(const SqliteResult&) = delete;
+
+   SqliteResult(SqliteResult&& other) noexcept;
+   SqliteResult& operator=(SqliteResult&& other) noexcept;
+
    ~SqliteResult();
 
    // -------------------------------------------------------
@@ -57,7 +68,10 @@ public:
     */
    virtual bool runQuery(
       const std::string& sql,
-      const SqlParameterCollection& parameters = SqlParameterCollection());
+      const SqlParameterCollection& parameters = {},
+      ParameterStyle paramStyle = ParameterStyle::named );
+   
+   bool runPreparedQuery(SqliteCommand& command);
 
    /// Set specific driver sql connection class implementation.
    void connection(SqliteConnection* conn);
@@ -108,16 +122,16 @@ public:
     */
    virtual bool isNullField(const int columnIndex) const;
 
+   bool getData(DataSetPtr dataSet, sqlite3_stmt* stmt);
+
 private:
 
    /// Setup column informations.
-   void setupColumnProperties();
+   void setupColumnProperties(sqlite3_stmt* stmt);
 
-   /// Get column declared type.
-   std::string columnDeclaredType(sqlite3_stmt* stmt, int pos);
 
    /// Setup column metadata.
-   void setupColumnMetaData();
+   void setupColumnMetaData(sqlite3_stmt* stmt);
 
    /// SQLite column informations.
    struct ColumnMetadata
@@ -129,22 +143,16 @@ private:
       std::string  tableName    = "";
       std::string  collSeqName  = "";
       std::string  dataType     = "";
-      //bool         isNotNull    = true;
-      //bool         isPrimaryKey = false;
-      //bool         isAutoInc    = false;
    };
+
+   /// Implemented Sqlite connection object.
+   SqliteConnection* _pConn;
 
    /// Column metadata collection.
    std::vector<ColumnMetadata> _metadataCollection;
 
    /// Cached data from backend.
-   RecordVariant _dataVariant;
-
-   /// Sqlite driver native statement pointer.
-   sqlite3_stmt* _pStatement;
-
-   /// Implemented Sqlite connection object.
-   SqliteConnection* _pConn;
+   DataSetPtr _pDataset;
 
    NavigatorBasic _navigator;
 };

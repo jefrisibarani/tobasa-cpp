@@ -11,9 +11,9 @@ namespace tbs {
  * DateTime class - Local time.
  */
 
-using LocalTimeMilis = tbsdate::local_time<std::chrono::milliseconds>;
-using ZonedTimeMilis = tbsdate::zoned_time<std::chrono::milliseconds>;
-using SysTimeMilis   = tbsdate::sys_time<std::chrono::milliseconds>;
+using LocalTime = tbsdate::local_time<std::chrono::nanoseconds>;
+using ZonedTime = tbsdate::zoned_time<std::chrono::nanoseconds>;
+using SysTime   = tbsdate::sys_time<std::chrono::nanoseconds>;
 
 
 /**
@@ -40,6 +40,9 @@ public:
    static bool initTimezoneData(const std::string& dataFolder="");
    static bool usingInMemoryTZDB();
 
+   /// Returns the current time zone name. Initialize time zone data first.
+   static std::string getCurrentTimezone();
+
    DateTime();
 
   /**
@@ -65,7 +68,7 @@ public:
    /**
     * @brief Constructs a DateTime object from a local time point.
     * 
-    * This constructor creates a DateTime object from a provided LocalTimeMilis object,
+    * This constructor creates a DateTime object from a provided LocalTime object,
     * representing a local time point.
     * 
     * Example:
@@ -73,9 +76,9 @@ public:
     *    auto expiredTime = DateTime();
     *    DateTime expiredTime2(expiredTime.timePoint());
     * @endcode 
-    * @param timePoint A LocalTimeMilis object representing the local time point.
+    * @param timePoint A LocalTime object representing the local time point.
     */  
-   DateTime(const LocalTimeMilis& timePoint);
+   DateTime(const LocalTime& timePoint);
 
    ~DateTime();
 
@@ -173,13 +176,13 @@ public:
     *  long long interval  = ( expiredTime2.timePoint() - expiredTime.timePoint() ).count();
     *  @endcode
     */
-   LocalTimeMilis& timePoint();
+   LocalTime& timePoint();
 
    /// Returns the date portion of this DateTime object.
    tbsdate::year_month_day ymd();
 
    /// Returns the time-of-day portion of this DateTime object.
-   tbsdate::hh_mm_ss<std::chrono::milliseconds> hms();
+   tbsdate::hh_mm_ss<std::chrono::nanoseconds> hms();
 
    /// Returns this DateTime as Unix time in milliseconds.
    long long toUnixTimeMiliSeconds();
@@ -199,11 +202,16 @@ public:
 private:
 
    void init(std::chrono::system_clock::time_point);
-   ZonedTimeMilis zonedTime();
-   std::string    _dateInputStr;
-   LocalTimeMilis _timepoint;
+
+   /// Combines the stored local time with the current time zone.
+   ZonedTime zonedTime();
+
+   std::string _dateInputStr;
+
+   LocalTime _timepoint;
    
    inline static bool _timeZoneInitialized = false;
+   
    inline static bool _usingInMemoryTZDB = false;
 
    bool _setToNull = false;

@@ -18,27 +18,37 @@ BytesReader::~BytesReader()
 // Read `bufSize` bytes from internal data into the buffer
 std::streamsize BytesReader::read(uint8_t* buffer, std::streamsize bufSize) 
 {
-   if ( _rawData.empty() || bufSize < 0 )
+   if (!_opened || bufSize < 0)
       return -1;
-   // make sure bufSize non negative, so we can safely static_cast into size_t
 
-   auto nSize = static_cast<std::size_t>(bufSize);
-   std::size_t nBytes = _rawData.size() < nSize  ? _rawData.size() : nSize;
-   std::memcpy(buffer, _rawData.data(), nBytes);
-   return nBytes;
+   const auto nSize = static_cast<std::size_t>(bufSize);
+   if (_position >= _rawData.size())
+      return -1;
+
+   const std::size_t available = _rawData.size() - _position;
+   const std::size_t nBytes = available < nSize ? available : nSize;
+
+   std::memcpy(buffer, _rawData.data() + _position, nBytes);
+   _position += nBytes;
+   return static_cast<std::streamsize>(nBytes);
 }
 
 // Read `bufSize` bytes from internal data then write into ostream
 std::streamsize BytesReader::read(std::ostream& ostream, std::streamsize bufSize)
 {
-   if ( _rawData.empty() || bufSize < 0 )
+   if (!_opened || bufSize < 0)
       return -1;
-   // make sure bufSize non negative, so we can safely static_cast into size_t
 
-   auto nSize = static_cast<std::size_t>(bufSize);
-   std::size_t nBytes = _rawData.size() < nSize  ? _rawData.size() : nSize;
-   ostream.write(reinterpret_cast<const char*>(_rawData.data()), nBytes);
-   return nBytes;
+   const auto nSize = static_cast<std::size_t>(bufSize);
+   if (_position >= _rawData.size())
+      return -1;
+
+   const std::size_t available = _rawData.size() - _position;
+   const std::size_t nBytes = available < nSize ? available : nSize;
+
+   ostream.write(reinterpret_cast<const char*>(_rawData.data() + _position), static_cast<std::streamsize>(nBytes));
+   _position += nBytes;
+   return static_cast<std::streamsize>(nBytes);
 }
 
 // Read `bufSize` bytes starting at a specific position `position` then copy to buffer

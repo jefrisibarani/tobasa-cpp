@@ -3,7 +3,7 @@
 #include <vector>
 #include <functional>
 #include <string>
-
+#include <tobasasql/sql_util.h>
 #include "tobasaweb/db_migration.h"
 
 namespace tbs {
@@ -19,7 +19,7 @@ void runDbMigrationImpl(const sql::conf::Database* opt, const std::string& secur
    try
    {
       DbConn conn;
-      auto connStr = util::getConnectionString(*opt, securitySalt);
+      auto connStr = sql::getConnectionString(*opt, securitySalt);
 
       if (conn.connect(connStr))
       {

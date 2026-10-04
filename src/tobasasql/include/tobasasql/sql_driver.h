@@ -49,6 +49,7 @@ namespace sql {
 template <
    typename ConnectionImplemented,
    typename ResultImplemented,
+   typename CommandImplemented,
    typename HelperImplemented,
    typename TableHelperImplemented,
    typename LoggerImplemented,
@@ -57,6 +58,7 @@ struct SqlDriver
 {
    using ConnectionImpl             = ConnectionImplemented;
    using ResultImpl                 = ResultImplemented;
+   using CommandImpl                = CommandImplemented;
    using HelperImpl                 = HelperImplemented;
    using TableHelperImpl            = TableHelperImplemented;
    using Logger                     = LoggerImplemented;
@@ -73,23 +75,23 @@ struct SqlDriver
 };
 
 #if defined(TOBASA_SQL_USE_PGSQL)
-   using PgsqlDriverDefault   = SqlDriver<PgsqlConnection,  PgsqlResult,  PgsqlHelper,  PgsqlTableHelper,  log::NullLogger>;
+   using PgsqlDriverDefault   = SqlDriver<PgsqlConnection, PgsqlResult, PgsqlCommand, PgsqlHelper, PgsqlTableHelper, log::NullLogger>;
    /// Postgresql driver with TobasaLogger.
-   using PgsqlDriver = SqlDriver<PgsqlConnection, PgsqlResult, PgsqlHelper, PgsqlTableHelper, log::TobasaLogger>;
+   using PgsqlDriver = SqlDriver<PgsqlConnection, PgsqlResult, PgsqlCommand, PgsqlHelper, PgsqlTableHelper, log::TobasaLogger>;
 #endif
 
 #if defined(TOBASA_SQL_USE_SQLITE)
-   using SqliteDriverDefault  = SqlDriver<SqliteConnection, SqliteResult, SqliteHelper, SqliteTableHelper, log::NullLogger>;
+   using SqliteDriverDefault  = SqlDriver<SqliteConnection, SqliteResult, SqliteCommand, SqliteHelper, SqliteTableHelper, log::NullLogger>;
    /// SQLite driver with TobasaLogger.
-   using SqliteDriver = SqlDriver<SqliteConnection, SqliteResult, SqliteHelper, SqliteTableHelper, log::TobasaLogger>;
+   using SqliteDriver = SqlDriver<SqliteConnection, SqliteResult, SqliteCommand, SqliteHelper, SqliteTableHelper, log::TobasaLogger>;
 #endif
 
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
-   using AdodbDriverDefault   = SqlDriver<AdodbConnection,  AdodbResult,  AdodbHelper,  AdodbTableHelper,  log::NullLogger>;
+   using AdodbDriverDefault   = SqlDriver<AdodbConnection, AdodbResult, AdodbCommand, AdodbHelper,  AdodbTableHelper,  log::NullLogger>;
 
    /// ADODB driver with TobasaLogger.
    class AdodbDriver
-      : public SqlDriver<AdodbConnection, AdodbResult, AdodbHelper, AdodbTableHelper, log::TobasaLogger, ComVariantType>
+      : public SqlDriver<AdodbConnection, AdodbResult, AdodbCommand, AdodbHelper, AdodbTableHelper, log::TobasaLogger, ComVariantType>
    {
    public:
       using VariantHelper = ComVariantHelper;
@@ -98,17 +100,17 @@ struct SqlDriver
 #endif
 
 #if defined(TOBASA_SQL_USE_ODBC)
-   using OdbcDriverDefault    = SqlDriver<OdbcConnection,   OdbcResult,   OdbcHelper,   OdbcTableHelper,   log::NullLogger>;
+   using OdbcDriverDefault    = SqlDriver<OdbcConnection, OdbcResult, OdbcCommand, OdbcHelper, OdbcTableHelper, log::NullLogger>;
    /// ODBC driver with TobasaLogger.
-   using OdbcDriver = SqlDriver<OdbcConnection, OdbcResult, OdbcHelper, OdbcTableHelper, log::TobasaLogger>;
+   using OdbcDriver = SqlDriver<OdbcConnection, OdbcResult, OdbcCommand, OdbcHelper, OdbcTableHelper, log::TobasaLogger>;
 #endif
 
 #if defined(TOBASA_SQL_USE_MYSQL)
-   using MysqlDriverDefault   = SqlDriver<MysqlConnection,  MysqlResult,  MysqlHelper,  MysqlTableHelper,  log::NullLogger>;
+   using MysqlDriverDefault   = SqlDriver<MysqlConnection, MysqlResult, MysqlCommand, MysqlHelper,  MysqlTableHelper,  log::NullLogger>;
 
    /// MySql driver with TobasaLogger.
    class MysqlDriver
-      : public SqlDriver<MysqlConnection, MysqlResult, MysqlHelper, MysqlTableHelper, log::TobasaLogger, MysqlVariantType>
+      : public SqlDriver<MysqlConnection, MysqlResult, MysqlCommand, MysqlHelper, MysqlTableHelper, log::TobasaLogger, MysqlVariantType>
    {
    public:
       using SqlParameter              = MysqlParameter;

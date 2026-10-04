@@ -130,6 +130,12 @@ bool streq(const T &a, const S &b, size_t blen)
                     std::next(std::begin(b), blen));
 }
 
+std::string doubleToString(double value);
+void doubleToString(double value, std::string& outStr);
+
+std::string floatToString(float value);
+void floatToString(float value, std::string& outStr);
+
 /** @}*/
 } // namespace util
 } // namespace tbs

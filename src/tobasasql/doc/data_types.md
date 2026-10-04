@@ -47,7 +47,7 @@ Each table is read in two directions:
 ## SQLite
 
 SQLite result values use SQLite runtime storage classes, not declared column
-types: `NULL`, `INTEGER`, `REAL`, `TEXT`, and `BLOB`.
+types: `NULL`, `INTEGER`, `REAL(SQLITE_FLOAT)`, `TEXT`, and `BLOB`.
 
 | TobasaSQL type | SQLite type when sent | SQLite type -> TobasaSQL | Notes |
 | --- | --- | --- | --- |
@@ -55,10 +55,10 @@ types: `NULL`, `INTEGER`, `REAL`, `TEXT`, and `BLOB`.
 | `smallint` | `INTEGER` |  | Same runtime class as every SQLite integer. |
 | `integer` | `INTEGER` |  |  |
 | `bigint` | `INTEGER` |  |  |
-| `numeric` | `REAL` | `REAL` -> `float8` | Exact decimal semantics are not preserved by this mapping. |
-| `float4` | `REAL` |  |  |
-| `float8` | `REAL` |  |  |
-| `boolean` | `INTEGER` |  | SQLite has no boolean storage class. |
+| `numeric` | `TEXT` | `TEXT` -> `varchar` | With declared type NUMERIC, DECIMAL |
+| `float4` | `REAL` | `REAL`->`float4`  | With declared type SINGLE, REAL, FLOAT  |
+| `float8` | `REAL` | `REAL`->`float8` | With declared type DOUBLE, DOUBLE PRECISION  |
+| `boolean` | `INTEGER` | `INTEGER`->`boolean`   | With declared type BOOL, BOOLEAN  |
 | `character` | `TEXT` | `TEXT` -> `varchar` |  |
 | `varchar` | `TEXT` |  |  |
 | `text` | `TEXT` |  |  |
@@ -67,18 +67,8 @@ types: `NULL`, `INTEGER`, `REAL`, `TEXT`, and `BLOB`.
 | `timestamp` | `TEXT` |  | SQLite timestamp values are stored as text. |
 | `varbinary` | `BLOB` | `BLOB` -> `varbinary` | Result BLOB bytes are converted to a hexadecimal `std::string` in `SqliteResult`; this differs from the documented portable `vector<uint8_t>` representation. |
 | `varbit` | `BLOB` | `BLOB` -> `varbinary` | SQLite has no native `BIT`/`VARBIT` type. The implementation treats bit-like values as binary blobs and normalizes them as `varbinary` on read. |
-| `unknown` | -- |  | Throws when converting to SQLite. |
 
-The reverse mapping is intentionally lossy: SQLite `INTEGER` is normalized to
-`bigint`, `REAL` to `float8`, and `TEXT` to `varchar`, regardless of the
-original declared type. SQLite `NULL` is stored as `std::monostate` in a value
-variant, while `sqliteTypeToDataType(SqliteType::null)` still reports `varchar`
-for metadata purposes.
 
-SQLite declared-type inspection uses a compatibility parser for common type
-names such as `INTEGER`, `BOOLEAN`, `CHAR`, `VARCHAR`, `TEXT`, `DOUBLE`,
-`FLOAT`, `REAL`, `NUMERIC`, `BLOB`, `DATE`, `DATETIME`, and `TIMESTAMP`.
-Unrecognized declared types are treated as text by `sqliteColumnDeclaredType`.
 
 ## PostgreSQL
 

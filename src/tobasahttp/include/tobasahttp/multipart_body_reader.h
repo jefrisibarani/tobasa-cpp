@@ -14,36 +14,31 @@ namespace http {
 
 /**
  * @class MultipartBodyReader
- * @brief Asynchronous body reader for multipart/form-data requests.
+ * @brief Reads multipart/form-data request bodies as data arrives.
  *
- * The MultipartBodyReader provides an abstraction layer to parse multipart
- * request bodies that may arrive via either Content-Length-delimited or
- * chunked transfer encoding. It cooperates with the HTTP server’s connection
- * loop: the server feeds incoming buffers via feed(), while the reader
- * invokes user-provided handlers to process those buffers.
+ * This class parses multipart request bodies that can come in either a normal
+ * Content-Length format or chunked transfer encoding. It works with the
+ * server's connection loop: the server sends each new incoming buffer through
+ * feed(), and this reader processes it with a handler.
  *
- * ### Responsibilities
- * - Manage multipart parsing state across multiple network reads.
- * - Support both normal Content-Length uploads and chunked transfer encoding.
- * - Allow middleware or parsers to attach a DataHandler to process incoming data.
- * - Trigger async continuation of request handling by invoking ReadCallback when
- *   more network data is required.
+ * It keeps track of the parsing state across multiple network reads, and it can
+ * ask the server to read more data when needed. This makes it useful for
+ * handling uploads without waiting for the full body to arrive at once.
  *
- * ### Usage
- * 1. Construct a MultipartBodyReader from the server’s first read buffer and a
- *    continuation callback.
- * 2. Call read() with a DataHandler implementation that parses the multipart data.
- * 3. For each subsequent incoming buffer, call feed() to deliver new bytes.
- * 4. The DataHandler should return a parser::Info structure describing whether
- *    parsing succeeded and how many bytes were consumed.
- * 5. Once parsing is complete, call done(true) to signal completion.
+ * ### Basic flow
+ * 1. Create the reader with the first buffer and a callback to read more data.
+ * 2. Call read() with a DataHandler to parse the incoming body.
+ * 3. Feed each new network buffer into the reader.
+ * 4. The handler returns parser::Info to say whether parsing succeeded and how
+ *    much data was consumed.
+ * 5. When the body is finished, call done(true).
  */
 class MultipartBodyReader
    : public std::enable_shared_from_this<MultipartBodyReader>
 {
 public:
    /// Callback invoked when more data must be read from the network.
-   using ReadCallback       = std::function<void()>;
+   using ReadCallback = std::function<void()>;
 
    /**
     * @brief Function that consumes incoming multipart body bytes.
@@ -52,15 +47,15 @@ public:
     * @param totalData Number of bytes available.
     * @return parser::Info containing parsing success, error messages, etc.
     */
-   using DataHandler        = std::function<parser::Info(const uint8_t *data, size_t totalData)>;
+   using DataHandler = std::function<parser::Info(const uint8_t *data, size_t totalData)>;
    
    /// Starter function used when multipart body uses chunked transfer encoding.
    using ProcessBodyStarter = std::function<parser::Info()>;
 
 private:
-   DataHandler        _dataHandler        = nullptr;
-   ReadCallback       _readCallback       = nullptr;
-   ProcessBodyStarter _processBodyStarter = nullptr;
+   DataHandler        _dataHandler        {nullptr};
+   ReadCallback       _readCallback       {nullptr};
+   ProcessBodyStarter _processBodyStarter {nullptr};
 
    // Initial buffer passed during construction (before async reads).
    span<const char> _buffer {};
@@ -72,12 +67,12 @@ private:
    size_t _totalData {0};
 
    // Indicates whether parsing is complete.
-   bool   _done           = false;
+   bool _done {false};
 
-   bool   _firstReadDone  = false;
+   bool _firstReadDone {false};
 
    // True if the multipart body uses Transfer-Encoding: chunked.
-   bool   _chunkedMultipart = false;
+   bool _chunkedMultipart {false};
 
 public:
 

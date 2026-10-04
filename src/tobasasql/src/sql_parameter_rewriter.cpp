@@ -1,11 +1,38 @@
+#include <tobasa/util_string.h>
 #include "tobasasql/sql_parameter_rewriter.h"
 
 namespace tbs {
 namespace sql {
 
 
+bool SqlParameterRewriter::hasNativePostgresPositionalPlaceholder(const std::string& sql)
+{
+   for (size_t i = 0; i < sql.size(); ++i)
+   {
+      if (sql[i] != '$' || i + 1 >= sql.size())
+         continue;
+
+      const unsigned char next = static_cast<unsigned char>(sql[i + 1]);
+      if (!std::isdigit(next))
+         continue;
+
+      size_t j = i + 1;
+      while (j < sql.size() && std::isdigit(static_cast<unsigned char>(sql[j])))
+         ++j;
+
+      // PostgreSQL positional placeholders are numeric, e.g. $1, $2.
+      // Dollar-quoted literals like $$...$$ or $tag$...$tag$ are not positional params.
+      return true;
+   }
+
+   return false;
+}
+
 std::string SqlParameterRewriter::rewrite(const std::string& sql) 
 {
+   if (_dbms == sql::BackendType::pgsql && hasNativePostgresPositionalPlaceholder(sql))
+      return sql;
+
    _params.clear();
 
    std::string result;
@@ -33,6 +60,13 @@ std::string SqlParameterRewriter::rewrite(const std::string& sql)
          if (c == '"')  { state = DoubleQuote; result += c; continue; }
 
          // dollar-quote start ($tag$...$tag$)
+         // PostgreSQL positional placeholders like $1, $2 are not dollar quotes.
+         if (c == '$' && i + 1 < sql.size() && std::isdigit(static_cast<unsigned char>(sql[i + 1])))
+         {
+            result += c;
+            continue;
+         }
+
          if (c == '$') 
          {
             size_t j = i + 1;
@@ -48,7 +82,8 @@ std::string SqlParameterRewriter::rewrite(const std::string& sql)
          }
 
          // param detection
-         if (c == ':' && !(i + 1 < sql.size() && sql[i+1] == ':')) 
+          if (c == ':' && !(i > 0 && sql[i-1] == ':') &&
+             !(i + 1 < sql.size() && sql[i+1] == ':')) 
          {
             size_t j = i + 1;
             if (j < sql.size() && (isalpha((unsigned char)sql[j]) || sql[j] == '_')) 

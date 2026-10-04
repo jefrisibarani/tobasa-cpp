@@ -12,8 +12,6 @@ MultipartBodyReader::MultipartBodyReader(ReadCallback readCb, span<const char> _
 
 MultipartBodyReader::~MultipartBodyReader()
 {
-   std::cout << "TMPDBG ~MultipartBodyReader() \n";
-
    _dataHandler        = nullptr;
    _readCallback       = nullptr;
    _processBodyStarter = nullptr;
@@ -31,8 +29,11 @@ MultipartBodyReader::DataHandler MultipartBodyReader::chunkedHandler()
 }
 
 bool MultipartBodyReader::done() { return _done; }
+
 void MultipartBodyReader::done(bool val) { _done=val;}
+
 void MultipartBodyReader::setMultipartWithChunkedTransferEncoding() { _chunkedMultipart = true; }
+
 bool MultipartBodyReader::chunkedMultipart() const { return _chunkedMultipart; }
 
 /**

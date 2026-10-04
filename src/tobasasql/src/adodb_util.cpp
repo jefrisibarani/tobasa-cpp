@@ -1,9 +1,22 @@
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
+// for decimalToString
+#include <windows.h>
+#include <oleauto.h>
+//#include <cstdint>
+#include <algorithm>
+
+// For time2BytesToString
+#include <cinttypes>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
 #include <tobasa/format.h>
 #include <tobasa/util_string.h>
 #include <tobasa/util_utf.h>
 #include "tobasasql/sql_parameter.h"
+#include "tobasasql/adodb_types.h"
 #include "tobasasql/adodb_util.h"
 
 /*
@@ -45,106 +58,6 @@ Note:
 */
 
 namespace tbs {
-namespace util {
-
-_bstr_t utf8_to_bstr_t(const std::string& str)
-{
-   std::wstring strW = utf8_to_wstring(str);
-   _bstr_t strBW((wchar_t*)strW.c_str());
-
-   return strBW;
-}
-
-std::string utf8_from_bstr_t(const _bstr_t& str)
-{
-   std::string strC = wstring_to_utf8((wchar_t*)str);
-   return strC;
-}
-
-} // namespace util
-
-ComError::ComError(_com_error& e, const char* fl, int ln)
-{
-    _bstr_t errMsg = (_bstr_t) e.ErrorMessage();
-    _bstr_t errSrc = (_bstr_t) e.Source();
-    _bstr_t errDes = (_bstr_t) e.Description();
-
-    errMsg = errMsg.length() == 0 ? _bstr_t("") : errMsg;
-    errSrc = errSrc.length() == 0 ? _bstr_t("") : errSrc;
-    errDes = errDes.length() == 0 ? _bstr_t("") : errDes;
-
-    std::string fullMessage_;
-    if (strlen(fl)>0  && ln != 0)
-    {
-        fullMessage_ =
-        tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}, File: {}, Line: {}",
-            static_cast<unsigned>(e.Error()),
-            (char*) errMsg,
-            (char*) errSrc,
-            (char*) errDes,
-            fl,
-            ln);
-
-        file = fl;
-        line = ln;
-    }
-    else
-    {
-        fullMessage_ =
-        tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}",
-            static_cast<unsigned>(e.Error()),
-            (char*) errMsg,
-            (char*) errSrc,
-            (char*) errDes);
-    }
-
-    fullMessage = fullMessage_;
-    message     = (char*) errMsg;
-    source      = (char*) errSrc;
-    description = (char*) errDes;
-}
-
- void extractComError(_com_error& e, ComError& comError, const char* file, int line)
-{
-   _bstr_t errMsg = (_bstr_t)e.ErrorMessage();
-   _bstr_t errSrc = (_bstr_t)e.Source();
-   _bstr_t errDes = (_bstr_t)e.Description();
-
-   errMsg = errMsg.length() == 0 ? _bstr_t("") : errMsg;
-   errSrc = errSrc.length() == 0 ? _bstr_t("") : errSrc;
-   errDes = errDes.length() == 0 ? _bstr_t("") : errDes;
-
-   std::string fullMessage;
-   if (strlen(file)>0 && line != 0)
-   {
-      fullMessage =
-         tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}, File: {}, Line: {}",
-            static_cast<unsigned>(e.Error()),
-            (char*)errMsg,
-            (char*)errSrc,
-            (char*)errDes,
-            file,
-            line);
-
-      comError.file = file;
-      comError.line = line;
-   }
-   else
-   {
-      fullMessage =
-         tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}",
-            static_cast<unsigned>(e.Error()),
-            (char*)errMsg,
-            (char*)errSrc,
-            (char*)errDes);
-   }
-
-   comError.fullMessage = fullMessage;
-   comError.message     = (char*)errMsg;
-   comError.source      = (char*)errSrc;
-   comError.description = (char*)errDes;
-}
-
 namespace sql {
 
 ADODB::DataTypeEnum adoDataTypeFromString(const std::string& ftype)
@@ -542,7 +455,266 @@ TypeClass typeClassFromAdodbType(const long type)
    return retVal;
 }
 
-} // namespace sql
+_bstr_t utf8_to_bstr_t(const std::string& str)
+{
+   std::wstring strW = util::utf8_to_wstring(str);
+   _bstr_t strBW((wchar_t*)strW.c_str());
+
+   return strBW;
+}
+
+std::string utf8_from_bstr_t(const _bstr_t& str)
+{
+   std::string strC = util::wstring_to_utf8((wchar_t*)str);
+   return strC;
+}
+
+std::string adoDbTime2ToString(const sql::AdoDbTime2& time)
+{
+   char buffer[32];
+
+   if (time.fraction != 0)
+   {
+      std::snprintf(
+         buffer,
+         sizeof(buffer),
+         "%02" PRIu16 ":%02" PRIu16 ":%02" PRIu16 ".%07" PRIu32,
+         time.hour,
+         time.minute,
+         time.second,
+         time.fraction
+      );
+   }
+   else if (time.second != 0)
+   {
+      std::snprintf(
+         buffer,
+         sizeof(buffer),
+         "%02" PRIu16 ":%02" PRIu16 ":%02" PRIu16,
+         time.hour,
+         time.minute,
+         time.second
+      );
+   }
+   else
+   {
+      std::snprintf(
+         buffer,
+         sizeof(buffer),
+         "%02" PRIu16 ":%02" PRIu16 ":%02" PRIu16,
+         time.hour,
+         time.minute,
+         0
+      );
+   }
+
+   return buffer;
+}
+
+std::string adoDbTime2VariantToString(const tbs::ComVariantType& variantVal)
+{
+   if (std::holds_alternative<std::vector<uint8_t>>(variantVal))
+   {
+      auto& timeValueBytes = std::get<std::vector<uint8_t>>(variantVal);
+      return adoDbTime2BytesToString(timeValueBytes);
+   }
+
+   throw AppException("variant type holds unknown alternative");
+}
+
+std::string adoDbTime2BytesToString(const std::vector<uint8_t>& data)
+{
+   if (data.size() != sizeof(sql::AdoDbTime2))
+      throw AppException("Invalid DBTIME2 data size");
+
+   sql::AdoDbTime2 time{};
+
+   std::memcpy(&time, data.data(), sizeof(time));
+
+   return adoDbTime2ToString(time);
+}
+
+std::string decimalToString(const DECIMAL& value)
+{
+   // DECIMAL uses:
+   //
+   //   Hi32:Mid32:Lo32 = 96-bit unsigned integer
+   //   scale            = number of decimal digits
+   //   sign             = 0x00 positive, 0x80 negative
+   //
+   // Value = integer / 10^scale
+
+   const uint32_t lo  = value.Lo32;
+   const uint32_t mid = value.Mid32;
+   const uint32_t hi  = value.Hi32;
+
+   // DECIMAL scale is defined as 0..28.
+   if (value.scale > 28)
+      throw std::invalid_argument("Invalid DECIMAL scale");
+
+   // Convert the 96-bit integer to decimal digits.
+   //
+   // We repeatedly divide the 96-bit number by 10.
+   // The quotient remains 96-bit, while the remainder gives
+   // one decimal digit.
+
+   uint32_t words[3] = { lo, mid, hi };
+
+   std::string digits;
+
+   bool isZero = (lo == 0 && mid == 0 && hi == 0);
+
+   if (isZero)
+   {
+      digits = "0";
+   }
+   else
+   {
+      while (words[0] != 0 || words[1] != 0 || words[2] != 0)
+      {
+         uint64_t remainder = 0;
+
+         // Divide the 96-bit value by 10.
+         //
+         // Process from most significant word to least significant.
+         for (int i = 2; i >= 0; --i)
+         {
+            uint64_t current =
+               (remainder << 32) | words[i];
+
+            words[i] =
+               static_cast<uint32_t>(current / 10);
+
+            remainder = current % 10;
+         }
+
+         digits.push_back(
+            static_cast<char>('0' + remainder)
+         );
+      }
+
+      std::reverse(digits.begin(), digits.end());
+   }
+
+   const unsigned scale = value.scale;
+
+   // No fractional part.
+   if (scale == 0)
+   {
+      if (value.sign & 0x80)
+         return "-" + digits;
+
+      return digits;
+   }
+
+   // Make sure there are enough digits to put the decimal
+   // point into the correct position.
+   if (digits.size() <= scale)
+   {
+      digits.insert(
+         0,
+         scale + 1 - digits.size(),
+         '0'
+      );
+   }
+
+   const size_t decimalPos = digits.size() - scale;
+
+   digits.insert(decimalPos, 1, '.');
+
+   // DECIMAL zero should normally not be returned as "-0".
+   if ((value.sign & 0x80) && !isZero)
+      digits.insert(0, 1, '-');
+
+   return digits;
+}
+
+
+} // namespace sql ------------------------------------------------------------------
+
+
+ComError::ComError(_com_error& e, const char* fl, int ln)
+{
+    _bstr_t errMsg = (_bstr_t) e.ErrorMessage();
+    _bstr_t errSrc = (_bstr_t) e.Source();
+    _bstr_t errDes = (_bstr_t) e.Description();
+
+    errMsg = errMsg.length() == 0 ? _bstr_t("") : errMsg;
+    errSrc = errSrc.length() == 0 ? _bstr_t("") : errSrc;
+    errDes = errDes.length() == 0 ? _bstr_t("") : errDes;
+
+    std::string fullMessage_;
+    if (strlen(fl)>0  && ln != 0)
+    {
+        fullMessage_ =
+        tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}, File: {}, Line: {}",
+            static_cast<unsigned>(e.Error()),
+            (char*) errMsg,
+            (char*) errSrc,
+            (char*) errDes,
+            fl,
+            ln);
+
+        file = fl;
+        line = ln;
+    }
+    else
+    {
+        fullMessage_ =
+        tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}",
+            static_cast<unsigned>(e.Error()),
+            (char*) errMsg,
+            (char*) errSrc,
+            (char*) errDes);
+    }
+
+    fullMessage = fullMessage_;
+    message     = (char*) errMsg;
+    source      = (char*) errSrc;
+    description = (char*) errDes;
+}
+
+ void extractComError(_com_error& e, ComError& comError, const char* file, int line)
+{
+   _bstr_t errMsg = (_bstr_t)e.ErrorMessage();
+   _bstr_t errSrc = (_bstr_t)e.Source();
+   _bstr_t errDes = (_bstr_t)e.Description();
+
+   errMsg = errMsg.length() == 0 ? _bstr_t("") : errMsg;
+   errSrc = errSrc.length() == 0 ? _bstr_t("") : errSrc;
+   errDes = errDes.length() == 0 ? _bstr_t("") : errDes;
+
+   std::string fullMessage;
+   if (strlen(file)>0 && line != 0)
+   {
+      fullMessage =
+         tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}, File: {}, Line: {}",
+            static_cast<unsigned>(e.Error()),
+            (char*)errMsg,
+            (char*)errSrc,
+            (char*)errDes,
+            file,
+            line);
+
+      comError.file = file;
+      comError.line = line;
+   }
+   else
+   {
+      fullMessage =
+         tbsfmt::format("Error Code: {:08x}, Message: {}, Source: {}, Description: {}",
+            static_cast<unsigned>(e.Error()),
+            (char*)errMsg,
+            (char*)errSrc,
+            (char*)errDes);
+   }
+
+   comError.fullMessage = fullMessage;
+   comError.message     = (char*)errMsg;
+   comError.source      = (char*)errSrc;
+   comError.description = (char*)errDes;
+}
+
 } // namespace tbs
 
 #endif // defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)

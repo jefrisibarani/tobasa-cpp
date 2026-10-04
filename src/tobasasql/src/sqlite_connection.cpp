@@ -3,6 +3,7 @@
 #include "tobasasql/exception.h"
 #include "tobasasql/sql_dataset.h"
 #include "tobasasql/sqlite_util.h"
+#include "tobasasql/sqlite_command.h"
 #include "tobasasql/sqlite_connection.h"
 
 namespace tbs {
@@ -10,10 +11,39 @@ namespace sql {
 
 SqliteConnection::SqliteConnection()
    : ConnectionCommon()
+   , _pDatabase(nullptr)
+   , _isEncrypted(false)
 {
-   _pDatabase     = nullptr;
-   _isEncrypted   = false;
    notifierSource = "SqliteConnection";
+}
+
+SqliteConnection::SqliteConnection(SqliteConnection&& other) noexcept
+   : ConnectionCommon(std::move(other))
+   , _pDatabase(    other._pDatabase)
+   , _databaseName( std::move(other._databaseName))
+   , _isEncrypted(  other._isEncrypted)
+{
+   other._pDatabase   = nullptr;
+   other._databaseName.clear();
+   other._isEncrypted = false;
+}
+
+SqliteConnection& SqliteConnection::operator=(SqliteConnection&& other) noexcept
+{
+   if (this != &other)
+   {
+      disconnect();
+      ConnectionCommon::operator=(std::move(other));
+
+      _pDatabase    = other._pDatabase;
+      _databaseName = std::move(other._databaseName);
+      _isEncrypted  = other._isEncrypted;
+
+      other._pDatabase   = nullptr;
+      other._databaseName.clear();
+      other._isEncrypted = false;
+   }
+   return *this;
 }
 
 SqliteConnection::~SqliteConnection()
@@ -91,11 +121,22 @@ bool SqliteConnection::connect(const std::string& connString)
       openFlag = SQLITE_OPEN_READWRITE|SQLITE_OPEN_MEMORY;
    }
 
+   if (!paramOpenMemory && paramDatabase.empty())
+   {
+      onNotifyError(logId() + "SQLite Database file is not specified");
+      return false;
+   }
+
    int retCode = sqlite3_open_v2(paramDatabase.c_str(), (sqlite3**)&_pDatabase, openFlag, NULL);
 
    if (retCode == SQLITE_OK)
    {
-      if (keyDatabase(paramPassword))
+      if (!paramOpenMemory && !paramPassword.empty() && keyDatabase(paramPassword) )
+      {
+         _connStatus = ConnectionStatus::ok;
+         return true;
+      }
+      else
       {
          _connStatus = ConnectionStatus::ok;
          return true;
@@ -115,9 +156,9 @@ bool SqliteConnection::disconnect()
    if (_pDatabase)
    {
       sqlite3_close(_pDatabase);
-      _pDatabase = nullptr;
+      _pDatabase   = nullptr;
       _isEncrypted = true;
-      _connStatus = ConnectionStatus::bad;
+      _connStatus  = ConnectionStatus::bad;
 
       return true;
    }
@@ -147,86 +188,23 @@ int SqliteConnection::execute(const std::string& sql, const SqlParameterCollecti
    if (status() != ConnectionStatus::ok)
       return -1;
 
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
-
-   sqlite3_stmt* pStatement = createStatement(sql, parameters);
-   int retCode              = sqlite3_step(pStatement);
-   int affectedRows         = sqlite3_changes(_pDatabase);
-
-   // INSERT, UPDATE, and DELETE
-   if (retCode == SQLITE_DONE)
-   {
-      sqlite3_finalize(pStatement);
-
-      // Only changes made directly by the INSERT, UPDATE or DELETE statement are considered affected rows
-      if (affectedRows < 0)
-         affectedRows = 0;
-
-      if (logExecuteStatus())
-         onNotifyTrace(logId() + tbsfmt::format("SQL command executed successfully, affectedRows: {}", affectedRows));
-      
-      return affectedRows;
-   }
-   // Query returns rows, ignore the result!
-   else if (retCode == SQLITE_ROW)
-   {
-      sqlite3_finalize(pStatement);
-      return 0;
-   }
+   SqliteCommand cmd(this);
+   if (cmd.query(sql, parameters))
+      return cmd.execute();
    else
-   {
-      auto errMessage = lastBackendError();
-      onNotifyError(logId() + errMessage );
-      sqlite3_finalize(pStatement);
-      throw tbs::SqlException(tbsfmt::format("execute, {}", errMessage), "SqliteConnection");
-   }
-
-   return -1;
+      return -1;
 }
 
 std::string SqliteConnection::executeScalar(const std::string& sql, const SqlParameterCollection& parameters)
 {
    if (status() != ConnectionStatus::ok)
-      throw tbs::SqlException("Invalid connection status", "SqliteConnection");
-
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("executeScalar: {}", sql));
-
-   sqlite3_stmt* pStatement = createStatement(sql, parameters);
-   //int numColumns         = sqlite3_column_count(pStatement);
-   int retCode              = sqlite3_step(pStatement);
-   //int affectedRows       = sqlite3_changes(_pDatabase);
-
-   if (retCode == SQLITE_ROW)
-   {
-      std::string result;
-      if (nullptr == sqlite3_column_text(pStatement, 0))
-         result = sql::NULLSTR;
-      else
-      {
-         const unsigned char* val = sqlite3_column_text(pStatement,0);
-         result = std::string((const char*)val);
-      }
-
-      sqlite3_finalize(pStatement);
-      return result;
-   }
-   // INSERT, UPDATE, and DELETE
-   else if (retCode == SQLITE_DONE)
-   {
-      sqlite3_finalize(pStatement);
-      onNotifyInfo(logId() + "Scalar query returned no record");
       return "";
-   }
-   else
-   {
-      onNotifyError(logId() + lastBackendError());
-      sqlite3_finalize(pStatement);
-      throw tbs::SqlException(tbsfmt::format("execute, {}", lastBackendError()),"SqliteConnection");
-   }
 
-   return "";
+   SqliteCommand cmd(this);
+   if (cmd.query(sql, parameters))
+      return cmd.executeScalar();
+   else 
+      return "";
 }
 
 std::string SqliteConnection::versionString() const
@@ -240,7 +218,7 @@ std::string SqliteConnection::versionString() const
 std::string SqliteConnection::databaseName()
 {
    if (status() != ConnectionStatus::ok)
-      return "";
+       return "";
    
    SqlApplyLogInternal applyLogRule(this);
    return executeScalar("select file from pragma_database_list where name='main'");
@@ -277,7 +255,7 @@ int64_t SqliteConnection::lastInsertRowid()
 // Specific implementation functions
 // -------------------------------------------------------
 
-sqlite3* SqliteConnection::nativeConn() const { return _pDatabase; }
+sqlite3* SqliteConnection::nativeConnection() const { return _pDatabase; }
 
 bool SqliteConnection::keyDatabase(const std::string& key)
 {
@@ -292,17 +270,28 @@ bool SqliteConnection::keyDatabase(const std::string& key)
       onNotifyError(logId() + lastBackendError());
       return false;
    }
-
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "kdf_iter",              256000);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "fast_kdf_iter",         2);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_use",              1);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_pgno",             1);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_salt_mask",        0x3a);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "legacy",                4);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "legacy_page_size",      4096);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "kdf_algorithm",         2);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_algorithm",        2);
-   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "plaintext_header_size", 0);
+   
+   // Note: https://utelle.github.io/SQLite3MultipleCiphers/docs/ciphers/cipher_sqlcipher/
+   // Number of iterations for key derivation
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "kdf_iter",              256000); 
+   // Number of iterations for HMAC key derivation
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "fast_kdf_iter",         2);      
+   // Flag whether a HMAC should be used
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_use",              1);      
+   // Storage type for page number in HMAC: 0 = native, 1 = little endian, 2 = big endian
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_pgno",             1);      
+   // Mask byte for HMAC salt
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_salt_mask",        0x3a);   
+   // SQLCipher version to be used in legacy mode
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "legacy",                4);      
+   // Page size to use in legacy mode, 0 = default SQLite page size
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "legacy_page_size",      4096);   
+   // Hash algoritm for key derivation function 0 = SHA1, 1 = SHA256, 2 = SHA512
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "kdf_algorithm",         2);      
+   // Hash algoritm for HMAC calculation 0 = SHA1, 1 = SHA256, 2 = SHA512
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "hmac_algorithm",        2);      
+   // Size of plaintext database header must be a multiple of 16, i.e. 32
+   sqlite3mc_config_cipher((sqlite3*)_pDatabase, "sqlcipher", "plaintext_header_size", 0);      
 
    retCode = sqlite3_key((sqlite3*)_pDatabase, localKey, (int)key.length());
    if (retCode != SQLITE_OK)
@@ -352,221 +341,17 @@ bool SqliteConnection::rekeyDatabase(const std::string& newKey)
 
 std::string SqliteConnection::lastBackendError() const
 {
-   std::string errmsg;
-   const char* sqliteErr = 0;
-
-   if (_pDatabase)
+   if (_pDatabase == nullptr)
    {
-      sqliteErr = sqlite3_errmsg(_pDatabase);
-      if (sqliteErr)
-         errmsg = std::string(sqliteErr);
+      onNotifyError("lastBackendError, invalid connection object", "SqliteConnection");
+      return "invalid connection object";
    }
 
-   return errmsg;
-}
+   const char* err = sqlite3_errmsg(_pDatabase);
+   if (err != nullptr && err[0] != '\0')
+      return std::string(err);
 
-sqlite3_stmt* SqliteConnection::createStatement(const std::string& sql, const SqlParameterCollection& parameters)
-{
-   sqlite3_stmt* pStatement = nullptr;
-
-   try
-   {
-      const char* szTail = 0;
-      const char* sqlBuffer = sql.c_str();
-      int retCode = sqlite3_prepare_v2(_pDatabase, sqlBuffer, -1, &pStatement, &szTail);
-      if (retCode != SQLITE_OK)
-      {
-         pStatement = nullptr;
-         onNotifyError(logId() + lastBackendError());
-         throw tbs::SqlException(tbsfmt::format("createStatement, {}", lastBackendError()), "SqliteConnection");
-      }
-      
-      for (unsigned int i = 0; i < parameters.size(); i++)
-      {
-         int bindRc  = SQLITE_OK;
-         auto& param = parameters.at(i);
-         SqliteType parameterType = sqliteTypeFromDataType(param->type());
-
-         if (std::holds_alternative<std::monostate>(param->value()))
-         {
-            // this is a param with monostate variant value. send it to backend as NULL
-            bindRc = sqlite3_bind_null(pStatement, i + 1);
-         }
-         else 
-         {
-            std::string variantErrorMessage = "Invalid variant type for " + dataTypeToString(param->type());
-            
-            switch (parameterType)
-            {
-               case SqliteType::null:
-                  bindRc = sqlite3_bind_null(pStatement, i + 1);
-                  break;
-               case SqliteType::integer:
-               {
-                  if (std::holds_alternative<bool>(param->value()))
-                  {
-                     bool bvalue = std::get<bool>(param->value());
-                     auto paramValue = (int)((bvalue == true) ? 1 : 0);
-                     bindRc = sqlite3_bind_int(pStatement, i + 1, paramValue);
-                  }
-                  else if (std::holds_alternative<int16_t>(param->value()))
-                  {
-                     auto paramValue = std::get<int16_t>(param->value());
-                     bindRc = sqlite3_bind_int(pStatement, i + 1, paramValue);
-                  }                  
-                  else if (std::holds_alternative<int32_t>(param->value()))
-                  {
-                     auto paramValue = std::get<int32_t>(param->value());
-                     bindRc = sqlite3_bind_int(pStatement, i + 1, paramValue);
-                  }
-                  else if (std::holds_alternative<int64_t>(param->value()))
-                  {
-                     auto paramValue = std::get<int64_t>(param->value());
-                     bindRc = sqlite3_bind_int64(pStatement, i + 1, paramValue);
-                  }
-                  else
-                  {
-                     sqlite3_finalize(pStatement);
-                     throw SqlException(variantErrorMessage, "SqliteConnection");
-                  }
-               }
-                  break;
-               case SqliteType::real:
-               {
-                  if (std::holds_alternative<float>(param->value()))
-                  {
-                     auto paramValue = std::get<float>(param->value());
-                     bindRc = sqlite3_bind_double(pStatement, i + 1, paramValue);
-                  }
-                  else if (std::holds_alternative<double>(param->value()))
-                  {
-                     auto paramValue = std::get<double>(param->value());
-                     bindRc = sqlite3_bind_double(pStatement, i + 1, paramValue);
-                  }
-                  else if (std::holds_alternative<std::string>(param->value()))
-                  {
-                     const char* paramValue = VariantHelper<>::value<std::string>(param->value()).c_str();
-                     bindRc = sqlite3_bind_text(pStatement, i + 1, paramValue, -1, SQLITE_STATIC);
-                  }
-                  else 
-                  {
-                     sqlite3_finalize(pStatement);
-                     throw SqlException(variantErrorMessage, "SqliteConnection");
-                  }
-               }
-                  break;
-               case SqliteType::text:
-               {
-                  const char* paramValue = VariantHelper<>::value<std::string>(param->value()).c_str();
-                  bindRc = sqlite3_bind_text(pStatement, i + 1, paramValue, -1, SQLITE_STATIC);
-               }
-                  break;
-               case SqliteType::blob:
-               {
-                  // BLOB. The value is a blob of data, stored exactly as it was input.
-                  // store the data byte array
-                  void* pBlob = *(param->valueBinaryPtr());
-                  bindRc = sqlite3_bind_blob(pStatement, i + 1, (const void*)pBlob, static_cast<int>(param->size()), SQLITE_TRANSIENT);
-               }
-                  break;
-               default:
-               {
-                  sqlite3_finalize(pStatement);
-                  onNotifyError(logId() + "Invalid sqlite data type");
-                  throw tbs::SqlException(tbsfmt::format("createStatement, invalid sqlite data type"), "SqliteConnection");
-               }
-                  break;
-            }
-         }
-
-         if (bindRc != SQLITE_OK)
-         {
-            sqlite3_finalize(pStatement);
-            onNotifyError(logId() + lastBackendError());
-            throw tbs::SqlException(tbsfmt::format("createStatement, {}", lastBackendError()), "SqliteConnection");
-         }
-      }
-
-      return pStatement;
-   }
-   catch (const std::bad_variant_access&)
-   {
-      sqlite3_finalize(pStatement);
-      throw tbs::SqlException("createStatement, bad variant access", "SqliteConnection");
-   }
-   catch (const tbs::VariantException& ex)
-   {
-      sqlite3_finalize(pStatement);
-      throw tbs::SqlException(tbsfmt::format("createStatement, {}", ex.what()),"SqliteConnection");
-   }
-   catch (const tbs::TypeException& ex)
-   {
-      sqlite3_finalize(pStatement);
-      throw tbs::SqlException(tbsfmt::format("createStatement, {}", ex.what()),"SqliteConnection");
-   }
-
-   return nullptr;
-}
-
-std::shared_ptr<DataSet<DefaultVariantType>> SqliteConnection::executeResult(
-   const std::string& sql,
-   const SqlParameterCollection& parameters)
-{
-   if (status() != ConnectionStatus::ok)
-      return nullptr;
-
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("executeScalar: {}", sql));
-
-   sqlite3_stmt* pStatement = createStatement(sql, parameters);
-   //int affectedRows       = sqlite3_changes(_pDatabase);
-   int numColumns           = sqlite3_column_count(pStatement);
-   int retCode              = 0;
-   int resultsRetrieved     = 0;
-   auto dbresult            = std::make_shared<DataSet<DefaultVariantType>>();
-   dbresult->totalColumns   = numColumns;
-
-   while (true)
-   {
-      retCode = sqlite3_step(pStatement);
-
-      if (retCode == SQLITE_DONE)
-         break;
-      else if (retCode == SQLITE_ROW)
-      {
-         auto& newRow = dbresult->addRow();
-
-         int i = 0;
-         for (i = 0; i < numColumns; i++)
-         {
-            if (NULL == sqlite3_column_text(pStatement, i) )
-               newRow.push_back(sql::NULLSTR);
-            else
-            {
-               std::string value = (const char*)sqlite3_column_text(pStatement, i);
-               newRow.push_back(value);;
-            }
-         }
-         resultsRetrieved++;
-      }
-      else
-      {
-         auto errorMessage = lastBackendError();
-         onNotifyError(logId() + errorMessage);
-         sqlite3_finalize(pStatement);
-         throw tbs::SqlException(tbsfmt::format("executeResult, {}", errorMessage), "SqliteConnection");
-      }
-   }
-
-   dbresult->totalRows = resultsRetrieved;
-
-   if (retCode == SQLITE_DONE)
-   {
-      sqlite3_finalize(pStatement);
-      return dbresult;
-   }
-
-   return nullptr;
+   return "Unknown SQLite backend error";
 }
 
 bool SqliteConnection::tableOrViewExists(const std::string& tableName, bool checkTable)
@@ -590,6 +375,7 @@ bool SqliteConnection::tableOrViewExists(const std::string& tableName, bool chec
 bool SqliteConnection::getTablesOrViews(std::vector<std::string>& objectNames, bool getTables)
 {
    std::string tableType = getTables ? "table" : "view";
+
    onNotifyTrace(logId() + tbsfmt::format("getTablesOrViews: type is: {}", tableType));
 
    SqlApplyLogInternal applyLogRule(this);
@@ -598,15 +384,18 @@ bool SqliteConnection::getTablesOrViews(std::vector<std::string>& objectNames, b
    SqlParameterCollection parameters;
    auto paramType = std::make_shared<SqlParameter>("type", sql::DataType::varchar, tableType);
    parameters.push_back(paramType);
-   auto dbresult = executeResult(sql,parameters);
    
-   if (dbresult == nullptr) {
+   SqliteCommand cmd(this);
+   if (! cmd.query(sql, parameters) )
       return false;
-   }
 
-   for (long i = 0; i < dbresult->totalRows; i++)
+   auto dataSet = cmd.executeResult();
+   if (dataSet == nullptr)
+      return false;
+
+   for (long i = 0; i < dataSet->totalRows(); i++)
    {
-      auto variant = dbresult->data.at(0).at(0);
+      auto variant = dataSet->data().at(0).at(0);
       objectNames.push_back(VariantHelper<>::toString(variant));
    }
 

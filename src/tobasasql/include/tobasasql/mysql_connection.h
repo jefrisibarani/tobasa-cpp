@@ -23,6 +23,12 @@ public:
    MysqlConnection();
    ~MysqlConnection();
 
+   MysqlConnection(const MysqlConnection&) = delete;
+   MysqlConnection& operator=(const MysqlConnection&) = delete;
+
+   MysqlConnection(MysqlConnection&& other) noexcept;
+   MysqlConnection& operator=(MysqlConnection&& other) noexcept;
+
    std::string name();
    bool connect(const std::string& connString);
    bool disconnect();

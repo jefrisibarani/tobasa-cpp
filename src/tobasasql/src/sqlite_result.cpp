@@ -8,16 +8,50 @@ namespace sql {
 SqliteResult::SqliteResult(SqliteConnection* pconn)
    : ResultCommon()
 {
-   _pStatement     = nullptr;
    _pConn          = pconn;
    notifierSource  = "SqliteResult";
    _navigator.init( std::bind(&SqliteResult::totalRows, this) );
 }
 
+SqliteResult::SqliteResult(SqliteResult&& other) noexcept
+   : ResultCommon(        std::move(other))
+   , _pConn(              other._pConn)
+   , _metadataCollection( std::move(other._metadataCollection))
+   , _pDataset          ( std::move(other._pDataset))
+   , _navigator(          std::move(other._navigator))
+{
+   other._pConn         = nullptr;
+   other._nRows         = 0;
+   other._nColumns      = 0;
+   other._affectedRows  = 0;
+   other._resultStatus  = ResultStatus::unknown;
+   other._columnInfoCollection.clear();
+   other._qryStr.clear();
+}
+
+SqliteResult& SqliteResult::operator=(SqliteResult&& other) noexcept
+{
+   if (this != &other)
+   {
+      ResultCommon::operator=(std::move(other));
+      _pConn              = other._pConn;
+      _metadataCollection = std::move(other._metadataCollection);
+      _pDataset           = std::move(other._pDataset);
+      _navigator          = std::move(other._navigator);
+
+      other._pConn        = nullptr;
+      other._nRows        = 0;
+      other._nColumns     = 0;
+      other._affectedRows = 0;
+      other._resultStatus = ResultStatus::unknown;
+      other._columnInfoCollection.clear();
+      other._qryStr.clear();
+   }
+   return *this;
+}
+
 SqliteResult::~SqliteResult()
 {
-   if (_pStatement != nullptr)
-      _pStatement = nullptr;
 }
 
 // -------------------------------------------------------
@@ -29,7 +63,9 @@ std::string SqliteResult::name() const
    return "Sqlite Result";
 }
 
-bool SqliteResult::runQuery(const std::string& sql, const SqlParameterCollection& parameters)
+bool SqliteResult::runQuery(const std::string& sql, 
+                           const SqlParameterCollection& parameters,
+                           ParameterStyle paramStyle)
 {
    if (_pConn == nullptr)
       return false;
@@ -39,127 +75,32 @@ bool SqliteResult::runQuery(const std::string& sql, const SqlParameterCollection
 
    if (_optionOpenTable)
       _qryStr = "SELECT * FROM " + sql;
-   else
+   else 
       _qryStr = sql;
 
-   if (_pConn->logSqlQuery())
-      onNotifyDebug(_pConn->logId() + tbsfmt::format("runQuery: {}", _qryStr));
-
-   _pStatement = _pConn->createStatement(_qryStr, parameters);
-   _nColumns   = sqlite3_column_count(_pStatement);
-
-   if (_nColumns > 0)
+   SqliteCommand command(_pConn);
+   if (command.query(_qryStr, parameters))
    {
-      // we have total columns, now set up columns info
-      setupColumnProperties();
-      // OK, we have valid result set, now init metadatas
-      setupColumnMetaData();
-   }
-
-   // retrieve all rows
-   int retCode       = 0;
-   int rowsRetrieved = 0;
-
-   while (true)
-   {
-      retCode = sqlite3_step(_pStatement);
-      _affectedRows += sqlite3_changes(_pConn->nativeConn());
-
-      if (retCode == SQLITE_DONE)
-         break;
-      else if (retCode == SQLITE_ROW)
-      {
-         VectorVariant recordVariant;
-
-         if (_nColumns > 0) {
-            recordVariant.reserve(_nColumns);
-         }
-
-         for (int i = 0; i < _nColumns; i++)
-         {
-            int colType = sqlite3_column_type(_pStatement, i);
-            SqliteType sqliteType = (SqliteType)colType;
-            switch (sqliteType)
-            {
-               case SqliteType::null:
-               {
-                  recordVariant.emplace_back( std::monostate{} );
-                  break;
-               }
-               case SqliteType::integer:
-               {
-                  int64_t value = static_cast<int64_t>(sqlite3_column_int64(_pStatement, i));
-                  recordVariant.emplace_back(value);
-                  break;
-               }
-               case SqliteType::real:
-               {
-                  double value = sqlite3_column_double(_pStatement, i);
-                  recordVariant.emplace_back(value);
-                  break;
-               }
-               case SqliteType::text:
-               {
-                  std::string value = (const char*)sqlite3_column_text(_pStatement, i);
-                  recordVariant.emplace_back(value);
-                  break;
-               }
-               case SqliteType::blob:
-               {
-                  // BLOB. The value is a blob of data, stored exactly as it was input.
-                  // SQLite store blob as binary data, so we need to convert first to hex string
-                  int blobSize = sqlite3_column_bytes(_pStatement, i);
-                  tbs::byte_t* raw = (tbs::byte_t*)sqlite3_column_blob(_pStatement, i);
-                  std::string result;
-                  for (int i = 0; i < blobSize; ++i)
-                  {
-                     tbs::byte_t b = raw[i];
-                     result += conv::decToHex(b);
-                  }
-                  recordVariant.emplace_back(result);
-                  break;
-               }
-               default:
-               {
-                  std::string value = (const char*)sqlite3_column_text(_pStatement, i);
-                  recordVariant.emplace_back(value);
-                  break;
-               }
-            }
-         }
-
-         _dataVariant.emplace_back(recordVariant);
-         rowsRetrieved++;
-      }
-      else
-      {
-         onNotifyError(_pConn->logId() + _pConn->lastBackendError());
-         sqlite3_finalize(_pStatement);
-         _pStatement = nullptr;
-         throw tbs::SqlException(tbsfmt::format("runQuery, {}",_pConn->lastBackendError()), "SqliteResult");
-      }
-   }
-
-   _nRows = rowsRetrieved;
-
-   if (retCode == SQLITE_DONE)
-   {
-      sqlite3_finalize(_pStatement);
-      _pStatement = nullptr;
-
-      if (_pConn->logExecuteStatus())
-         onNotifyTrace(_pConn->logId() + tbsfmt::format("SQL command executed successfully, row: {}, columns: {} ", _nRows, _nColumns));
-
-      if (_nRows > 0)
-         _resultStatus = ResultStatus::tuplesOk;
-      else
-         _resultStatus = ResultStatus::commandOk;
-
-      _navigator.moveFirst();
-      return true;
+      auto dataSet  = command.executeResult();
+      if (dataSet == nullptr)
+         throw SqlException("runQuery, Invalid DataSet pointer", "SqliteResult"); 
+      
+      _affectedRows = command.affectedRows();
+      return getData(std::move(dataSet), command.statement());
    }
 
    return false;
+}
+
+bool SqliteResult::runPreparedQuery(SqliteCommand& command)
+{
+   _qryStr = command.sqlCommandText();
+   auto dataSet  = command.executeResult();
+   if (dataSet == nullptr)
+      throw SqlException("runPreparedQuery, Invalid DataSet pointer", "SqliteResult"); 
+
+   _affectedRows = command.affectedRows();
+   return getData(std::move(dataSet), command.statement());
 }
 
 void SqliteResult::connection(SqliteConnection* conn)
@@ -187,8 +128,10 @@ SqliteResult::VariantType SqliteResult::getVariantValue(const int columnIndex) c
    throwIfColumnIndexInvalid(columnIndex);
    throwIfRowIndexInvalid(row);
 
-   VariantType value = _dataVariant[row][columnIndex];
-   return value;
+   if (_pDataset == nullptr)
+      throw std::runtime_error("getVariantValue, Invalid DataSet pointer");
+
+   return _pDataset->data().at(row).at(columnIndex);
 }
 
 SqliteResult::VariantType SqliteResult::getVariantValue(const std::string& columnName) const
@@ -199,12 +142,14 @@ SqliteResult::VariantType SqliteResult::getVariantValue(const std::string& colum
 std::string SqliteResult::getStringValue(const int columnIndex) const
 {
    long row = _navigator.position();
-
    throwIfColumnIndexInvalid(columnIndex);
    throwIfRowIndexInvalid(row);
 
-   auto& value = _dataVariant[row][columnIndex];
-   return VariantHelper<>::toString(value);
+   if (_pDataset == nullptr)
+      throw std::runtime_error("getStringValue, Invalid DataSet pointer");
+
+   auto& value = _pDataset->data().at(row).at(columnIndex);
+   return VariantHelper::toString(value);
 }
 
 std::string SqliteResult::getStringValue(const std::string& columnName) const
@@ -218,11 +163,38 @@ bool SqliteResult::isNullField(const int columnIndex) const
    return getStringValue(columnIndex) == sql::NULLSTR;
 }
 
+bool SqliteResult::getData(DataSetPtr dataSet, sqlite3_stmt* stmt)
+{
+   if (dataSet == nullptr || stmt == nullptr)
+      throw tbs::SqlException("getData, invalid DataSet or statement object", "SqliteResult");
+
+   _pDataset =  std::move(dataSet);
+   _nRows    = _pDataset->totalRows();
+   _nColumns = _pDataset->totalColumns();
+
+   if (_nColumns > 0)
+   {
+      // we have total columns, now set up columns info
+      setupColumnProperties(stmt);
+      // OK, we have valid result set, now init metadatas
+      setupColumnMetaData(stmt);
+   }
+
+   if (_nRows > 0)
+      _resultStatus = ResultStatus::tuplesOk;
+   else
+      _resultStatus = ResultStatus::commandOk;
+
+   _navigator.moveFirst();
+
+   return true;
+}
+
 // -------------------------------------------------------
 // Specific to SqliteResult
 // -------------------------------------------------------
 
-void SqliteResult::setupColumnProperties()
+void SqliteResult::setupColumnProperties(sqlite3_stmt* stmt)
 {
    if (_nColumns <= 0)
       return;
@@ -240,17 +212,20 @@ void SqliteResult::setupColumnProperties()
       for (int i = 0; i < _nColumns; i++)
       {
          // save column name
-         const char* colname = sqlite3_column_name(_pStatement, i);
+         const char* colname = sqlite3_column_name(stmt, i);
          _columnInfoCollection[i].name = std::string(colname);
 
          // save column defined size
          _columnInfoCollection[i].definedSize = FIELD_SIZE_UNKNOWN;
 
-         std::string declaredTypeStr = columnDeclaredType(_pStatement, i);
-         SqliteType sqliteType = sql::sqliteTypeFromDeclaredType(declaredTypeStr);
+         std::string declaredTypeStr = sqliteColumnDeclaredType(stmt, i);
+         if (declaredTypeStr == "DECLTYPE_UNKNOWN")
+            declaredTypeStr = "Text";
+
+         SqliteType sqliteType = sqliteTypeFromDeclaredType(declaredTypeStr);
 
          // save column native type as string
-         _columnInfoCollection[i].nativeTypeStr = sql::sqliteTypeToString(sqliteType);
+         _columnInfoCollection[i].nativeTypeStr = sqliteTypeToString(sqliteType);
 
          // save column native declared type as string
          _columnInfoCollection[i].nativeFullTypeStr = declaredTypeStr;
@@ -258,38 +233,19 @@ void SqliteResult::setupColumnProperties()
          // save column native type
          _columnInfoCollection[i].nativeType = (long)sqliteType;
 
-         // save column data type : sql::DataType
-         _columnInfoCollection[i].dataType = sql::sqliteTypeToDataType(sqliteType);
+         // save column data type : DataType
+         _columnInfoCollection[i].dataType = sqliteTypeToDataType(sqliteType);
       }
    }
-   catch (const TypeException & ex)
+   catch (const std::exception& ex /*TypeException& ex*/)
    {
       onNotifyError(_pConn->logId() + ex.what());
       throw tbs::SqlException(tbsfmt::format("setupColumnProperties, {}", ex.what()), "SqliteResult");
    }
 }
 
-std::string SqliteResult::columnDeclaredType(sqlite3_stmt* stmt, int pos)
-{
-   // Note: https://www.sqlite.org/c3ref/column_decltype.html
-   // The first parameter is a prepared statement. If this statement is a SELECT statement 
-   // and the Nth column of the returned result set of that SELECT is a table column 
-   // (not an expression or subquery) then the declared type of the table column is returned. 
-   // If the Nth column of the result set is an expression or subquery, 
-   // then a NULL pointer is returned. The returned string is always UTF-8 encoded.
 
-   const char* colTypStr = sqlite3_column_decltype(stmt, pos);
-   if (!colTypStr)
-   {
-      onNotifyWarning(_pConn->logId() + "Could not get column declared type for column " + std::to_string(pos));
-      return "Text";
-   }
-
-   std::string declaredtype(colTypStr);
-   return sql::sqliteColumnDeclaredType(declaredtype);
-}
-
-void SqliteResult::setupColumnMetaData()
+void SqliteResult::setupColumnMetaData(sqlite3_stmt* stmt)
 {
    // Note: https://www.sqlite.org/c3ref/column_database_name.html
    // The names returned are the original un-aliased names of the database, table, and column.
@@ -297,7 +253,7 @@ void SqliteResult::setupColumnMetaData()
    // then all of these functions return NULL
 
    // Check first column, make sure that we are doing this on a table
-   const char* tableName = sqlite3_column_table_name(_pStatement, 0);
+   const char* tableName = sqlite3_column_table_name(stmt, 0);
    if (!tableName) // Not a table, return now
       return;
 
@@ -317,7 +273,7 @@ void SqliteResult::setupColumnMetaData()
    for (int i = 0; i < _nColumns; i++)
    {
       // check current column table origin
-      const char* tableName = sqlite3_column_table_name(_pStatement, i);
+      const char* tableName = sqlite3_column_table_name(stmt, i);
       if (tableName)
          _metadataCollection[i].tableName = std::string(tableName);
       else { 
@@ -325,20 +281,20 @@ void SqliteResult::setupColumnMetaData()
       }  
 
       // retrieve column name
-      const char* columnName = sqlite3_column_name(_pStatement, i);
+      const char* columnName = sqlite3_column_name(stmt, i);
       if (!columnName) { // Not a column, break now
          break;
       }
 
       // retrieve column origin name
-      const char* columnOriginName = sqlite3_column_origin_name(_pStatement, i);
+      const char* columnOriginName = sqlite3_column_origin_name(stmt, i);
       if (!columnOriginName) { // Not a column, break now
          break;
       }
 
       // retrive metadata
       int rc = sqlite3_table_column_metadata(
-                  _pConn->nativeConn(),
+                  _pConn->nativeConnection(),
                   0,
                   tableName,
                   columnOriginName,
@@ -350,10 +306,7 @@ void SqliteResult::setupColumnMetaData()
 
       if (rc == SQLITE_OK)
       {
-         if (!dataType)
-         {
-            sqlite3_finalize(_pStatement);
-            _pStatement = nullptr;
+         if (!dataType) {
             throw tbs::SqlException(tbsfmt::format("setupColumnMetaData, invalid column data type for column {}", columnName), "SqliteResult");
          }
 
@@ -361,10 +314,6 @@ void SqliteResult::setupColumnMetaData()
          _metadataCollection[i].collSeqName   = std::string(collSeq);
          _metadataCollection[i].colName       = std::string(columnName);
          _metadataCollection[i].dataType      = std::string(dataType);
-         
-         //_metadataCollection[i].isAutoInc     = util::numToBool(isAutoInc);
-         //_metadataCollection[i].isNotNull     = util::numToBool(isNotNull);
-         //_metadataCollection[i].isPrimaryKey  = util::numToBool(isPrimaryKey);
 
          _columnInfoCollection[i].autoIncrement = util::numToBool(isAutoInc);
          _columnInfoCollection[i].allowNull   = ! util::numToBool(isNotNull);
@@ -373,8 +322,6 @@ void SqliteResult::setupColumnMetaData()
       else
       {
          onNotifyError(_pConn->logId() + _pConn->lastBackendError());
-         sqlite3_finalize(_pStatement);
-         _pStatement = nullptr;
          throw tbs::SqlException(tbsfmt::format("setupColumnMetaData, {}", _pConn->lastBackendError()), "SqliteResult");
       }
    }

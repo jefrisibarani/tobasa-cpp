@@ -46,5 +46,9 @@ AppException::AppException(const std::exception &ex, const std::string& src, con
    appError = AppError(ex.what(), src, fl, ln);
 }
 
+char const* AppException::what() const
+{
+   return appError.message.c_str();
+}
 
 } // namespace tbs

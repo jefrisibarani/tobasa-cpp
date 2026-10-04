@@ -502,9 +502,9 @@ void Webapp::setThreadPoolSize(size_t ioPoolSize, size_t workerPoolSize)
       _workerPoolSize = worker;
    }
 
-   _dbConnPoolSize = _appOption.dbConnectionPoolSize;
+   _dbConnPoolSize = static_cast<int>(_appOption.dbConnectionPoolSize);
    if (_dbConnPoolSize < 4)
-      _dbConnPoolSize = _workerPoolSize;
+      _dbConnPoolSize = static_cast<int>(_workerPoolSize);
 
    Logger::logI("[webapp] IO threads: {}, Worker threads: {}, DB Connection pools: {}", _ioPoolSize, _workerPoolSize, _dbConnPoolSize );
 }

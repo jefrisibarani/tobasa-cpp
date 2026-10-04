@@ -23,9 +23,9 @@ public:
    Message() = default;
    virtual ~Message() = default;
    
-   uint16_t     majorVersion()  const noexcept { return _majorVersion; }
-   uint16_t     minorVersion()  const noexcept { return _minorVersion; }
-   Headers&     headers()             { return _headers; }
+   uint16_t majorVersion() const noexcept { return _majorVersion; }
+   uint16_t minorVersion() const noexcept { return _minorVersion; }
+   Headers& headers() { return _headers; }
    const std::string& content() const noexcept { return _content; }
 
    std::string contentType();

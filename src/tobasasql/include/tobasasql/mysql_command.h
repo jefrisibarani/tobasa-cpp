@@ -1,36 +1,43 @@
 #pragma once
 
+#include <tobasa/notifier.h>
 #include "tobasasql/sql_parameter.h"
 #include "tobasasql/mysql_common.h"
 #include "tobasasql/mysql_variant_helper.h"
 #include "tobasasql/mysql_util.h"
+
 #include <mysql/mysql.h>
 
 namespace tbs {
 namespace sql {
 
 template <typename VariantTypeImplemented>
-struct DataSet;
+class DataSet;
 
 class MysqlConnection;
-class MysqlCommand;
 class MysqlResult;
 
 const uint64_t MYSQL_NON_AFFECTING_ROWS_QUERY = (unsigned long long) ~0;
 
-class MysqlCommand
+class MysqlCommand : public Notifier
 {
    using VariantType   = MysqlVariantType;
-   using VectorVariant = std::vector<VariantType>;
    using VariantHelper = MysqlVariantHelper;
-
-   friend class MysqlResult;
+   using VectorVariant = std::vector<VariantType>;
+   using RecordVariant = std::vector<VectorVariant>;
+   using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;
 
 public:
-   MysqlCommand(MYSQL *conn);
+   MysqlCommand(MysqlConnection* conn);
    ~MysqlCommand();
 
-   bool init(const std::string& sql, const MysqlParameterCollection& parameters);
+   /// Prepare for one-shot query execution
+   bool query(const std::string& sql, const MysqlParameterCollection& parameters);
+
+   bool prepare(const std::string& sql);
+   bool bind(const MysqlParameterCollection& parameters);
+   void reset();
+   void close();
 
    /**
     * @brief Executes the prepared query.
@@ -39,24 +46,21 @@ public:
     */
    int execute();
 
+   std::string executeScalar();
+
    /**
     * @brief Executes the prepared query and returns its result set.
     * @return A shared dataset for row-producing queries such as SELECT;
     *         an empty shared pointer for INSERT, UPDATE, or DELETE.
     */
-   std::shared_ptr<DataSet<MysqlVariantType>> executeResult();
+   DataSetPtr executeResult();
+
+   MysqlResult executeSqlResult();
 
    uint64_t affectedRows() { return _affectedRows; }
 
-private:
-   MYSQL*         _pConn;
-   MYSQL_STMT*    _pStmt;
-   MYSQL_RES*     _pResultMetadata;
-   uint64_t       _affectedRows;
-
-   /// Get last backend error.
-   std::string lastBackendError();
-   std::string statementError();
+   std::string sqlCommandText() const { return _sql; }
+   
 
    class ParameterContext
    {
@@ -104,8 +108,24 @@ private:
       VectorVariant              fieldBuffers;
    };
 
+
+   ResultContext* resultContext() const { return _pResultContext; }
+
+private:
+
+   MysqlConnection* _pConn;
+   MYSQL*           _pMYConn;
+   MYSQL_STMT*      _pStmt;
+   MYSQL_RES*       _pResultMetadata;
+   uint64_t         _affectedRows;
+   std::string      _sql;
+
+   /// Get last backend error.
+   std::string lastBackendError();
+   std::string statementError();
+
    ParameterContext _paramContext;
-   ResultContext* _pResultContext;
+   ResultContext*   _pResultContext;
 };
 
 

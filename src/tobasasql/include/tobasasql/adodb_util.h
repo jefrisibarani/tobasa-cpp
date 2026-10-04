@@ -4,44 +4,11 @@
 
 #import "c:\Program Files\Common Files\System\ado\msado15.dll" rename("EOF", "EndOfFile")
 
+#include "tobasasql/adodb_types.h"
 #include "tobasasql/common_types.h"
+#include "tobasasql/com_variant.h"
 
 namespace tbs {
-namespace util {
-
-/// convert std::string (UTF-8 by default) to _bstr_t (wchar_t Unicode)
-_bstr_t utf8_to_bstr_t(const std::string& str);
-
-/// create std::string (UTF-8 by default) from _bstr_t (wchar_t Unicode)
-std::string utf8_from_bstr_t(const _bstr_t& str);
-
-} // namespace util
-
-/** \addtogroup SQL
-   @{
- */
-
-/**
- * COM Error
- */
-struct ComError
-{
-   ComError(_com_error& e, const char* fl="", int ln=0);
-
-   std::string fullMessage;
-   std::string message;
-   std::string source;
-   std::string description;
-   std::string file;
-   int line;
-};
-
-#define EXTRACT_COM_ERROR(com_error, comError) extractComError(com_error, comError, __FILE__, __LINE__)
-
-/// Extract COM error
-void extractComError(_com_error& e, ComError& comError, const char* file="", int line=0);
-
-/** @}*/
 
 namespace sql {
 
@@ -67,9 +34,53 @@ ADODB::ParameterDirectionEnum adoParamDirectionFromParamDirection(ParameterDirec
 /// Get Type class from Adodb data type.
 TypeClass typeClassFromAdodbType(const long type);
 
-/** @}*/
+/// convert std::string (UTF-8 by default) to _bstr_t (wchar_t Unicode)
+_bstr_t utf8_to_bstr_t(const std::string& str);
 
-} // namespace util
+/// create std::string (UTF-8 by default) from _bstr_t (wchar_t Unicode)
+std::string utf8_from_bstr_t(const _bstr_t& str);
+
+
+std::string adoDbTime2ToString(const sql::AdoDbTime2& time);
+
+std::string adoDbTime2VariantToString(const tbs::ComVariantType& variantVal);
+
+std::string adoDbTime2BytesToString(const std::vector<uint8_t>& data);
+
+std::string decimalToString(const DECIMAL& value);
+
+/** @}*/
+} // namespace sql ------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------------
+/** \addtogroup SQL
+   @{
+ */
+
+
+/// COM Error
+struct ComError
+{
+   ComError(_com_error& e, const char* fl="", int ln=0);
+
+   std::string fullMessage;
+   std::string message;
+   std::string source;
+   std::string description;
+   std::string file;
+   int line;
+};
+
+#define EXTRACT_COM_ERROR(com_error, comError) extractComError(com_error, comError, __FILE__, __LINE__)
+
+/// Extract COM error
+void extractComError(_com_error& e, ComError& comError, const char* file="", int line=0);
+
+/** @}*/
+// ----------------------------------------------------------------------------------
+
+
 } // namespace tbs
 
 #endif // defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
