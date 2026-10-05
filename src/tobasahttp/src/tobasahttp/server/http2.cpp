@@ -6,6 +6,7 @@
 #include <tobasa/datetime.h>
 #include <tobasa/file_reader.h>
 #include "tobasahttp/exception.h"
+#include "tobasahttp/multipart_body_reader.h"
 #include "tobasahttp/server/common.h"
 #include "tobasahttp/response.h"
 #include "tobasahttp/server/http2.h"
@@ -72,6 +73,17 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
                   nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_INTERNAL_ERROR);
                   return 0;
                }
+            }
+
+            if (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS &&
+                streamData->hasMultipartBody &&
+                !httpSession->option()->enableMultipartParsing &&
+                !streamData->requestDispatched)
+            {
+               streamData->requestDispatched = true;
+               auto result = httpSession->handleRequest(frame->hd.stream_id);
+               if (!result.success())
+                  return NGHTTP2_ERR_CALLBACK_FAILURE;
             }
 
          // WebSocket request
@@ -425,11 +437,31 @@ int onDataChunkRecvCallback(nghttp2_session *session, uint8_t flags,
       }
       else if (streamData->hasMultipartBody)
       {
-         auto result = streamData->multipartParser().parse(data, len);
-         if (streamData->multipartParser().done())
+         streamData->requestBody.append(reinterpret_cast<const char*>(data), len);
+
+         if (!httpSession->option()->enableMultipartParsing)
          {
-            // Move parser's multipartBody to streamData
-            streamData->multipartBody = streamData->multipartParser().multipartBody();
+            auto httpContext = httpSession->findHttpContext(streamId);
+            if (httpContext && httpContext->getBodyReader())
+            {
+               auto info = httpContext->getBodyReader()->feed(
+                  tbs::span<const char>(reinterpret_cast<const char*>(data), len), len);
+
+               if (!info.success())
+               {
+                  Logger::logE("[{}] [conn:{}] [http2] multipart body reader rejected DATA chunk for stream {}: {}",
+                     LOGTYPE, httpSession->connId(), streamId, std::string(info.message()));
+               }
+            }
+         }
+         else
+         {
+            auto result = streamData->multipartParser().parse(data, len);
+            if (streamData->multipartParser().done())
+            {
+               // Move parser's multipartBody to streamData
+               streamData->multipartBody = streamData->multipartParser().multipartBody();
+            }
          }
       }
       else
@@ -993,6 +1025,15 @@ Http2StreamData* Http2Session::findStream(int32_t streamId)
    }
 
    return (*it).second.get();
+}
+
+http::HttpContext Http2Session::findHttpContext(int32_t streamId)
+{
+   auto it = _httpContexts.find(streamId);
+   if (it == std::end(_httpContexts))
+      return nullptr;
+
+   return it->second;
 }
 
 // -------------------------------------------------------

@@ -1,9 +1,12 @@
 #include <csignal>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <utility>
 
+#include <tobasa/base64.h>
 #include <tobasa/datetime.h>
 #include <tobasa/logger.h>
 #include "tobasahttp/server/http_server.h"
@@ -123,18 +126,20 @@ http::RequestStatus middlewareMultipart(const http::HttpContext& context, http::
          auto info = mparser->parse(data, totalData);
          if (info.success())
          {
-            if (mparser->done())
+            if ( mparser->done() )
             {
                info.message("multipart-done");
+
                currentContext->request()->multipartBody(std::move(mparser->multipartBody()));
                currentContext->getBodyReader()->done(true);
                if (nextHandler)
                {
+                  // resume pipeline
                   auto nextStatus = nextHandler(currentContext);
                   currentContext->complete(nextStatus);
                }
                else
-                  currentContext->complete();
+                  currentContext->complete(); // default ends with RequestStatus::handled
             }
          }
 
@@ -142,6 +147,10 @@ http::RequestStatus middlewareMultipart(const http::HttpContext& context, http::
       };
 
    context->getBodyReader()->read(std::move(dataHandler));
+
+   // Instead of next(context), we return async status.
+   // This way ServerConnection will not write a response immediately, 
+   // But later after we call context->complete() 
    return http::RequestStatus::async;
 }
 
@@ -224,9 +233,49 @@ http::RequestStatus handleRouteUpload(const http::HttpContext& context)
    if (!request->hasMultipartBody() || !body)
       return statusResult(context, http::StatusCode::BAD_REQUEST, "No parsed multipart body was attached to this request.");
 
+   auto userNamePart = body->find("userName");
+   auto profileImagePart = body->find("profileImage");
+
+   std::string userName = userNamePart && !userNamePart->isFile ? userNamePart->body : "";
+   std::string profileImageName = profileImagePart && profileImagePart->isFile ? profileImagePart->fileName : "";
+   std::string profileImageLocation = profileImagePart && !profileImagePart->location.empty() ? profileImagePart->location : "";
+   std::string imageData;
+   std::string imageContentType;
+   if (profileImagePart && profileImagePart->isFile && !profileImageLocation.empty())
+   {
+      imageContentType = profileImagePart->contentType;
+      if (imageContentType == "image/png" || imageContentType == "image/jpeg" ||
+          imageContentType == "image/gif" || imageContentType == "image/webp")
+      {
+         std::ifstream imageFile(profileImageLocation, std::ios::binary);
+         std::string imageBytes((std::istreambuf_iterator<char>(imageFile)), std::istreambuf_iterator<char>());
+         if (imageFile.is_open() && !imageFile.bad() && !imageBytes.empty())
+            imageData = base64::encode(imageBytes);
+      }
+   }
+
    std::string content = "<html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Multipart Upload</title><style>";
    content += kMinimalPageCss;
-   content += "</style></head><body><div class=\"card\"><div class=\"badge\">Multipart</div><h1>Request parsed</h1><p>Parsed ";
+   content += "</style></head><body><div class=\"card\"><div class=\"badge\">Multipart</div><h1>Upload received</h1><p><strong>User Name:</strong> ";
+   content += escapeHtml(userName.empty() ? "(not provided)" : userName);
+   content += "</p><p><strong>Profile Image:</strong> ";
+   content += escapeHtml(profileImageName.empty() ? "(not provided)" : profileImageName);
+   content += "</p>";
+   if (!profileImageLocation.empty())
+   {
+      content += "<p><strong>Saved path:</strong> ";
+      content += escapeHtml(profileImageLocation);
+      content += "</p>";
+   }
+   if (!imageData.empty())
+   {
+      content += "<p><img alt=\"Uploaded profile image\" style=\"max-width:100%;max-height:360px;object-fit:contain;border-radius:8px\" src=\"data:";
+      content += escapeHtml(imageContentType);
+      content += ";base64,";
+      content += imageData;
+      content += "\"></p>";
+   }
+   content += "<p>Parsed ";
    content += std::to_string(body->parts().size());
    content += " multipart parts.</p></div></body></html>";
 
@@ -307,6 +356,11 @@ int main()
 
       http::SettingsTls settings;
       settings
+         .logVerbose(true)
+#ifdef TOBASA_HTTP_USE_HTTP2
+         .http2Enabled(true)
+         .logVerboseHttp2(true)
+#endif
          .port(8085)
          .address("0.0.0.0")
          .certificateChainFile("localhost.crt")

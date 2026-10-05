@@ -830,6 +830,10 @@ protected:
 
    void handleKeepAliveOrClose() 
    {
+      auto request = this->_httpContext->request();
+      if (request->hasMultipartBody())
+         request->multipartBody()->cleanup(true);
+
       bool keepAlive = this->_httpContext->keepAlive();
 
       // if maxRequestsPerConnection  is 0, do not check
@@ -1551,10 +1555,11 @@ protected:
    void startHttp2()
    {
       this->_http2Option = std::make_shared<http2::Http2Option>();
-      this->_http2Option->sendBufferSize = this->_settings.sendBufferSize();
-      this->_http2Option->maxHeaderSize  = this->_settings.maxHeaderSize();
-      this->_http2Option->logVerbose     = this->_settings.logVerboseHttp2();
-      this->_http2Option->temporaryDir   = this->_settings.temporaryDir();
+      this->_http2Option->sendBufferSize         = this->_settings.sendBufferSize();
+      this->_http2Option->maxHeaderSize          = this->_settings.maxHeaderSize();
+      this->_http2Option->logVerbose             = this->_settings.logVerboseHttp2();
+      this->_http2Option->enableMultipartParsing = this->_settings.enableMultipartParsing();
+      this->_http2Option->temporaryDir           = this->_settings.temporaryDir();
 
       this->_http2Session = std::make_shared<http2::Http2Session>(
                               this->id(), 
@@ -1794,10 +1799,26 @@ protected:
       httpContext->request()->minorVersion(  0 );
       httpContext->request()->headers(       std::move(streamData->requestHeaders));
 
+      httpContext->request()->setMultipart(   streamData->hasMultipartBody);
       httpContext->request()->content(       std::move(streamData->requestBody));
 
       if (streamData->hasMultipartBody)
-         httpContext->request()->multipartBody( std::move( streamData->multipartBody ) );
+      {
+         if (this->_http2Option && this->_http2Option->enableMultipartParsing)
+         {
+            httpContext->request()->multipartBody( std::move( streamData->multipartBody ) );
+         }
+         else
+         {
+            auto requestBody = httpContext->request()->content();
+            auto reader = std::make_shared<MultipartBodyReader>(
+               []() {},
+               span<const char>(requestBody.data(), requestBody.size()),
+               0,
+               requestBody.size());
+            httpContext->setBodyReader(std::move(reader));
+         }
+      }
 
       this->_http2Session->addHttpContext(httpContext);
 
@@ -1818,19 +1839,24 @@ protected:
 
       auto streamData = _http2Session->findStream(streamId);
       const bool isWebSocket = streamData && streamData->isWebSocketConnect();
+      auto weakSelf = std::weak_ptr{this->selfPtr()};
+      std::weak_ptr<Context> weakHttpContext{httpContext};
 
       auto processStatus = 
-      [self = this->selfPtr(), ctx=httpContext, sid=streamId, isWebSocket](RequestStatus status)
+      [weakSelf, weakHttpContext, sid=streamId, isWebSocket](RequestStatus status)
       {
+         if (status == RequestStatus::async)
+            return http2::Result(0, "", sid);
+
+         auto self = weakSelf.lock();
+         auto ctx = weakHttpContext.lock();
+         if (!self || !ctx)
+            return http2::Result::fail("HTTP/2 request context expired", sid);
+
          if (status == RequestStatus::notHandled) {
             self->buildErrorResponse(StatusCode::NOT_FOUND);
          }
          else if (status == RequestStatus::handled) {}
-         else if (status == RequestStatus::async)
-         {
-            // should not be called here, async middlewares keep control
-            return http2::Result(0,"",sid);
-         }
 
          if (isWebSocket)
          {
@@ -1876,9 +1902,11 @@ protected:
       );
 
       httpContext->sseInitHandler(
-         [self = this->selfPtr(), httpContext](SseContextPtr ctx)
+         [weakSelf, weakHttpContext](SseContextPtr ctx)
          {
-            if (ctx)
+            auto self = weakSelf.lock();
+            auto httpContext = weakHttpContext.lock();
+            if (ctx && self && httpContext)
                self->createSseConnection(httpContext, ctx);
          }
       );
@@ -1886,9 +1914,11 @@ protected:
       if (isWebSocket)
       {
          httpContext->webSocketInitHandler(
-            [self = this->selfPtr(), httpContext, streamId](WebSocketContextPtr wsContext)
+            [weakSelf, weakHttpContext, streamId](WebSocketContextPtr wsContext)
             {
-               if (wsContext)
+               auto self = weakSelf.lock();
+               auto httpContext = weakHttpContext.lock();
+               if (wsContext && self && httpContext)
                   self->createHttp2WebSocketConnection(httpContext, std::move(wsContext), streamId);
             });
       }

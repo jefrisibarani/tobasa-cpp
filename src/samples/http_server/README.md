@@ -1,250 +1,172 @@
 # HTTP Server Sample
 
-A small HTTP/HTTPS server example using the Tobasa HTTP library.
+This sample starts an HTTP server and an HTTPS server. Both use the same
+request handler and WebSocket context.
 
-## Overview
+The sample shows how to:
 
-This sample creates one plain HTTP server and one HTTPS server. Both servers
-use the same request handler, the same `wwwroot` directory, and the same
-WebSocket context.
+- serve files from `wwwroot`;
+- handle a multipart file upload;
+- save and browse uploaded files;
+- handle WebSocket connections;
+- configure HTTP and HTTPS server settings.
 
-The sample is useful when you want to see how to:
+## Build
 
-- create HTTP and HTTPS listeners;
-- configure request timeouts, buffers, multipart parsing, and connection
-  limits;
-- serve files from a web root;
-- handle a request directly with `HttpContext` and `Response`;
-- receive a multipart file upload;
-- upgrade a request to WebSocket handling.
+Build the `http_server` target from the workspace root:
 
-## Features
-
-- HTTP/1.1 support;
-- optional HTTP/2 support on HTTPS when `TOBASA_HTTP_USE_HTTP2` is enabled;
-- plain HTTP on port `8084`;
-- HTTPS on port `8085`;
-- static files from `wwwroot`;
-- uploaded files served from `data` through `/uploads/`;
-- multipart upload handling;
-- WebSocket endpoint and browser test page;
-- request and connection logging.
-
-## Building
-
-The sample is built as part of the main build system. The executable is
-written to:
-
-```text
-_output/http_server/debug/
+```powershell
+cmake --build build --target http_server --config Debug
 ```
 
-The post-build step copies these resources beside the executable:
+CMake copies `wwwroot` and the TLS files beside the executable. It also copies
+timezone data when the build is configured to use external timezone data. If
+package output is enabled, it copies the executable and resources to
+`_output/http_server/debug/` for a Debug build.
 
-- `wwwroot/` from the sample directory;
-- TLS files from the sample `resources/` directory;
-- timezone data when it is not embedded in the build.
+## Run
 
-## Running
+Run the executable from the folder that contains it and the copied resources.
+In PowerShell:
 
-```bash
-./http_server
+```powershell
+.\http_server.exe
 ```
 
-The server listens on all interfaces:
+The servers listen on all network interfaces:
 
 - HTTP: `http://localhost:8084`
 - HTTPS: `https://localhost:8085`
 
-The HTTPS certificate is intended for local testing. With `curl`, use `-k` to
-skip certificate verification:
-
-```bash
-curl http://localhost:8084/
-curl -k https://localhost:8085/
-```
-
-Press `Ctrl+C` to stop both servers. The application stops the listeners and
-releases the WebSocket context before stopping the I/O context.
-
-## How requests are handled
-
-`main.cpp` creates one `asio::io_context` and starts an I/O thread pool with
-four threads. Both `PlainServerDefault` and `SecureServerDefault` register the
-same function:
-
-```cpp
-serverHttp.requestHandler(
-   [&](const http::HttpContext& context) {
-      return handleServerRequest(context);
-   });
-```
-
-`handleServerRequest()` checks the request path:
-
-1. `/hello` goes to `handleHelloPage()`.
-2. `/upload` goes to `handleUpload()`.
-3. `/websocket_ep` prepares the WebSocket upgrade.
-4. `/test_websocket` serves the WebSocket browser page.
-5. Any other path goes to `handleIndexPage()` and is read from disk.
-
-Each handler fills `context->response()` and returns
-`RequestStatus::handled`. The server then sends the response. This sample does
-not use a separate controller or router object; the path selection is done in
-`handleServerRequest()`.
-
-## Exposed endpoints
-
-### `/hello` (normally `GET`)
-
-Returns a small HTML page containing `Hello World!`.
-
-It also demonstrates response features:
-
-- `X-Processed-By: Request Handler`;
-- `Content-Type: text/html`;
-- a cookie named `cookie_test_1`;
-- removal of `cookie_test_2`;
-- a session cookie named `cookie_test_3`.
-
-### `/upload` (normally `POST`)
-
-Handles a request body in two ways:
-
-- for a multipart request containing a file part named `profileImage`, it
-  returns that uploaded file to the client;
-- otherwise, it returns the request body as an HTML page.
-
-Multipart parsing is enabled in the server settings. Uploaded temporary files
-are stored under `./tmp`.
-
-Example multipart request:
-
-```bash
-curl -F "profileImage=@image.png" http://localhost:8084/upload
-```
-
-The response uses the uploaded part's content type and sends the file with
-chunked encoding.
-
-### `/test_websocket` (normally `GET`)
-
-Serves `wwwroot/test_websocket.html`. This is the browser page used to test
-the WebSocket endpoint.
-
-The handler safely checks the path and then looks for this file:
+The HTTPS certificate is for local testing. Use `-k` with `curl` to skip
+certificate verification:
 
 ```text
-./wwwroot/test_websocket.html
+curl.exe http://localhost:8084/
+curl.exe -k https://localhost:8085/
 ```
 
-If the path is invalid or the file is missing, it returns `403 Forbidden` or
-`404 Not Found`.
+Press `Ctrl+C` to stop both servers. The sample stops the servers and releases
+the WebSocket context before it stops the I/O context.
 
-### `/websocket_ep` (normally `GET` with an upgrade request)
+## Request handling
 
-This is the WebSocket endpoint. The handler attaches a shared
-`WebSocketContext` to the HTTP context and returns a handled response. The
-HTTP server then performs the WebSocket upgrade.
+The sample creates one `asio::io_context` and runs it on four threads. The HTTP
+and HTTPS servers use the same function, `handleServerRequest()`, to choose
+what to do with each request:
 
-When a client connects, the WebSocket context:
+| Path | What the handler does |
+| --- | --- |
+| `/hello` | Returns a small HTML greeting and demonstrates response headers and cookies. |
+| `/upload` | Handles a multipart upload or returns a non-multipart request body in an HTML page. |
+| `/browse_uploads` and `/browse_uploads/...` | Lists saved upload folders and files, or returns a requested file. |
+| `/websocket_ep` | Starts a WebSocket connection. |
+| `/test_websocket` | Serves the WebSocket browser test page. |
+| Any other path | Reads the matching file from `wwwroot`. A path ending in `/` uses `index.html`. |
 
-1. assigns a random identifier;
-2. sends a welcome message with the connection ID and user ID;
-3. explains the message format.
+The handler selects these actions by checking the request path. It does not use
+a separate router. Only `/upload` checks the HTTP method and requires `POST`;
+the other paths are not restricted to a particular method by this handler.
 
-Messages use this format:
+## Uploads
+
+Open `http://localhost:8084/test_multipart.html` in a browser to use the upload
+form. The form sends two files to `/upload`:
+
+- `profileImage`, which the server returns in the response;
+- `attachment`, which the server also saves.
+
+It also sends `userName` and `userNote`. For a multipart request with a
+`profileImage` file, the server copies each uploaded file into a new,
+timestamp-named folder under `app_data/uploads` beside the executable. It writes
+`userName` and `userNote` to an `info.json` file in that folder. File names are
+cleaned before saving, and duplicate names get a numeric suffix.
+
+The response sends the saved `profileImage` file and uses the content type from
+that multipart part. Multipart temporary files are stored in `./tmp` while
+the request is processed.
+
+You can also send an upload with `curl`:
+
+```text
+curl.exe -F "userName=Sam" -F "userNote=Test upload" -F "profileImage=@image.png" -F "attachment=@document.pdf" http://localhost:8084/upload
+```
+
+## Browse uploaded files
+
+Open `http://localhost:8084/browse_uploads` to see saved uploads. The page lets
+you open folders and files. A file request returns that file with a content
+type chosen from its extension.
+
+Uploads are stored under:
+
+```text
+<executable folder>/app_data/uploads/<timestamp>/
+```
+
+The browser maps `/browse_uploads/` to that folder. It checks paths stay inside
+the upload folder and does not show symbolic links. Missing paths return `404`
+and paths outside the folder return `403`.
+
+## WebSockets
+
+Open `http://localhost:8084/test_websocket` to load the browser test page. It
+connects to the `/websocket_ep` WebSocket endpoint over HTTPS by default. The
+page's endpoint field can be changed when needed.
+
+When a client connects, the server sends a welcome message with the connection
+ID and a user ID. Send messages in this format:
 
 ```text
 MESSAGE|{destination}|{data}
 ```
 
-`{destination}` can be a numeric connection ID or `ALL`.
-
-Examples:
-
-```text
-MESSAGE|12|hello connection 12
-MESSAGE|ALL|hello everyone
-```
-
-Numeric destinations receive a message addressed to that connection. `ALL`
-broadcasts to every connected client. An invalid message or destination is
-returned to the sender as an error message.
-
-Messages that do not start with `MESSAGE|` are echoed back with an `[echo]`
-prefix.
-
-The sample also logs open, close, ping, pong, message, and error events.
+Use a numeric connection ID to send to one client, or use `ALL` to broadcast to
+all clients. Other text is echoed to the sender with an `[echo]` prefix. Invalid
+message formats and destinations receive an error message.
 
 ## `wwwroot` files
 
-Paths that are not one of the special endpoints are looked up under
-`./wwwroot`. A request ending in `/` gets `index.html` appended. The sample
-dispatches by path and does not enforce `GET` or `POST` in
-`handleServerRequest()`, so the methods shown above describe the intended use.
+The current web root contains these files:
 
-The sample web root contains:
-
-| Path | Use |
+| URL | File |
 | --- | --- |
-| `/` or `/index.html` | Main sample page. |
-| `/login.html` | Login page example. |
-| `/register.html` | Registration page example. |
-| `/password.html` | Password page example. |
-| `/test_websocket.html` | WebSocket test client. |
-| `/demo.json` | Static JSON example. |
-| `/css/...` | CSS files. |
-| `/js/...` | JavaScript files. |
-| `/assets/...` | Images and other application assets. |
-| `/vendor/...` | Third-party browser libraries. |
+| `/` or `/index.html` | `wwwroot/index.html`, the home page. |
+| `/test_multipart.html` | `wwwroot/test_multipart.html`, the upload form and response viewer. |
+| `/test_websocket.html` | `wwwroot/test_websocket.html`, the WebSocket test page. |
+| `/css/styles.css` | `wwwroot/css/styles.css`, the page styles. |
+| `/js/tbs.js` | `wwwroot/js/tbs.js`, the sample JavaScript file. |
+| `/assets/images/...` | `_default_doctor.jpg`, `_default_person.jpg`, `_default_person.png`, `_default_slide.jpg`, `_logo.jpg`, `_logo_report.jpg`, and `index.html`. |
 
-The handler checks that the request path starts with `/` and does not contain
-`..`. Unsafe paths return `403 Forbidden`. Missing files return `404 Not Found`.
+The static-file handler blocks paths containing `..`, checks that resolved paths
+stay inside `wwwroot`, and returns `404` for missing files. It chooses the
+response content type from the file extension.
 
-For normal paths, the response MIME type is selected from the file extension
-and the file is sent with `response->fileContent()`.
-
-### `/uploads/` mapping
-
-Requests beginning with `/uploads/` are read from `./data` instead of
-`./wwwroot`:
-
-```text
-/uploads/report.pdf  ->  ./data/uploads/report.pdf
-```
-
-The same path validation and missing-file checks apply. Make sure the `data`
-directory and requested file exist before testing this path.
-
-## Server settings used by the sample
-
-The sample configures these important values:
+## Server settings
 
 | Setting | HTTP | HTTPS |
 | --- | --- | --- |
 | Address | `0.0.0.0` | `0.0.0.0` |
 | Port | `8084` | `8085` |
-| Read timeout | `10` seconds | `10` seconds |
-| Write timeout | `60` seconds | `60` seconds |
-| Processing timeout | `3600` seconds | `3600` seconds |
-| Read/send buffers | `32 KB` | `32 KB` |
-| Maximum header size | `1 MB` | `1 MB` |
+| Read timeout | 10 seconds | 10 seconds |
+| Write timeout | 60 seconds | 60 seconds |
+| Request processing timeout | 3600 seconds | 3600 seconds |
+| Read and send buffers | 32 KB | 32 KB |
+| Maximum header size | 1 MB | 1 MB |
 | Multipart parsing | Enabled | Enabled |
-| Temporary directory | `./tmp` | `./tmp` |
+| Multipart temporary folder | `./tmp` | `./tmp` |
+| Maximum requests per connection | No limit | 100 |
 
 HTTPS uses `localhost.crt`, `localhost.key`, and `dh2048.pem`. HTTP/2 is
-enabled on HTTPS only when the source is compiled with
-`TOBASA_HTTP_USE_HTTP2`.
+disabled by this sample, even when HTTP/2 support is compiled into the library.
 
 ## Source files
 
-- [`src/main.cpp`](src/main.cpp) contains the server setup, request handler,
-  static-file handling, upload handling, and WebSocket handling.
-- [`cmake/sources.cmake`](cmake/sources.cmake) lists the source files used by
-  the target.
-- [`CMakeLists.txt`](CMakeLists.txt) copies `wwwroot`, TLS files, and optional
-  timezone data beside the executable.
+- [`src/main.cpp`](src/main.cpp) sets up both servers and handles requests.
+- [`src/server_lib.cpp`](src/server_lib.cpp) contains upload folder and file-name helpers.
+- [`src/server_lib.h`](src/server_lib.h) declares those helpers.
+- [`wwwroot/`](wwwroot/) contains the sample pages and assets.
+- [`CMakeLists.txt`](CMakeLists.txt) copies the web root and TLS resources beside the executable.
 
 ## License
 

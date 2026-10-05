@@ -346,12 +346,12 @@ http::ResultPtr AdminController::onUsersResetPasswordPost(const web::RouteArgume
    {
       EventAction action;
       action.type = "button";
-      action.link = "/pacs/download/fafadfaffdfadfadsfadsf";
+      action.link = "/login";
 
       EventData data;
       data.type      = "success";
       data.title     = "Password changed successfully";
-      data.content   = "Your User Data File export is ready for download";
+      data.content   = "Your password has been changed. Please log in again.";
       data.timestamp = DateTime::now().toUnixTimeMiliSeconds();
       data.action    = action;
 
@@ -359,7 +359,7 @@ http::ResultPtr AdminController::onUsersResetPasswordPost(const web::RouteArgume
 
       EventMessage message("notification", "Password change completed", data);
       _eventEngine->sendSseMessage(message, userIdentity);
-      _eventEngine->sendMessage(message, userIdentity);
+      //_eventEngine->sendMessage(message, userIdentity);
 
       return web::okResult();
    }

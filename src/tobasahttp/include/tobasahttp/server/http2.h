@@ -154,6 +154,7 @@ struct Http2Option
    size_t sendBufferSize         = http::HTTP_SEND_BUFFER_SIZE_DEFAULT;
    size_t maxHeaderSize          = http::HTTP_HEADER_MAX_SIZE_DEFAULT;
    bool   logVerbose             = true;
+   bool   enableMultipartParsing = true;
 
    int    maxConcurrentStreams   = 100;
    int    windowBits             = 16;       // 64 KB
@@ -178,6 +179,7 @@ public:
    Http2StreamData* createStreamData(int32_t streamId);
    void closeStream(int32_t streamId);
    Http2StreamData* findStream(int32_t streamId);
+   http::HttpContext findHttpContext(int32_t streamId);
 
    Result handleRequest(int32_t streamId);
 

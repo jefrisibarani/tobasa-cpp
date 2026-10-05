@@ -1,151 +1,92 @@
-# HTTPS Server Minimal Sample
+# HTTPS Server Samples
 
-A small HTTPS server example using the Tobasa HTTP library. This sample shows
-two ways to install a request handler:
+This folder builds four small HTTPS server programs. They all listen on port
+`8085` and use the `localhost.crt` and `localhost.key` certificate files. Run
+only one at a time because they use the same port.
 
-- `src/with_worker_threads.cpp` sends request work to a worker pool;
-- `src/without_worker_threads.cpp` handles the request on the I/O thread;
-- `src/minimal_io_context_thread.cpp` runs the HTTPS server with one I/O context
-	on the main thread.
+## Programs
 
-The CMake targets match these source files:
+| Target | Source file | What it does |
+| --- | --- | --- |
+| `server_with_worker` | `src/with_worker_threads.cpp` | Sends request work to a worker pool. It returns an HTML greeting containing the requested path. `/db` waits 15 seconds to simulate a slow database call. |
+| `server_no_worker` | `src/without_worker_threads.cpp` | Handles each request directly and returns an HTML `Hello World!` page. Keep this handler short because it runs as part of I/O processing. |
+| `server_minimal` | `src/minimal_io_context_thread.cpp` | Runs the I/O context on the main thread and returns plain-text `Hello World!` for every request. |
+| `server_middlewares` | `src/with_middlewares.cpp` | Runs exception and multipart middleware before route handling. It includes a profile upload form. |
 
-- `server_with_worker` is built from `with_worker_threads.cpp`;
-- `server_no_worker` is built from `without_worker_threads.cpp`;
-- `server_minimal` is built from `minimal_io_context_thread.cpp`.
+## Build
 
-## Overview
+Build all four programs as part of the main project, or build one target from
+the workspace root. For example:
 
-This sample shows the basic server setup: create an `io_context`, configure a
-TLS listener, install a request handler, start the server, and stop it when
-`SIGINT` is received.
-
-## Features
-
-- HTTPS/TLS support
-- Minimal configuration
-- Basic request handling
-- HTML responses
-- Optional worker-pool processing
-
-## Building
-
-The sample is built as part of the main build system. It creates three
-executables in `_output/https_server_minimal/debug/`:
-
-- `server_with_worker`;
-- `server_no_worker`;
-- `server_minimal`.
-
-## Running
-
-```bash
-./server_with_worker
-./server_no_worker
-./server_minimal
+```powershell
+cmake --build build --target server_middlewares --config Debug
 ```
 
-All three executables listen for HTTPS requests on port `8085`.
+The sample's packaged executables are placed in
+`_output/https_server_minimal/debug/` when package output is enabled.
 
-Run one target at a time. They both bind to the same port, so they cannot run
-at the same time.
+## Run
 
-## Usage
+In PowerShell, start one program from its output directory:
 
-Send HTTPS requests to the running server:
+```powershell
+cd _output/https_server_minimal/debug
+.\server_middlewares.exe
+```
 
-```bash
+Use `server_with_worker.exe`, `server_no_worker.exe`, or `server_minimal.exe`
+to run one of the other programs. On Linux or macOS, use the same names without
+`.exe` and prefix the command with `./`.
+
+Open `https://localhost:8085/` or test it with:
+
+```text
 curl -k https://localhost:8085/
 ```
 
-(Use `-k` to skip certificate verification in development)
+The `-k` option skips certificate verification. Use it only with this sample's
+development certificate.
 
-## The two request-handler examples
+## Request handling
 
-### `with_worker_threads.cpp` / `server_with_worker`: request handler with a worker pool
+`server_with_worker` creates a worker pool sized from the machine's hardware
+thread count. If that count is not available, it uses four workers. The request
+handler returns `RequestStatus::async`, posts the work to the pool, and calls
+`context->complete()` when the response is ready. The `/db` delay runs in the
+worker pool, so it does not block I/O processing.
 
-This source file is built as the `server_with_worker` target. It creates:
+`server_no_worker` and `server_minimal` build their responses in the request
+handler and return `RequestStatus::handled`. Keep this work quick. A long
+operation in these handlers can delay other I/O work.
 
-- an Asio I/O context for socket operations;
-- an I/O thread count based on `std::thread::hardware_concurrency()`;
-- an Asio worker pool for blocking request work.
+`server_middlewares` uses this order:
 
-The HTTP request handler starts the work and immediately returns:
+1. Exception middleware
+2. Multipart middleware
+3. Route handler
 
-```cpp
-return tbs::http::RequestStatus::async;
-```
+The multipart middleware defers parsing until it receives the request body. It
+returns `RequestStatus::async` and continues to the route handler after parsing
+finishes.
 
-The handler posts the actual work to `workerPool`. In the worker task,
-`realRequestHandler()` builds the response. When the work is complete, it
-posts back to the I/O context and calls:
+## Routes
 
-```cpp
-ctx->complete(resultStatus);
-```
+The first three programs do not have general route tables. They return their
+normal response for `/`, `/health`, and other paths. In `server_with_worker`,
+the `/db` path also runs the 15-second delay.
 
-Calling `complete()` on the I/O context finishes the asynchronous request and
-allows the server to send the response.
+`server_middlewares` has these routes:
 
-The `/db` path sleeps for 15 seconds to simulate a blocking database call. In
-this version, that delay runs on the worker pool, so it does not block socket
-processing on the I/O context. Other requests can continue to be accepted and
-processed while the simulated database call is running, as long as a worker
-thread is available.
+- `GET /form_upload` shows a form with `User Name` and `Profile image` fields.
+- `POST /upload` reads the `userName` and `profileImage` multipart fields. The
+	response echoes the name and filename, and shows an inline preview for PNG,
+	JPEG, GIF, and WebP uploads.
+- Other paths show the default page with a link to the form.
 
-The worker version also shows response features such as:
-
-- the `X-Processed-By` response header;
-- an HTML response body;
-- a status code and content type;
-- setting and removing cookies;
-- sending an internal-server-error response when the worker task throws.
-
-### `without_worker_threads.cpp` / `server_no_worker`: request handler without a worker pool
-
-This source file is built as the `server_no_worker` target. It uses only the
-Asio I/O context. The request handler writes the response directly and returns:
-
-```cpp
-return tbs::http::RequestStatus::handled;
-```
-
-It is shorter and useful when request work is quick and non-blocking. There is
-no `asio::post()` to a worker pool and no later call to `context->complete()`.
-The response is complete when the handler returns.
-
-Do not perform slow database calls, file operations, or other blocking work in
-this handler. A blocking call holds the I/O thread and can delay unrelated
-connections. Use the worker-pool version when the handler may wait for a
-blocking operation.
-
-The worker-pool version has more moving parts because it must keep the request
-asynchronous and return to the I/O context before completing it. The
-no-worker version is easier to read, but it is only a good fit for short
-handlers.
-
-## Request handler choice
-
-| Handler style | Use it when | Important rule |
-| --- | --- | --- |
-| With worker pool (`server_with_worker`, `with_worker_threads.cpp`) | The handler may call a blocking database, filesystem, or other slow API. | Return `RequestStatus::async`, do the work on the worker pool, then call `context->complete()` on the I/O context. |
-| Without worker pool (`server_no_worker`, `without_worker_threads.cpp`) | The handler only does short, non-blocking work. | Build the response and return `RequestStatus::handled`; do not block the I/O thread. |
-
-## Endpoints
-
-Both examples answer every request with an HTML response. There is no router
-and no separately registered `/health` endpoint.
-
-- `GET /` - The worker version returns the requested path in the response;
-	the no-worker version returns `Hello World!`.
-- `/health` - This is not a special endpoint. It receives the same default
-	response as any other path.
-- `/db` - In `with_worker_threads.cpp`, simulates a 15-second blocking
-	database call on the worker pool before returning the response.
-
-The `without_worker_threads.cpp` version does not include the `/db`
-simulation.
+The form route only accepts `GET`, and the upload route only accepts `POST`.
+Other methods for those routes receive `405 Method Not Allowed`. Uploaded files
+are written under `./tmp` while the request is processed.
 
 ## License
 
-See LICENSE file in the root directory.
+See the `LICENSE` file in the repository root.

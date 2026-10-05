@@ -649,10 +649,9 @@ void runHttpServer()
    // settings for http server
    http::Settings httpSetting;
    httpSetting
-      .logVerbose(false)   
+      .logVerbose(false)
       .port(8084)
       .address("0.0.0.0")
-      .logVerbose(true)
       .maxRequestsPerConnection(0)      // default 100,  max 10000, set to 0 to disable limit
       .timeoutRead(10)                  // default 60s,  min 10s, max 1 hour, set value to 0 disable limit
       .timeoutWrite(60)                 // default 60s,  min 10s, max 1 hour, set value to 0 disable limit
@@ -672,7 +671,7 @@ void runHttpServer()
       .privateKeyFile( "localhost.key" )
       .tmpDhFile( "dh2048.pem" )
 #ifdef TOBASA_HTTP_USE_HTTP2
-      .http2Enabled(false)
+      .http2Enabled(true)
       .logVerboseHttp2(true)
 #endif
       .logVerbose(true)
