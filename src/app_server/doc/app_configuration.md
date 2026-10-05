@@ -67,7 +67,7 @@ The separate `configuration_embed/appsettings_header_rules.json` resource is
 loaded after the main configuration:
 
 ```cpp
-[`Config::addOption`](../../tobasa/include/tobasa/config.h#L104)<web::conf::HttpResponseHeaderRule>(
+Config::addOption<web::conf::HttpResponseHeaderRule>(
 	 "httpResponseHeaderRule", headerRuleFile, embeddedHeaderRule);
 ```
 

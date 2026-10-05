@@ -20,7 +20,7 @@ flows. They are useful when changing the HTTP or WebSocket implementation.
 
 ## Application server
 
-These guides explain how to configure, run, and extend the application server.
+These guides explain how to configure, run, and extend the application server under [`src/app_server`](src/app_server/) .
 
 | Document | What it covers |
 | --- | --- |
@@ -39,14 +39,27 @@ These module-level guides describe the main reusable libraries in the project.
 | Module | Document | What it covers |
 | --- | --- | --- |
 | Tobasa core | [`src/tobasa/README.md`](src/tobasa/README.md) | Shared utilities, config, logging, file helpers, and the common framework foundation. |
-| Tobasa HTTP | [`src/tobasahttp/README.md`](src/tobasahttp/README.md) | HTTP/HTTPS and WebSocket networking, TLS support, and async transport helpers. |
-| Tobasa HTTP docs | [`src/tobasahttp/doc/http_server.md`](src/tobasahttp/doc/http_server.md), [`src/tobasahttp/doc/http_server_connection_handling.md`](src/tobasahttp/doc/http_server_connection_handling.md), [`src/tobasahttp/doc/http_parser.md`](src/tobasahttp/doc/http_parser.md) | Lower-level HTTP parsing and connection lifecycle details. |
 | Tobasa Web | [`src/tobasaweb/README.md`](src/tobasaweb/README.md) | Web framework concepts, routing, middleware, controller patterns, and app structure. |
 | Tobasa LIS | [`src/tobasalis/README.md`](src/tobasalis/README.md) | LIS2-A2 and HL7 instrument communication, protocol handling, and device connectivity. |
 
-## TobasaSQL
+## Tobasa HTTP
 
-These guides are for applications using the TobasaSQL library directly.
+These documents cover the HTTP library, its server and parser, multipart
+request handling, connection lifecycle, and WebSocket usage.
+
+| Document | What it covers |
+| --- | --- |
+| [`README.md`](src/tobasahttp/README.md) | Library overview, protocols, features, dependencies, and architecture. |
+| [`http_server.md`](src/tobasahttp/doc/http_server.md) | Server capabilities, configuration, and the boundary between the transport library and application code. |
+| [`http_server_connection_handling.md`](src/tobasahttp/doc/http_server_connection_handling.md) | Accepting clients, HTTP/1 and HTTP/2 request processing, timeouts, WebSockets, SSE, and connection cleanup. |
+| [`http_parser.md`](src/tobasahttp/doc/http_parser.md) | Incremental HTTP/1.x parsing, message framing, parser lifetime, and results. |
+| [`parsing_multipart_internally.md`](src/tobasahttp/doc/parsing_multipart_internally.md) | How the HTTP server parses multipart form fields and uploaded files internally. |
+| [`parsing_multipart_with_middleware.md`](src/tobasahttp/doc/parsing_multipart_with_middleware.md) | Multipart parsing through `MultipartMiddleware` and asynchronous request-body reading. |
+| [`work_with_websocket.md`](src/tobasahttp/doc/work_with_websocket.md) | Managing WebSocket clients and connecting a `WebSocketContext` to request handling. |
+
+## Tobasa SQL
+
+These guides are for applications using the Tobasa SQL library directly.
 
 | Document | What it covers |
 | --- | --- |
