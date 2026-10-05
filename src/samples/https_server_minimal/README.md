@@ -4,12 +4,15 @@ A small HTTPS server example using the Tobasa HTTP library. This sample shows
 two ways to install a request handler:
 
 - `src/with_worker_threads.cpp` sends request work to a worker pool;
-- `src/without_worker_threads.cpp` handles the request on the I/O thread.
+- `src/without_worker_threads.cpp` handles the request on the I/O thread;
+- `src/minimal_io_context_thread.cpp` runs the HTTPS server with one I/O context
+	on the main thread.
 
 The CMake targets match these source files:
 
 - `server_with_worker` is built from `with_worker_threads.cpp`;
-- `server_no_worker` is built from `without_worker_threads.cpp`.
+- `server_no_worker` is built from `without_worker_threads.cpp`;
+- `server_minimal` is built from `minimal_io_context_thread.cpp`.
 
 ## Overview
 
@@ -27,20 +30,22 @@ TLS listener, install a request handler, start the server, and stop it when
 
 ## Building
 
-The sample is built as part of the main build system. It creates two
+The sample is built as part of the main build system. It creates three
 executables in `_output/https_server_minimal/debug/`:
 
 - `server_with_worker`;
-- `server_no_worker`.
+- `server_no_worker`;
+- `server_minimal`.
 
 ## Running
 
 ```bash
 ./server_with_worker
 ./server_no_worker
+./server_minimal
 ```
 
-Both executables listen for HTTPS requests on port `8085`.
+All three executables listen for HTTPS requests on port `8085`.
 
 Run one target at a time. They both bind to the same port, so they cannot run
 at the same time.

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Multipart Upload Test</title>
+	<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="multipart-page">
+	<main class="app">
+		<header class="page-heading">
+			<h1>Multipart Upload</h1>
+			<a class="endpoint" href="/">Home</a>
+		</header>
+
+		<form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+			<div class="text-fields">
+				<div class="text-field">
+					<label for="userName">User Name</label>
+					<input id="userName" name="userName" type="text" autocomplete="name" placeholder="Enter a name" />
+				</div>
+
+				<div class="text-field">
+					<label for="userNote">User Note</label>
+					<textarea id="userNote" name="userNote" rows="1" placeholder="Add a note"></textarea>
+				</div>
+			</div>
+
+			<div class="upload-grid">
+				<div class="file-field">
+					<div class="field-heading">
+						<label class="field-title" for="profileImage">Profile image</label>
+						<span class="field-name">profileImage</span>
+					</div>
+					<input id="profileImage" name="profileImage" type="file" accept="image/*" required />
+					<div class="file-meta" id="profileImageMeta">No file selected</div>
+				</div>
+
+				<div class="file-field">
+					<div class="field-heading">
+						<label class="field-title" for="attachment">Second file</label>
+						<span class="field-name">attachment</span>
+					</div>
+					<input id="attachment" name="attachment" type="file" required />
+					<div class="file-meta" id="attachmentMeta">No file selected</div>
+				</div>
+			</div>
+
+			<div class="form-footer">
+				<button id="uploadButton" type="submit">Upload both files</button>
+				<span class="muted" id="uploadStatus" role="status" aria-live="polite">Select one file in each field.</span>
+			</div>
+		</form>
+
+		<section class="response-section" aria-labelledby="responseTitle">
+			<div class="response-header">
+				<h2 id="responseTitle">Server response</h2>
+				<span class="status" id="responseStatus">Waiting</span>
+			</div>
+			<div class="response-body" id="responseBody" role="status" aria-live="polite">No upload submitted.</div>
+			<img class="response-image" id="responseImage" alt="Image returned by the upload endpoint" hidden />
+		</section>
+	</main>
+
+	<script>
+		const form           = document.getElementById("uploadForm");
+		const uploadButton   = document.getElementById("uploadButton");
+		const uploadStatus   = document.getElementById("uploadStatus");
+		const responseStatus = document.getElementById("responseStatus");
+		const responseBody   = document.getElementById("responseBody");
+		const responseImage  = document.getElementById("responseImage");
+		let responseImageUrl = "";
+
+		function describeFile(input, meta) {
+			const file = input.files[0];
+			meta.textContent = file
+				? `${file.name} · ${(file.size / 1024).toFixed(1)} KB`
+				: "No file selected";
+		}
+
+		document.getElementById("profileImage").addEventListener("change", (event) => {
+			describeFile(event.currentTarget, document.getElementById("profileImageMeta"));
+		});
+
+		document.getElementById("attachment").addEventListener("change", (event) => {
+			describeFile(event.currentTarget, document.getElementById("attachmentMeta"));
+		});
+
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			uploadButton.disabled      = true;
+			uploadStatus.textContent   = "Uploading both files...";
+			responseStatus.textContent = "Uploading";
+			responseStatus.className   = "status";
+			responseBody.textContent   = "Waiting for /upload...";
+			responseImage.hidden       = true;
+
+			if (responseImageUrl) {
+				URL.revokeObjectURL(responseImageUrl);
+				responseImageUrl = "";
+			}
+
+			try {
+				const response = await fetch(form.action, {
+					method: "POST",
+					body: new FormData(form)
+				});
+				const contentType = response.headers.get("content-type") || "";
+				responseStatus.textContent = `${response.status} ${response.statusText}`;
+				responseStatus.className = response.ok ? "status success" : "status error";
+
+				if (contentType.startsWith("image/")) {
+					const image = await response.blob();
+					responseImageUrl = URL.createObjectURL(image);
+					responseImage.src = responseImageUrl;
+					responseImage.hidden = false;
+					responseBody.textContent = `Image returned (${contentType}). The endpoint echoes the profileImage part.`;
+				} 
+            else {
+					const text = await response.text();
+					responseBody.textContent = text || "The server returned an empty response.";
+				}
+
+				uploadStatus.textContent = response.ok
+					? "Upload request completed."
+					: "The server rejected the upload request.";
+			} 
+         catch (error) {
+				responseStatus.textContent = "Request failed";
+				responseStatus.className = "status error";
+				responseBody.textContent = error.message;
+				uploadStatus.textContent = "Could not reach the upload endpoint.";
+			} 
+         finally {
+				uploadButton.disabled = false;
+			}
+		});
+	</script>
+</body>
+</html>

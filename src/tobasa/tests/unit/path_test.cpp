@@ -75,8 +75,8 @@ TEST(TobasaPathTest, ChecksSubpathsAndExecutableRelativeResolution)
    EXPECT_TRUE(tbs::path::createDir(child.string()));
    EXPECT_TRUE(tbs::path::createDir(sibling.string()));
 
-   EXPECT_TRUE(tbs::path::isSubPath(child.string(), base.string()));
-   EXPECT_FALSE(tbs::path::isSubPath(sibling.string(), base.string()));
+   EXPECT_TRUE(tbs::path::isPathWithinRoot(child.string(), base.string()));
+   EXPECT_FALSE(tbs::path::isPathWithinRoot(sibling.string(), base.string()));
 
    const auto resolved = tbs::path::resolveExecutableRelativePath(".");
    EXPECT_FALSE(resolved.empty());

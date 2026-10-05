@@ -1,193 +1,171 @@
-# Web Service Application Startup Flow
+# Web Service Application Startup and Shutdown Flow
 
-This flow follows `src/app_server/src/main.cpp` through
-`tbs::web::Webapp::start()` and `Webapp::runHttpServer()`.
+This note follows the current code in `src/app_server/src/main.cpp` and `src/tobasaweb/src/tobasaweb/webapp.cpp`.
 
-## Process Entry
+## 1. Startup entry
 
-1. `main()` creates `ModuleConfig` and disables page release mode.
+1. `main()` creates a `ModuleConfig` object to keep the LIS start and stop callbacks.
+2. `web::Page::releaseMode(false)` keeps the app in development mode.
+3. `DateTime::initTimezoneData()` runs first. If it fails, the app exits with code `1`.
+4. A `web::Webapp` object is created.
+5. The app loads `appsettings.json` from the app folder and uses embedded config as a fallback when needed.
+6. `webapp.loadConfig()` loads the app settings and sets up the logger with `log::MultiLogger`.
+7. If the temp folder or TLS files are not valid, startup stops with an error.
 
-2. Time-zone data is initialized. Startup stops with exit code `1` if this
-   fails.
+## 2. Building the application in `main()`
 
-3. `main()` constructs `web::Webapp`.
+8. The app reads the `webapp` settings and sets the in-memory resource flag for the current build.
+9. It adds database migrations to `webapp.migrationJob()`:
+   - test migration when `TOBASA_USE_TESTS_MODULE` is enabled
+   - LIS migration when `TOBASA_USE_LIS_ENGINE` is enabled
+10. A custom `DbServiceFactoryApp` is created, configured with the main database connection, and passed into the app with `webapp.useDbService(dbService)`.
+11. An `EventEngine` is created and passed to the app controllers.
+12. The home page is set with `tbs::web::Page::homePage()`.
+13. HTTP response-header rules are loaded from the app config.
+14. A custom status result builder is registered for the router.
+15. Middleware is added in this order:
+   - exception handler
+   - database connectivity check
+   - multipart parsing
+   - response-header rules
+   - request identification
+   - cache-control
+   - content type validation
+   - session handling
+   - authentication
+   - authorization
+16. Controllers are added for the main app, user API, admin API, and application APIs.
+17. If the LIS engine is enabled, `AppLisModule` is created and its start/stop callbacks are stored in `ModuleConfig`.
+18. The default TLS asset callback is registered so HTTPS resources can be served from embedded data.
+19. `webapp.onStart()` is set to call `moduleConfig.startLisEngine()`, and `webapp.onStop()` is set to call `moduleConfig.stopLisEngine()`.
 
-4. The application loads `appsettings.json`, using the embedded configuration
-   as a fallback. If loading fails, `main()` returns `1`.
+## 3. `Webapp::start()`
 
-5. The `webapp` configuration is read and applied to resource handling. The
-   configured database connection, HTTP settings, TLS settings, thread counts,
-   and application options become available to the startup sequence.
+20. `Webapp::start()` runs after the app is assembled.
+21. It checks whether config is valid. If not, it returns `1`.
+22. `Session::clearOldSessionFiles()` removes old session files.
+23. `setThreadPoolSize(ioPoolSize, workerPoolSize)` calculates:
+   - IO thread count
+   - HTTP worker thread count
+   - database connection pool size
+24. If no custom database service is supplied, the app creates one. In this app, a custom DB service is already supplied, so that path is skipped.
+25. The DB service is set with the computed pool size and attached to the web service with `_pWebService->useDbService(_dbService)`.
+26. The migration job runs, and the app checks if the database is connected. If not, startup stops with `1`.
+27. `_pWebService->setupHandlers()` finishes the routing and middleware setup.
+28. `runHttpServer()` is called to start the HTTP and HTTPS listeners.
 
-## Application Assembly
+## 4. Starting the HTTP and HTTPS servers
 
-6. Optional database migrations are added to `webapp.migrationJob()`.
+29. `runHttpServer()` creates the worker pool used for request handling.
+30. It builds the `http::Settings` and `http::SettingsTls` objects from the app config, including:
+   - listen address and ports
+   - read/write/processing timeouts
+   - buffer sizes
+   - multipart and temp folder settings
+   - compression settings
+   - rate limiting settings
+   - TLS certificate files and callbacks
+31. A `PlainServer` and a `SecureServer` are created using the same `asio::io_context`.
+32. The request handlers are assigned to `Webapp::handleRequest()` when worker threads are enabled. Otherwise, the direct web service handler is used.
+33. `WebappAgent` stores the server pointers and the configured ports.
 
-7. The application creates `DbServiceFactoryApp`, adds the main database
-   connector option, and gives the service to `Webapp` with `useDbService()`.
+## 5. Startup timing and callback order
 
-8. The application creates `EventEngine`, configures the home page, and loads
-   HTTP response-header rules.
+34. `runHttpServer()` installs a `SIGINT` handler on the IO context.
+35. When Ctrl+C is pressed, the handler does not stop the app right away. Instead, it posts a task to the server executor that:
+   - stops the HTTP servers
+   - calls `shutdown()`
+36. Another task is posted to start the server:
+   - HTTPS-only mode starts only `secureServer`
+   - normal mode starts both `plainServer` and `secureServer`
+37. When the startup task succeeds, it sets `_myAgent->_status.startedTime`.
+38. `callOnStartFunctor()` is called right after the startup task is posted, not after the server has definitely started listening. This means the app's `onStart` callback runs in the normal startup sequence, but before the event loop has necessarily processed the start task.
+39. If `_ioPoolSize <= 0`, the IO context runs on the current thread. Otherwise, it starts IO threads with `runIoContextOnThreadPool()`.
+40. After the IO context stops, `Webapp::start()` joins the worker pool if one was created.
 
-9. The application registers the status-result content builder.
+## 6. The actual shutdown process
 
-10. Middleware is registered in this order:
+41. Shutdown can start from the signal handler or by calling `Webapp::shutdown()` directly.
+42. `Webapp::shutdown()` is protected by a `std::atomic<bool>`, so only the first call is allowed through:
 
-   1. Exception handling
-   2. Database connectivity check
-   3. Multipart support
-   4. Response-header rules
-   5. Request identification/CORS-related processing
-   6. Cache-control
-   7. Content-type validation
-   8. Session
-   9. Authentication
-   10. Authorization
+```cpp
+bool expected = false;
+if (!_shutdownCalled.compare_exchange_strong(expected, true))
+   return;
 
-11. Controllers are registered, including the core, users, administration,
-   API, and optional test controllers.
+_ioContext.stop();
+```
 
-12. If enabled, the LIS module is initialized. Its start and stop functions are
-   stored in `ModuleConfig` for later lifecycle callbacks.
+43. So shutdown is safe to call multiple times. Extra calls are ignored.
+44. The actual web servers are stopped before `shutdown()` is called in the posted SIGINT task:
 
-13. The default TLS asset callback is registered.
+```cpp
+if (_appOption.httpServer.runHttpsOnly)
+   secureServer.stop();
+else
+{
+   plainServer.stop();
+   secureServer.stop();
+}
 
-14. `webapp.onStart()` is registered to start the LIS engine, and
-   `webapp.onStop()` is registered to stop it.
+shutdown();
+```
 
-## `Webapp::start()`
+45. Calling `_ioContext.stop()` stops the event loop and ends the IO work.
+46. After the IO context exits, `Webapp::start()` does this:
+   - joins the worker pool if it exists
+   - calls `callOnStopFunctor()`
+   - calls `cleanup()`
+47. `callOnStopFunctor()` runs the app-level `onStop` callback. In this app, that callback calls `moduleConfig.stopLisEngine()`, which is how the LIS engine is shut down.
+48. Final cleanup resets the DB service pointer, clears the logger sink, and marks the app as stopped.
+49. The destructor also calls `cleanup()`, so the object remains safe even if shutdown happens during destruction.
 
-15. `Webapp::start()` verifies that configuration was loaded.
-
-16. Old session files are removed.
-
-17. `setThreadPoolSize()` calculates and stores:
-
-   - IO thread count;
-   - HTTP worker thread count;
-   - database connection-pool size.
-
-18. If no custom database service was supplied, `Webapp` creates the default
-   database service. In this application, the custom `DbServiceFactoryApp`
-   has already been supplied.
-
-19. The database connection-pool size is applied and the database service is
-   attached to the web service.
-
-20. The migration job runs. Startup then checks database connectivity. If the
-   database is unavailable, `start()` returns `1`; migration exceptions are
-   logged and startup continues to the subsequent connectivity check.
-
-21. `_pWebService->setupHandlers()` finalizes web-service routing and handler
-   setup.
-
-22. `runHttpServer()` is called.
-
-## HTTP and HTTPS Server Construction
-
-23. `runHttpServer()` creates the HTTP worker `asio::thread_pool`.
-
-24. It builds `http::Settings` from the configured HTTP options, including:
-
-   - address and ports;
-   - read, write, and processing timeouts;
-   - read, send, and header buffer sizes;
-   - multipart and temporary-directory settings;
-   - compression settings;
-   - rate-limiter settings.
-
-25. A `PlainServer` is constructed with the shared application IO context and
-   receives the configured status-page builder.
-
-26. A `SecureServer` is constructed with TLS certificates, TLS asset settings,
-   HTTPS settings, and the same request-handler selection.
-
-27. If worker threads are enabled, both servers route requests through
-   `Webapp::handleRequest()`. Otherwise, both use the web service's direct
-   HTTP request handler.
-
-28. `WebappAgent` receives pointers to the plain and secure server objects and
-   records their configured ports.
-
-## Server Start Scheduling
-
-29. A SIGINT handler is registered on the IO context. On SIGINT it posts a
-   shutdown operation to the plain-server executor. That operation stops the
-   configured servers and calls `Webapp::shutdown()`.
-
-30. A separate task is posted to the plain-server executor to start the
-   servers:
-
-   - HTTPS-only mode starts only `secureServer`;
-   - normal mode starts `plainServer` and `secureServer`.
-
-31. After successful server startup, the task records `startedTime` in the
-   `WebappAgent` status.
-
-32. The posted server-start task is asynchronous. `callOnStartFunctor()` is
-   called immediately after posting it, before the IO context necessarily
-   executes that task. Therefore, the application's `onStart` callback is
-   scheduled in startup order before the event loop begins processing the
-   posted server-start operation; it should not assume the listening sockets
-   have already started unless that is guaranteed by the executor state.
-
-33. The IO context begins running:
-
-   - with `ioPoolSize <= 0`, `run()` executes on the current thread;
-   - with an IO pool, `runIoContextOnThreadPool()` starts the IO threads and
-     joins them.
-
-34. If worker threads are enabled, `Webapp::start()` joins the worker pool
-   after the IO context stops.
-
-## Shutdown Boundary
-
-35. A SIGINT or another shutdown request stops the servers, stops the IO
-   context, joins worker and IO threads, invokes the registered `onStop`
-   callback, and runs final cleanup.
-
-36. In this application, `onStop` invokes `moduleConfig.stopLisEngine()`.
+## 7. Lifecycle summary
 
 ```text
 main()
-  |
   +--> initialize timezone data
-  +--> construct Webapp
-  +--> load configuration
-  +--> create DB service and EventEngine
-  +--> register migrations, middleware, controllers, TLS assets
+  +--> create Webapp
+  +--> load config
+  +--> add migrations
+  +--> create DB service and event engine
+  +--> register middleware and controllers
   +--> register onStart/onStop
-  |
-  v
+  +--> start webapp
+
 Webapp::start()
-  |
+  +--> validate config
   +--> clear old sessions
-  +--> calculate IO/worker/DB pool sizes
-  +--> run migrations and connect database
-  +--> setup web-service handlers
-  |
-  v
+  +--> calculate thread sizes
+  +--> configure DB service
+  +--> run migrations and check DB
+  +--> set up handlers
+  +--> start HTTP server
+
 runHttpServer()
-  |
-  +--> create worker pool
-  +--> construct PlainServer and SecureServer
-  +--> configure request handlers and status
-  +--> post server-start task
-  +--> call onStart functor
-  |
-  v
-IO context runs
-  |
-  +--> start plain/secure server task executes
-  +--> accept HTTP/TLS connections
-  +--> process requests
-  |
-  v
-SIGINT or shutdown request
-  |
-  +--> stop servers
+  +--> build plain and secure servers
+  +--> attach request handlers
+  +--> post startup task
+  +--> call app onStart callback
+  +--> run IO context
+
+Shutdown
+  +--> Ctrl+C triggers stop task
+  +--> stop plain/secure servers
   +--> stop IO context
-  +--> join pools
-  +--> call onStop
-  +--> cleanup
+  +--> event loop exits
+  +--> join worker pool
+  +--> run app onStop callback
+  +--> clean app resources
 ```
+
+## 8. Important shutdown note
+
+The current shutdown flow is not a big multi-step routine inside `Webapp::shutdown()` itself. The real sequence is:
+
+1. stop the active HTTP servers,
+2. tell the IO context to stop,
+3. let the loop exit,
+4. join the worker threads,
+5. run the registered `onStop` callback,
+6. clean up resources.

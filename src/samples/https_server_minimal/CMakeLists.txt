@@ -80,4 +80,6 @@ function(configure_https_server_target target source_file)
 endfunction()
 
 configure_https_server_target(server_with_worker with_worker_threads.cpp)
-configure_https_server_target(server_no_worker without_worker_threads.cpp)
+configure_https_server_target(server_no_worker   without_worker_threads.cpp)
+configure_https_server_target(server_minimal     minimal_io_context_thread.cpp)
+configure_https_server_target(server_middlewares with_middlewares.cpp)

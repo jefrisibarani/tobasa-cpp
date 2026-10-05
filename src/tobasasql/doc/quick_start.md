@@ -2,16 +2,15 @@
 
 ## Introduction
 
-TobasaSQL is a small C++ SQL library. It gives your application the same main
-connection, parameter, query, and result APIs for SQLite, PostgreSQL,
-MySQL/MariaDB, and Microsoft SQL Server.
+TobasaSQL is a small C++ SQL library. It gives your app one set of APIs for
+SQLite, PostgreSQL, MySQL/MariaDB, and Microsoft SQL Server.
 
 The ODBC and ADO drivers in this project are built and tested for Microsoft
 SQL Server. They are not general-purpose ODBC or ADO integrations for every
 database.
 
 TobasaSQL is not an ORM. You write the SQL yourself. The library handles the
-backend-specific parts of connections, parameters, results, metadata, and
+backend-specific work for connections, parameters, results, metadata, and
 optional logging.
 
 The main types are templates that use a selected driver:
@@ -46,8 +45,8 @@ The CMake option controls which driver types are available. For example,
 ## Two ways to use TobasaSQL
 
 There are two common ways to use the library. Use a typed connection when the
-backend is fixed. Use the connector layer when configuration should choose the
-backend at runtime.
+backend is fixed. Use the connector layer when the app should choose the backend
+at runtime.
 
 ### Direct typed connection
 
@@ -79,11 +78,11 @@ Use `DatabaseConnector` or `DbServiceFactory` when configuration should choose
 the backend at runtime. This is a better fit for configured applications,
 services, repositories, and connection pools.
 
-`DatabaseConnector` reads the development or production settings, creates the
-matching typed connection, applies SQL logging options, connects, and exposes
-connection, transaction, and service operations.
+`DatabaseConnector` reads the app settings, creates the matching typed
+connection, applies SQL logging options, connects, and exposes connection,
+transaction, and service operations.
 
-`DbServiceFactory` builds on it and can create pooled or non-pooled services:
+`DbServiceFactory` builds on that and can create pooled or non-pooled services:
 
 ```cpp
 tbs::sql::DbServiceFactory factory;
@@ -92,7 +91,7 @@ factory.addConnectorOption("MainDb", connectorOptions);
 auto service = factory.createService<MyService>("MainDb", true);
 ```
 
-Use `true` when the service should acquire and return pooled connections
+Use `true` when the service should get and return pooled connections
 automatically. Use `false` for a long-lived non-pooled connector.
 
 The connector settings contain the backend, connection string, selected
@@ -196,9 +195,13 @@ Do not build SQL by joining user input into a string. Use typed parameters.
 
 ## Parameterized SQL with `SqlQuery`
 
-`SqlQuery` keeps parameters in the order you add them. By default, write named
-placeholders such as `:id`; TobasaSQL changes them to the syntax required by
-the selected backend.
+`SqlQuery` is the prepared-statement style API in TobasaSQL. It stores the SQL,
+adds parameters, and runs the statement through the backend command object.
+
+It also supports one-shot execution when you want a simpler single-call pattern.
+The important part is that the parameters are still bound in order, and named
+placeholders such as `:id` are rewritten to the syntax required by the selected
+backend.
 
 The sample uses `ParameterStyle::native` for MySQL because the SQL already
 uses `?` placeholders.

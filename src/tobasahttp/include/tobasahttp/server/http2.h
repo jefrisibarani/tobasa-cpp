@@ -183,7 +183,7 @@ public:
 
    Result submitResponse(http::HttpContext httpContext, int streamId);
 
-   Result submitWebSocketResponse(int32_t streamId);
+   Result submitWebSocketResponse(int32_t streamId, const std::string& subprotocol = {});
 
    struct WebSocketStreamData
    {

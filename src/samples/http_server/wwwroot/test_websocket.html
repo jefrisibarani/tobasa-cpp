@@ -1,146 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WebSocket Test</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f9f9f9;
-        }
-        #messages, #errors {
-            /*width: 100%;*/
-            height: 150px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
-            background-color: #fff;
-        }
-        #controls, #input-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 8px;
-            font-size: 16px;
-        }
-        button {
-            padding: 8px 16px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+    <link rel="stylesheet" href="css/styles.css" />
 </head>
-<body>
-    <h2>WebSocket Test Page</h2>
-    <div id="controls">
-        <input type="text" id="endpointInput" placeholder="Enter WebSocket endpoint (e.g., wss://localhost:8085/websocket_ep)"
-           value="wss://localhost:8085/websocket_ep">
-        
-        <button id="connectButton">Connect</button>
-    </div>
-    <div>
-        <h3>Messages</h3>
-        <div id="messages"></div>
-    </div>
+<body class="websocket-page">
+    <div class="app">
+        <header class="page-heading">
+            <h2>WebSocket Test</h2>
+            <a class="home-link" href="/">Home</a>
+        </header>
 
-    <div id="input-container">
-        <input type="text" id="messageInput" placeholder="Enter your message here" disabled>
-        <button id="sendButton" disabled>Send</button>
-    </div>
+        <div class="card">
+            <div class="toolbar">
+                <input
+                    type="text"
+                    id="endpointInput"
+                    value="wss://localhost:8085/websocket_ep"
+                    placeholder="Enter WebSocket endpoint"
+                />
+                <button id="connectButton" class="primary">Connect</button>
+            </div>
 
-    <div>
-        <h3>Error Messages</h3>
-        <div id="errors"></div>
-    </div>    
+            <div class="status-row">
+                <div class="badge">
+                    <span id="statusDot" class="dot disconnected"></span>
+                    <span id="statusText">Disconnected</span>
+                </div>
+                <span class="muted">Vanilla JS demo</span>
+            </div>
+        </div>
+
+        <div class="section-gap">
+            <div class="panel">
+                <div class="header">
+                    <span>Messages</span>
+                </div>
+                <div id="messages"></div>
+            </div>
+        </div>
+
+        <div class="section-gap">
+            <div class="composer">
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="Type a message to send"
+                    disabled
+                />
+                <button id="sendButton" class="secondary" disabled>Send</button>
+            </div>
+        </div>
+
+        <div class="section-gap">
+            <div class="panel">
+                <div class="header">
+                    <span>Errors</span>
+                </div>
+                <div id="errors"></div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        const messagesDiv   = document.getElementById('messages');
-        const errorsDiv     = document.getElementById('errors');
+        const messagesDiv = document.getElementById('messages');
+        const errorsDiv = document.getElementById('errors');
         const endpointInput = document.getElementById('endpointInput');
         const connectButton = document.getElementById('connectButton');
-        const messageInput  = document.getElementById('messageInput');
-        const sendButton    = document.getElementById('sendButton');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
 
         let socket = null;
 
-        // Append messages to the message display area
-        function appendMessage(message) {
-            const messageElement = document.createElement('div');
+        function appendMessage(message, type = 'event') {
+            const item = document.createElement('div');
+            item.textContent = message;
 
-            if (message.includes("[RECV] ")) {
-                messageElement.style.color = "blue";
-            } else {
-                messageElement.style.color = "green";
-            }
+            if (type === 'sent') item.className = 'message-sent';
+            else if (type === 'recv') item.className = 'message-recv';
+            else if (type === 'error') item.className = 'message-error';
+            else item.className = 'message-event';
 
-            messageElement.textContent = message;
-            messagesDiv.appendChild(messageElement);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the bottom
+            messagesDiv.appendChild(item);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
-        // Append error messages to the error display area
         function appendError(message) {
-            const errorElement = document.createElement('div');
-            errorElement.textContent = message;
-            errorsDiv.appendChild(errorElement);
-            errorsDiv.scrollTop = errorsDiv.scrollHeight; // Auto-scroll to the bottom
+            const item = document.createElement('div');
+            item.textContent = message;
+            item.className = 'message-error';
+            errorsDiv.appendChild(item);
+            errorsDiv.scrollTop = errorsDiv.scrollHeight;
         }
 
-        // Connect button event listener
+        function setConnectedState(isConnected) {
+            statusDot.classList.toggle('connected', isConnected);
+            statusDot.classList.toggle('disconnected', !isConnected);
+            statusText.textContent = isConnected ? 'Connected' : 'Disconnected';
+            messageInput.disabled = !isConnected;
+            sendButton.disabled = !isConnected;
+        }
+
         connectButton.addEventListener('click', () => {
             const endpoint = endpointInput.value.trim();
 
             if (!endpoint) {
-                appendError("[ERR ] WebSocket endpoint is required.");
+                appendError('[ERR ] WebSocket endpoint is required.');
                 return;
             }
 
-            // Initialize WebSocket connection
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+
             socket = new WebSocket(endpoint);
 
             socket.addEventListener('open', () => {
-                appendMessage("[EVT ] Connected to WebSocket server at " + endpoint);
-                messageInput.disabled = false;
-                sendButton.disabled = false;
+                setConnectedState(true);
+                appendMessage('[EVT ] Connected to WebSocket server at ' + endpoint, 'event');
             });
 
             socket.addEventListener('message', (event) => {
                 const lines = event.data.split('\n');
-                // Process each line
-                lines.forEach((line, index) => {
-                    appendMessage("[RECV] " + line);
+                lines.forEach((line) => {
+                    if (line) {
+                        appendMessage('[RECV] ' + line, 'recv');
+                    }
                 });
             });
 
             socket.addEventListener('close', () => {
-                appendMessage("[EVT ] Disconnected from WebSocket server.");
-                messageInput.disabled = true;
-                sendButton.disabled = true;
+                setConnectedState(false);
+                appendMessage('[EVT ] Disconnected from WebSocket server.', 'event');
             });
 
-            socket.addEventListener('error', (error) => {
-                appendError("[ERR ] " + (error.message || "An unknown error occurred."));
+            socket.addEventListener('error', (event) => {
+                setConnectedState(false);
+                appendError('[ERR ] WebSocket connection failed or closed unexpectedly.');
             });
         });
 
-        // Send button event listener
         sendButton.addEventListener('click', () => {
             const message = messageInput.value.trim();
 
-            if (socket && socket.readyState === WebSocket.OPEN && message) {
-                socket.send(message);
-                appendMessage("[SENT] " + message);
-                messageInput.value = ""; // Clear input
-            } else {
-                appendError("[ERR ] WebSocket is not connected or message is empty.");
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                appendError('[ERR ] WebSocket is not connected.');
+                return;
+            }
+
+            if (!message) {
+                appendError('[ERR ] Message is empty.');
+                return;
+            }
+
+            socket.send(message);
+            appendMessage('[SENT] ' + message, 'sent');
+            messageInput.value = '';
+        });
+
+        messageInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                sendButton.click();
             }
         });
+
+        setConnectedState(false);
     </script>
 </body>
 </html>

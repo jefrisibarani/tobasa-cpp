@@ -1,26 +1,107 @@
-# Prepared Statement Note
+# Prepared statements in TobasaSQL
 
-This library supports parameterized SQL, but it is not a full prepared-statement implementation in the usual database sense.
+TobasaSQL supports SQL parameters. That means you can pass values into a query without building a raw SQL string by hand.
 
-What this means in practice:
+This library also supports a prepared-operation flow. The exact details depend on the database driver, but the overall idea is the same across backends.
 
-- You can pass values through query parameters instead of building raw SQL strings.
-- Named parameters like :id are rewritten to the database-specific style before execution.
-- The SQL is executed as a normal command, and the driver may create a statement object internally for that single call.
+## What `SqlQuery` does
 
-It is not the same as creating a reusable server-side prepared statement object and reusing it many times.
+`SqlQuery<Driver>` is the easy, high-level API most apps should use.
 
-In other words, the library may use driver statement APIs internally, but only for one-shot execution. The public abstraction is still a query-plus-parameter list, not a long-lived prepared statement handle.
+It keeps these things together:
 
-So for library users:
+- the SQL text,
+- the parameter list,
+- the active connection,
+- the driver-specific command object behind it.
 
-- Parameterized queries are supported.
-- Reusing the same prepared statement object across multiple executions is not the main abstraction here.
-- This is still safer than concatenating SQL strings directly, but it is not the same as a true database prepared statement.
+You can use it in one step:
 
-In short: parameter binding is available, but this is not a full prepared-statement system.
+```cpp
+using namespace tbs::sql;
 
-Example of the real MySQL lifecycle:
+SqlConnection<SqliteDriver> conn;
+conn.connect("Database=./app.db3;OpenCreate=True;");
+
+SqlQuery<SqliteDriver> query(conn, "SELECT name FROM people WHERE id = :id");
+query.addParam("id", DataType::integer, 7);
+
+std::string name = query.executeScalar();
+```
+
+You can also prepare it yourself and run it in stages:
+
+```cpp
+SqlQuery<SqliteDriver> query(conn);
+query.prepare("INSERT INTO people (id, name) VALUES (:id, :name)");
+query.addParam("id", DataType::integer, 10);
+query.addParam("name", DataType::varchar, std::string("Ada"));
+query.execute();
+```
+
+So `SqlQuery` is not limited to only one call. It supports a normal flow like:
+
+- prepare the SQL,
+- add parameters,
+- bind them,
+- run the command,
+- reset or close when done.
+
+## Named parameters are rewritten automatically
+
+By default, `SqlQuery` uses named parameters.
+
+That means you write SQL like this:
+
+```cpp
+"SELECT * FROM users WHERE id = :id AND name = :name"
+```
+
+Before the command runs, the library rewrites it to the style that the selected backend expects.
+
+Examples:
+
+- MySQL / SQLite: `?`
+- PostgreSQL: `$1`, `$2`, ...
+
+If the SQL already uses the backend's native style, you can use `ParameterStyle::native` and it will not rewrite the text.
+
+```cpp
+SqlQuery<MysqlDriver> query(
+   conn,
+   "SELECT * FROM users WHERE id = :id AND name = :name",
+   ParameterStyle::named);
+
+query.addParam("id", DataType::integer, 1);
+query.addParam("name", DataType::varchar, "Alice");
+```
+
+This is still a parameterized query. You are not concatenating values into SQL by hand.
+
+## The driver command classes
+
+Under the hood, each database driver has its own command class. These are the lower-level classes that do the actual prepared execution.
+
+Examples:
+
+- `MysqlCommand`
+- `PgsqlCommand`
+- `SqliteCommand`
+- `OdbcCommand`
+- `AdodbCommand`
+
+They all follow a similar flow:
+
+- `query(sql, params)`
+- `prepare(sql)`
+- `bind(params)`
+- `execute()`, `executeScalar()`, or `executeResult()`
+- `reset()`
+- `close()`
+
+So `SqlQuery` is the simple portable layer, and the driver command class is the real backend-specific implementation.
+
+### Example: direct driver command usage
 
 ```cpp
 using namespace tbs::sql;
@@ -47,4 +128,14 @@ cmd.reset();
 cmd.close();
 ```
 
-This is a true prepared statement at the MySQL driver level. The public `SqlQuery` API still stays simple and one-shot for normal use, while `MysqlCommand` can be used when a reusable statement is needed.
+This is the actual prepared-statement flow at the driver level. The driver may create a native statement object internally, but the library gives you a consistent cross-driver API instead of forcing you to work with each backend's raw statement system directly.
+
+## Simple summary
+
+- `SqlQuery` is the easy app-level API.
+- Driver command classes are the real backend implementation.
+- Parameters are supported and safe to use.
+- Named placeholders are rewritten automatically.
+- The library supports prepared execution without building SQL strings by hand.
+
+In plain English: TobasaSQL lets you write SQL with parameters, and the library handles the backend details for you.

@@ -64,8 +64,8 @@ namespace path {
    /// Remove a file and return an error message on failure.
    bool removeFile(const std::string& path, std::string& errorMessage);
 
-   /// Check whether a path is located within the given base path.
-   bool isSubPath(const std::string& path, const std::string& base);
+   /// Check weheter a path is located within the given rootPath
+   bool isPathWithinRoot(const std::string& candidatePath, const std::string& rootPath);
 
    /// Convert a path to the operating system's path format.
    std::string convertToOsPath(const std::string& path);

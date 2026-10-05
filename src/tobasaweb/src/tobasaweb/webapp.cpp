@@ -374,28 +374,7 @@ void Webapp::shutdown() noexcept
    if (!_shutdownCalled.compare_exchange_strong(expected, true))
       return;
 
-   try
-   {
-      _ioContext.stop();
-
-      if (_workerPoolSize > 0 && _workerPool)
-         _workerPool->join();
-
-      if (_ioPoolSize > 0)
-         joinIoThreads();
-
-      callOnStopFunctor();
-
-      cleanup();
-   }
-   catch (const std::exception& ex)
-   {
-      Logger::logE("[webapp] shutdown() exception: {}", ex.what());
-   }
-   catch (...)
-   {
-      Logger::logE("[webapp] shutdown() unknown exception");
-   }
+   _ioContext.stop();
 }
 
 void Webapp::runIoContextOnThreadPool(size_t poolSize)
@@ -694,6 +673,9 @@ void Webapp::runHttpServer()
 
    if (_workerPoolSize > 0)
       _workerPool->join();
+
+   callOnStopFunctor();
+   cleanup();
 
    if (exceptionCaught)
       std::rethrow_exception( exceptionCaught );

@@ -1849,7 +1849,11 @@ protected:
             if (ws == self->_http2WebSockets.end() || !ws->second->state->wsContext)
                return http2::Result::fail("WebSocket context not initialized", sid);
 
-            auto result = self->_http2Session->submitWebSocketResponse(sid);
+            auto offeredProtocols = util::split(ctx->request()->headers().value("Sec-WebSocket-Protocol"), ",");
+            auto selectedProtocol = !offeredProtocols.empty() && offeredProtocols.front() == "Bearer"
+               ? std::string("Bearer")
+               : std::string();
+            auto result = self->_http2Session->submitWebSocketResponse(sid, selectedProtocol);
             if (result.success())
                ws->second->state->onOpen();
             return result;

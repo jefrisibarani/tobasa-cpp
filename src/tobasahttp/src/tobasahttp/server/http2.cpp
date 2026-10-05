@@ -853,7 +853,7 @@ Result Http2Session::submitResponse(http::HttpContext httpContext, int streamId)
 
 // WebSocket
 
-Result Http2Session::submitWebSocketResponse(int32_t streamId)
+Result Http2Session::submitWebSocketResponse(int32_t streamId, const std::string& subprotocol)
 {
    if (!isWebSocketStream(streamId))
       return Result::fail("WebSocket stream not registered", streamId);
@@ -861,6 +861,12 @@ Result Http2Session::submitWebSocketResponse(int32_t streamId)
    static const std::string statusCode = "200";
    auto nva = std::vector<nghttp2_nv>();
    nva.push_back(http2::makeNvLs(":status", statusCode));
+
+   // Note: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/WebSocket#protocols
+   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-WebSocket-Protocol
+   
+   if (!subprotocol.empty())
+      nva.push_back(http2::makeNvLs("sec-websocket-protocol", subprotocol));
 
    nghttp2_data_provider2 dataProvider {};
    dataProvider.source.ptr = findWebSocketStream(streamId);

@@ -136,6 +136,10 @@ driver installed on the machine.
 "password": "27CA998DA4C4D345BC0C86F62B7C81BA"
 ```
 
+```json
+"connectionString": "Driver={ODBC Driver 17 for SQL Server};Server=10.0.0.2;Database=tobasa_base${DBSUFFIX};UID=tbs_user;APP=ws_tcxx;TrustServerCertificate=Yes;",
+```
+
 On supported MSVC builds, the framework adds
 `Pwd=<decrypted-password>;` and passes the result to
 `ADODB::Connection::Open`. ADODB support depends on MSVC and the matching

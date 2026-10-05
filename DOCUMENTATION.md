@@ -32,6 +32,18 @@ These guides explain how to configure, run, and extend the application server.
 | [`server_architecture.md`](src/app_server/doc/server_architecture.md) | Server startup, request flow, middleware, controllers, HTTPS, TLS, and optional modules. |
 | [`server_mvc.md`](src/app_server/doc/server_mvc.md) | The MVC-style split between controllers, repositories, database services, views, and API results. |
 
+## Core modules
+
+These module-level guides describe the main reusable libraries in the project.
+
+| Module | Document | What it covers |
+| --- | --- | --- |
+| Tobasa core | [`src/tobasa/README.md`](src/tobasa/README.md) | Shared utilities, config, logging, file helpers, and the common framework foundation. |
+| Tobasa HTTP | [`src/tobasahttp/README.md`](src/tobasahttp/README.md) | HTTP/HTTPS and WebSocket networking, TLS support, and async transport helpers. |
+| Tobasa HTTP docs | [`src/tobasahttp/doc/http_server.md`](src/tobasahttp/doc/http_server.md), [`src/tobasahttp/doc/http_server_connection_handling.md`](src/tobasahttp/doc/http_server_connection_handling.md), [`src/tobasahttp/doc/http_parser.md`](src/tobasahttp/doc/http_parser.md) | Lower-level HTTP parsing and connection lifecycle details. |
+| Tobasa Web | [`src/tobasaweb/README.md`](src/tobasaweb/README.md) | Web framework concepts, routing, middleware, controller patterns, and app structure. |
+| Tobasa LIS | [`src/tobasalis/README.md`](src/tobasalis/README.md) | LIS2-A2 and HL7 instrument communication, protocol handling, and device connectivity. |
+
 ## TobasaSQL
 
 These guides are for applications using the TobasaSQL library directly.
@@ -40,6 +52,9 @@ These guides are for applications using the TobasaSQL library directly.
 | --- | --- |
 | [`quick_start.md`](src/tobasasql/doc/quick_start.md) | Backend selection, direct connections, configured services, parameters, queries, results, and logging. |
 | [`data_types.md`](src/tobasasql/doc/data_types.md) | Portable `tbs::sql::DataType` values and backend-specific type mappings. |
+| [`sql_parameter.md`](src/tobasasql/doc/sql_parameter.md) | Parameter order, names, binding rules, and backend-specific behavior. |
+| [`prepared_statement.md`](src/tobasasql/doc/prepared_statement.md) | The prepared-statement flow in `SqlQuery`, the driver `*Command` classes, and the one-shot execution pattern. |
+| [`README.md`](src/tobasasql/README.md) | Module overview, features, supported databases, dependencies, and usage patterns. |
 
 ## Samples
 
@@ -65,6 +80,12 @@ These README files explain the sample applications under `src/samples`.
   [`dev_notes`](dev_notes/).
 - To use the SQL library in another application, start with
   [`quick_start.md`](src/tobasasql/doc/quick_start.md), then read
-  [`data_types.md`](src/tobasasql/doc/data_types.md).
+  [`data_types.md`](src/tobasasql/doc/data_types.md),
+  [`sql_parameter.md`](src/tobasasql/doc/sql_parameter.md), and
+  [`prepared_statement.md`](src/tobasasql/doc/prepared_statement.md).
+- To see module-level background and usage notes, read the module README files
+  for [`tobasa`](src/tobasa/README.md), [`tobasahttp`](src/tobasahttp/README.md),
+  [`tobasaweb`](src/tobasaweb/README.md), [`tobasadicom`](src/tobasadicom/README.md),
+  [`tobasalis`](src/tobasalis/README.md), and [`tobasasql`](src/tobasasql/README.md).
 - To see working application examples, browse the
   [`src/samples`](src/samples/) README files listed above.

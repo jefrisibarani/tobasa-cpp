@@ -376,18 +376,32 @@ bool removeFile(const std::string& path, std::string& errorMessage)
    }
 }
 
-bool isSubPath(const std::string& path, const std::string& base)
+bool isPathWithinRoot(const std::string&  candidatePath, const std::string&  rootPath)
 {
    namespace fs = std::filesystem;
-   const auto fullPath = fs::weakly_canonical(fs::path(path)).lexically_normal();
-   const auto basePath = fs::weakly_canonical(fs::path(base)).lexically_normal();
 
-   const auto relative = fullPath.lexically_relative(basePath);
-   if (relative.empty())
-      return true;
+   std::error_code fsError;
+   fs::path canonicalRoot = fs::weakly_canonical(fs::path(rootPath), fsError);
+   if (fsError)
+      return false;
 
-   const auto relativeStr = relative.generic_string();
-   return relativeStr != ".." && relativeStr.find("../") != 0;
+   fs::path canonicalCandidate = fs::weakly_canonical(fs::path(candidatePath), fsError);
+   if (fsError)
+      return false;
+
+   fs::path relativePath = canonicalCandidate.lexically_relative(canonicalRoot);
+   if (relativePath.empty())
+      return canonicalCandidate == canonicalRoot;
+      
+   if (relativePath.is_absolute())
+      return false;
+
+   for (const auto& component : relativePath)
+   {
+      if (component == "..")
+         return false;
+   }
+   return true;
 }
 
 std::string convertToOsPath(const std::string& path)
@@ -406,59 +420,6 @@ std::string normalize(const std::string& path)
    std::filesystem::path p(path);
    p = p.lexically_normal();
    return p.string();
-/*
-   if (path.empty())
-      return "";
-
-   std::string cleanPath = path;
-#if defined(_WIN32)
-   std::replace(cleanPath.begin(), cleanPath.end(), '/', '\\');
-   const char pathDelimiter = '\\';
-#else
-   std::replace(cleanPath.begin(), cleanPath.end(), '\\', '/');
-   const char pathDelimiter = '/';
-#endif
-
-   std::stringstream ss(cleanPath);
-   std::string token;
-   std::vector<std::string> components;
-
-   // Detect if path is absolute (starts with slash or drive letter)
-   bool isAbsolute = false;
-#if defined(_WIN32)
-   if (cleanPath.size() > 1 && cleanPath[1] == ':')
-      isAbsolute = true;
-#else
-   if (!cleanPath.empty() && cleanPath[0] == '/')
-      isAbsolute = true;
-#endif
-
-   while (std::getline(ss, token, pathDelimiter)) {
-      if (token == "..") {
-         if (!components.empty())
-               components.pop_back();
-      } else if (token != "." && !token.empty()) {
-         components.push_back(token);
-      }
-   }
-
-   std::ostringstream normalized;
-   if (isAbsolute) {
-#if defined(_WIN32)
-      if (cleanPath.size() > 1 && cleanPath[1] == ':')
-         normalized << cleanPath.substr(0, 2); // preserve drive, e.g. "C:"
-#endif
-      normalized << pathDelimiter;
-   }
-
-   for (size_t i = 0; i < components.size(); ++i) {
-      if (i > 0)
-         normalized << pathDelimiter;
-      normalized << components[i];
-   }
-
-   return normalized.str();
-*/   
 }
 
 std::string resolveExecutableRelativePath(const std::string& path)
@@ -471,7 +432,7 @@ std::string resolveExecutableRelativePath(const std::string& path)
 
    fs::path base = fs::weakly_canonical(path::executableDir());
    fs::path full = fs::weakly_canonical(base / p);
-   if (!path::isSubPath(full.string(), base.string()))
+   if (!path::isPathWithinRoot(full.string(), base.string()))
    {
       return "";
    }
