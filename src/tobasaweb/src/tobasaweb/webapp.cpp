@@ -764,7 +764,9 @@ http::RequestStatus Webapp::handleRequest(const http::HttpContext& context)
          }
       });
 
-   return tbs::http::RequestStatus::async; // important
+   // Return async so the server waits instead of sending the response
+   // before the worker finishes. ctx->complete() resumes response handling.
+   return tbs::http::RequestStatus::async;
 }
 
 } // namespace web

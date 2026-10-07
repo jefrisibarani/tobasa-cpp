@@ -84,6 +84,17 @@ void Context::setBodyReader(std::shared_ptr<MultipartBodyReader> reader)
    _bodyReader = reader; 
 }
 
+void Context::bodyReaderReadyHandler(std::function<void()> handler)
+{
+   _bodyReaderReadyHandler = std::move(handler);
+}
+
+void Context::bodyReaderReady()
+{
+   if (_bodyReaderReadyHandler)
+      _bodyReaderReadyHandler();
+}
+
 void Context::onCompleteHandler(std::function<void(RequestStatus)> handler)
 {
    _onCompleteHandler = std::move(handler);

@@ -461,7 +461,10 @@ http::RequestStatus handleBrowseUpload(const http::HttpContext& context)
 
       response->httpStatus(http::StatusCode::OK);
       response->setHeaderContentType(http::mimetypes::fromExtension(extension));
+      
+      response->enableFileRangeResponse(true); // enable Accept-rage for download path
       response->fileContent(target.string());
+      
       return http::RequestStatus::handled;
    }
 
@@ -638,10 +641,6 @@ void runHttpServer()
    std::vector<std::thread> threadPool;
    size_t ioPoolSize = 4;
 
-   // We have to set log target for tbs::Logger
-   Logger::setTarget(new log::CoutLogSink()) ;
-   Logger::disableLogging();
-
    // logger
    log::StdoutLogger logger;
    logger.setLevel(log::Level::TraceMask);
@@ -652,14 +651,13 @@ void runHttpServer()
       .logVerbose(false)
       .port(8084)
       .address("0.0.0.0")
-      .maxRequestsPerConnection(0)      // default 100,  max 10000, set to 0 to disable limit
-      .timeoutRead(10)                  // default 60s,  min 10s, max 1 hour, set value to 0 disable limit
-      .timeoutWrite(60)                 // default 60s,  min 10s, max 1 hour, set value to 0 disable limit
-      .timeoutProcessing(3600)          // default 120s, min 10s, max 1 hour, set value to 0 disable limit
-      .readBufferSize(1024*32)          // default 64KB, min 1KB, max 8 MB
-      .sendBufferSize(1024*32)          // default 64KB, min 1KB, max 8 MB
-      .maxHeaderSize(1024*1024)         // default 64KB, min 1KB, max 1 MB
-      .enableMultipartParsing(true)
+      .maxRequestsPerConnection(0)      // default 100, max 34464, 0 to disable check
+      .timeoutRead(10)                  // default 60s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
+      .timeoutWrite(60)                 // default 60s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
+      .timeoutProcessing(3600)          // default 120s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
+      .readBufferSize(1024*32)          // default 64KB, min 16 KB, max 8 MB
+      .sendBufferSize(1024*32)          // default 64KB, min 16 KB, max 8 MB
+      .maxHeaderSize(1024*1024)         // default 64KB, min 16 KB, max 1 MB
       .temporaryDir("./tmp")
       ;
 
@@ -672,30 +670,25 @@ void runHttpServer()
       .tmpDhFile( "dh2048.pem" )
 #ifdef TOBASA_HTTP_USE_HTTP2
       .http2Enabled(true)
-      .logVerboseHttp2(true)
+      .logVerboseHttp2(false)
 #endif
-      .logVerbose(true)
+      .logVerbose(false)
       .port(8085)
       .address("0.0.0.0")
-      .maxRequestsPerConnection(100)    // default 100,  max 10000, set to 0 to disable limit
-      .timeoutRead(10)                  // default 60s,  min 10s, max 1 hour, set value to 0 disable limit
-      .timeoutWrite(60)                 // default 60s,  min 10s, max 1 hour, set value to 0 disable limit
-      .timeoutProcessing(3600)          // default 120s, min 10s, max 1 hour, set value to 0 disable limit
-      .readBufferSize(1024*32)          // default 64KB, min 1KB, max 8 MB
-      .sendBufferSize(1024*32)          // default 64KB, min 1KB, max 8 MB
-      .maxHeaderSize(1024*1024)         // default 64KB, min 1KB, max 1 MB
-      .enableMultipartParsing(true)
+      .maxRequestsPerConnection(100)    // default 100, max 34464, 0 to disable check
+      .timeoutRead(10)                  // default 60s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
+      .timeoutWrite(60)                 // default 60s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
+      .timeoutProcessing(3600)          // default 120s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
+      .readBufferSize(1024*32)          // default 64KB, min 16 KB, max 8 MB
+      .sendBufferSize(1024*32)          // default 64KB, min 16 KB, max 8 MB
+      .maxHeaderSize(1024*1024)         // default 64KB, min 16 KB, max 1 MB
       .temporaryDir("./tmp")
       ;
 
 
    http::PlainServerDefault serverHttp(ioContext, std::move(httpSetting), logger);
    // set server request handler
-   serverHttp.requestHandler(
-      [&](const http::HttpContext& context)
-      {
-         return handleServerRequest(context);
-      });
+   serverHttp.requestHandler(handleServerRequest);
 
 
    http::SecureServerDefault serverHttps(ioContext, std::move(tlsSetting), logger);

@@ -95,10 +95,18 @@ public:
    // Http headers, which will moved to HttpContext's Request
    http::Headers requestHeaders;
 
+   /// Raw request-body bytes received for this HTTP/2 stream.
    std::string requestBody;
 
-   bool hasContentLength {false};
+   /// Multipart DATA chunks received before the application reader is ready, kept in arrival order.
+   std::deque<std::string> pendingMultipartData;
+
+   /// True after middleware registers the body reader handler for this stream.
+   bool multipartHandlerReady {false};
+
    bool hasMultipartBody {false};
+
+   bool hasContentLength {false};
 
    bool requestDispatched {false};
 
@@ -182,6 +190,9 @@ public:
    http::HttpContext findHttpContext(int32_t streamId);
 
    Result handleRequest(int32_t streamId);
+
+   /// Marks the multipart handler ready and delivers queued DATA chunks in order.
+   Result multipartHandlerReady(int32_t streamId);
 
    Result submitResponse(http::HttpContext httpContext, int streamId);
 

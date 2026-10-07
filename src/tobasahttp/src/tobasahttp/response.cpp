@@ -9,17 +9,23 @@
 #include <tobasa/file_reader.h>
 #include <tobasa/bytes_reader.h>
 #include <tobasahttp/util.h>
+#include "tobasahttp/request.h"
 #include "tobasahttp/response.h"
 #include "tobasahttp/exception.h"
 #include <zlib.h>
+#include <charconv>
+#include <cctype>
 #include <memory>
 #include <algorithm>
 #include <cstring>
+#include <string_view>
 #include <tobasa/logger.h>
 
 // Note: HTTP/2 write variant selection is controlled by build flags
 
 namespace {
+   using namespace tbs::http;
+
    const size_t GZBUFFSIZE = 8092;
    struct GzipState 
    {
@@ -36,6 +42,128 @@ namespace {
          std::memset(&strm, 0, sizeof(strm)); 
       }
    };
+
+   std::string_view trimOws(std::string_view value)
+   {
+      while (!value.empty() && (value.front() == ' ' || value.front() == '\t'))
+         value.remove_prefix(1);
+      while (!value.empty() && (value.back() == ' ' || value.back() == '\t'))
+         value.remove_suffix(1);
+      return value;
+   }
+
+   bool equalsIgnoreCase(std::string_view left, std::string_view right)
+   {
+      if (left.size() != right.size())
+         return false;
+      for (size_t i = 0; i < left.size(); ++i)
+      {
+         if (std::tolower(static_cast<unsigned char>(left[i])) !=
+             std::tolower(static_cast<unsigned char>(right[i])))
+            return false;
+      }
+      return true;
+   }
+
+   bool parseUnsigned(std::string_view value, uint64_t& result)
+   {
+      if (value.empty())
+         return false;
+
+      auto parsed = std::from_chars(value.data(), value.data() + value.size(), result);
+      return parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size();
+   }
+
+   enum class RangeParseResult
+   {
+      ignore,
+      satisfiable,
+      unsatisfiable
+   };
+
+   struct ByteRange
+   {
+      size_t start {0};
+      size_t end {0};
+   };
+
+   RangeParseResult parseByteRange(std::string_view header, size_t resourceSize, ByteRange& range)
+   {
+      header = trimOws(header);
+      const auto equals = header.find('=');
+      if (equals == std::string_view::npos || header.find('=', equals + 1) != std::string_view::npos)
+         return RangeParseResult::ignore;
+
+      auto unit = trimOws(header.substr(0, equals));
+      auto spec = trimOws(header.substr(equals + 1));
+      if (!equalsIgnoreCase(unit, "bytes") || spec.empty() || spec.find(',') != std::string_view::npos)
+         return RangeParseResult::ignore;
+
+      const auto dash = spec.find('-');
+      if (dash == std::string_view::npos || spec.find('-', dash + 1) != std::string_view::npos)
+         return RangeParseResult::ignore;
+
+      const auto firstText = spec.substr(0, dash);
+      const auto lastText = spec.substr(dash + 1);
+      const uint64_t total = static_cast<uint64_t>(resourceSize);
+
+      if (firstText.empty())
+      {
+         uint64_t suffixLength = 0;
+         if (!parseUnsigned(lastText, suffixLength))
+            return RangeParseResult::ignore;
+         if (suffixLength == 0 || total == 0)
+            return RangeParseResult::unsatisfiable;
+
+         const auto selectedLength = std::min(suffixLength, total);
+         range.start = static_cast<size_t>(total - selectedLength);
+         range.end = resourceSize - 1;
+         return RangeParseResult::satisfiable;
+      }
+
+      uint64_t first = 0;
+      if (!parseUnsigned(firstText, first))
+         return RangeParseResult::ignore;
+
+      uint64_t last = total == 0 ? 0 : total - 1;
+      if (!lastText.empty())
+      {
+         uint64_t requestedLast = 0;
+         if (!parseUnsigned(lastText, requestedLast) || requestedLast < first)
+            return RangeParseResult::ignore;
+         last = std::min(requestedLast, last);
+      }
+
+      if (total == 0 || first >= total)
+         return RangeParseResult::unsatisfiable;
+
+      range.start = static_cast<size_t>(first);
+      range.end = static_cast<size_t>(last);
+      return RangeParseResult::satisfiable;
+   }
+
+   bool ifRangeMatches(Headers& requestHeaders, Headers& responseHeaders)
+   {
+      const auto ifRange = requestHeaders.findHeader("If-Range");
+      if (ifRange.count == 0)
+         return true;
+      if (ifRange.count != 1)
+         return false;
+
+      const auto validator = trimOws(ifRange.value);
+      if (validator.empty())
+         return false;
+
+      if (validator.front() == '"' || validator.substr(0, 2) == "W/")
+      {
+         const auto etag = responseHeaders.findHeader("ETag");
+         return etag.count == 1 && !etag.value.empty() && etag.value.front() == '"' &&
+            etag.value == validator;
+      }
+
+      const auto lastModified = responseHeaders.findHeader("Last-Modified");
+      return lastModified.count == 1 && !lastModified.value.empty() && lastModified.value == validator;
+   }
 }
 
 namespace tbs {
@@ -97,37 +225,104 @@ void Response::content(const std::string& content)
 {
    _content = std::move(content);
    
-   _dataSource->dataType   = http::ResponseDataType::string;
-   _dataSource->dataReader = std::make_unique<tbs::StringReader>(_content);
+   _dataSource->dataType     = http::ResponseDataType::string;
+   _dataSource->dataReader   = std::make_unique<tbs::StringReader>(_content);
+   _dataSource->sourceOffset = 0;
    
-   auto dataSize           = _dataSource->dataReader->dataSize();
-   _dataSource->dataSize   = dataSize;
-   _dataSource->readLeft   = dataSize;
+   auto dataSize             = _dataSource->dataReader->dataSize();
+   _dataSource->dataSize     = dataSize;
+   _dataSource->readLeft     = dataSize;
 }
 
 void Response::fileContent(const std::string& fullPath)
 {
    _content = "";
 
-   _dataSource->dataType   = http::ResponseDataType::file;
-   _dataSource->dataReader = std::make_unique<tbs::FileReader>(fullPath);
-   _dataSource->filePath   = fullPath;
+   _dataSource->dataType     = http::ResponseDataType::file;
+   _dataSource->dataReader   = std::make_unique<tbs::FileReader>(fullPath);
+   _dataSource->filePath     = fullPath;
+   _dataSource->sourceOffset = 0;
 
-   auto dataSize           = _dataSource->dataReader->dataSize();
-   _dataSource->dataSize   = dataSize;
-   _dataSource->readLeft   = dataSize;
+   auto dataSize             = _dataSource->dataReader->dataSize();
+   _dataSource->dataSize     = dataSize;
+   _dataSource->readLeft     = dataSize;
+}
+
+void Response::enableFileRangeResponse(bool value)
+{
+   _enableFileRange = value;
+}
+
+bool Response::fileRangeResponseEnabled() const
+{
+   return _enableFileRange;
+}
+
+void Response::prepareFileRangeResponse(Request& request)
+{
+   if (!_enableFileRange)
+      return;
+
+   if (statusCode() != StatusCode::OK)
+      return;
+
+   auto dataSource = _dataSource;
+   if (   !dataSource 
+       || dataSource->dataType != ResponseDataType::file 
+       || !dataSource->dataReader 
+       || !dataSource->dataReader->isOpen() 
+       || dataSource->hasWriterCallback() )
+      return;
+
+   setHeader("Accept-Ranges", "bytes");
+
+   if (request.method() != "GET" || request.isHeadRequest())
+      return;
+
+   const auto rangeHeader = request.headers().findHeader("Range");
+   if (rangeHeader.count != 1 || !ifRangeMatches(request.headers(), _headers))
+      return;
+
+   ByteRange range;
+   const auto parsed = parseByteRange(rangeHeader.value, dataSource->dataSize, range);
+   if (parsed == RangeParseResult::ignore)
+      return;
+
+   if (parsed == RangeParseResult::unsatisfiable)
+   {
+      httpStatus(StatusCode::RANGE_NOT_SATISFIABLE);
+      setHeader("Content-Range", "bytes */" + std::to_string(dataSource->dataSize));
+      useChunkedEncoding(false);
+      content("");
+      // disable compression
+      prepareForCompression({false, 0, {}, {}, {}});
+      return;
+   }
+
+   const size_t selectedLength = range.end - range.start + 1;
+   dataSource->sourceOffset    = range.start;
+   dataSource->dataSize        = selectedLength;
+   dataSource->readLeft        = selectedLength;
+
+   httpStatus(StatusCode::PARTIAL_CONTENT);
+   setHeader("Content-Range", "bytes " + std::to_string(range.start) + "-" +
+      std::to_string(range.end) + "/" + std::to_string(dataSource->dataReader->dataSize()));
+   
+   // disable compression
+   prepareForCompression({false, 0, {}, {}, {}});
 }
 
 void Response::rawBytesContent(const nonstd::span<const unsigned char>& rawBytes)
 {
    _content = "";
 
-   _dataSource->dataType   = http::ResponseDataType::rawBytes;
-   _dataSource->dataReader = std::make_unique<tbs::BytesReader>(rawBytes);
+   _dataSource->dataType     = http::ResponseDataType::rawBytes;
+   _dataSource->dataReader   = std::make_unique<tbs::BytesReader>(rawBytes);
+   _dataSource->sourceOffset = 0;
 
-   auto dataSize           = _dataSource->dataReader->dataSize();
-   _dataSource->dataSize   = dataSize;
-   _dataSource->readLeft   = dataSize;
+   auto dataSize             = _dataSource->dataReader->dataSize();
+   _dataSource->dataSize     = dataSize;
+   _dataSource->readLeft     = dataSize;
 }
 
 void Response::addCookieHeader(std::shared_ptr<ResponseCookie> cookie) 
@@ -213,7 +408,9 @@ bool Response::compressionActive() const
 
 void Response::prepareForCompression(CompressionRule rule)
 {
-   if (! rule.useCompression )
+   if (!rule.useCompression ||
+       _httpStatus.code() == StatusCode::PARTIAL_CONTENT ||
+       _httpStatus.code() == StatusCode::RANGE_NOT_SATISFIABLE)
    {
       _compressionEnabled = false;
       _preparedForCompression = true;
@@ -309,6 +506,15 @@ void ResponseDataSource::writerCallback(ResponseWriterCb cb)
    _writerCb = std::move(cb);
 }
 
+bool ResponseDataSource::hasWriterCallback() const
+{
+#ifdef TOBASA_HTTP_USE_HTTP2
+   return static_cast<bool>(_writerCb) || static_cast<bool>(_writerCb2);
+#else
+   return static_cast<bool>(_writerCb);
+#endif
+}
+
 #ifdef TOBASA_HTTP_USE_HTTP2
 void ResponseDataSource::writerCallback2(ResponseWriterCb2 cb) 
 {
@@ -324,6 +530,7 @@ void ResponseDataSource::connect(std::shared_ptr<Response> response)
    auto dataSize  = dataReader->dataSize();
    this->dataSize = dataSize;
    this->readLeft = dataSize;
+   this->sourceOffset = 0;
 }
 
 // -------------------------------------------------------
@@ -505,10 +712,12 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
       std::streamsize bytesRead = 0;
       if (readCount > 0) 
       {
-         auto startAt = dataSource->dataSize - dataSource->readLeft;
+         auto startAt = dataSource->sourceOffset + dataSource->dataSize - dataSource->readLeft;
          bytesRead = dataSource->dataReader->readAt(startAt, inBuf.data(), static_cast<std::streamsize>(readCount));
          if (bytesRead < 0) 
             throw http::Exception("Invalid Response data source state");
+         if (static_cast<size_t>(bytesRead) != readCount)
+            throw http::Exception("Incomplete read from response data source");
          
          dataSource->readLeft -= static_cast<size_t>(bytesRead);
       }
@@ -578,11 +787,13 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
       if (readCount > 0) 
       {
          // First copy the block into tmpBuffer
-         auto startAt = dataSource->dataSize - dataSource->readLeft;
+         auto startAt = dataSource->sourceOffset + dataSource->dataSize - dataSource->readLeft;
          bytesRead = dataSource->dataReader->readAt(startAt, tmpBuffer.data(), static_cast<std::streamsize>(readCount) );
 
          if (bytesRead < 0)
             throw http::Exception("Invalid Response data source state");
+         if (static_cast<size_t>(bytesRead) != readCount)
+            throw http::Exception("Incomplete read from response data source");
 
          dataSource->readLeft -= bytesRead;
       }
@@ -628,14 +839,16 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
             throw http::Exception(std::string("error opening data source " +  dataSource->filePath ));
 
          auto readCount = std::min(bufferSize, dataSource->readLeft);
-         auto startAt   = dataSource->dataSize - dataSource->readLeft;
+         auto startAt   = dataSource->sourceOffset + dataSource->dataSize - dataSource->readLeft;
          // we write/append data from dataSource directly into outStream
          auto bytesRead = dataSource->dataReader->readAt(startAt, outStream, static_cast<std::streamsize>(readCount));
          if (bytesRead < 0)
             throw http::Exception("Invalid Response data source state");
+         if (static_cast<size_t>(bytesRead) != readCount)
+            throw http::Exception("Incomplete read from response data source");
 
-         dataSource->readLeft -= readCount;
-         return headerSize + static_cast<int64_t>(readCount);
+         dataSource->readLeft -= static_cast<size_t>(bytesRead);
+         return headerSize + static_cast<int64_t>(bytesRead);
       }
    }
 
@@ -661,7 +874,7 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
       }
 
       auto readCount = std::min(bufferSize, dataSource->readLeft);
-      auto startAt   = dataSource->dataSize - dataSource->readLeft;
+      auto startAt   = dataSource->sourceOffset + dataSource->dataSize - dataSource->readLeft;
 
     #ifdef TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
       // NO-COPY variant: write compressed/plain data into provided streambuf
@@ -683,6 +896,8 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
             bytesRead = dataSource->dataReader->readAt(startAt, inBuf.data(), static_cast<std::streamsize>(readCount));
             if (bytesRead < 0) 
                throw http::Exception("Invalid Response data source state");
+            if (static_cast<size_t>(bytesRead) != readCount)
+               throw http::Exception("Incomplete read from response data source");
 
             dataSource->readLeft -= static_cast<size_t>(bytesRead);
          }
@@ -766,6 +981,8 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
          auto bytesRead = dataSource->dataReader->readAt(startAt, tmpBuffer.data(), static_cast<std::streamsize>(readCount));
          if (bytesRead < 0) 
             throw http::Exception("Invalid Response data source state");
+         if (static_cast<size_t>(bytesRead) != readCount)
+            throw http::Exception("Incomplete read from response data source");
 
          dataSource->readLeft -= static_cast<size_t>(bytesRead);
 
@@ -793,6 +1010,8 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
             bytesRead = dataSource->dataReader->readAt(startAt, inBuf.data(), static_cast<std::streamsize>(readCount));
             if (bytesRead < 0) 
                throw http::Exception("Invalid Response data source state");
+            if (static_cast<size_t>(bytesRead) != readCount)
+               throw http::Exception("Incomplete read from response data source");
 
             dataSource->readLeft -= static_cast<size_t>(bytesRead);
          }
@@ -877,6 +1096,8 @@ int64_t ResponseSerializer::doSerializeHttp1(asio::streambuf* sendBuffer, size_t
          auto bytesRead = dataSource->dataReader->readAt(startAt, tmpBuffer.data(), static_cast<std::streamsize>(readCount));
          if (bytesRead < 0) 
             throw http::Exception("Invalid Response data source state");
+         if (static_cast<size_t>(bytesRead) != readCount)
+            throw http::Exception("Incomplete read from response data source");
 
          dataSource->readLeft -= static_cast<size_t>(bytesRead);
 

@@ -163,10 +163,13 @@ int main(int argc, char* argv[])
       // -------------------------------------------------------
 
       // ExceptionHandler Middleware
-      webapp.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next) {
-            return web::exceptionHandlerMiddleware(context, next);
-         } , "ExceptionHandler" );
+      webapp.addMiddleware(web::exceptionHandlerMiddleware, "ExceptionHandler" );
+
+      // Multipart middleware must run before middleware that can stop the chain.
+      webapp.useMultipart(
+         [&webappOpt](web::MultipartMiddlewareOption& option) {
+            option.temporaryDir = webappOpt.httpServer.temporaryDir;
+         } );
 
       // Add middleware to perform a database connectivity check before processing http requests
       webapp.addMiddleware(
@@ -174,35 +177,17 @@ int main(int argc, char* argv[])
             return web::databaseCheckMiddleware(webapp, dbService, context, next);
          } , "DatabaseCheck" );
 
-      // Multipart middleware to parse multipart body
-      webapp.useMultipart(
-         [&webappOpt](web::MultipartMiddlewareOption& option) {
-            option.temporaryDir = webappOpt.httpServer.temporaryDir;
-         } );
-
       // Add middleware to check client User-Agent, or any custom header related to our App
-      webapp.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next) {
-            return web::responseHeaderRuleMiddleware(context, next);
-         } , "ResponseHeaderRule" );
+      webapp.addMiddleware(web::responseHeaderRuleMiddleware, "ResponseHeaderRule" );
 
       // Add HTTP Response header middleware / CORS
-      webapp.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next) {
-            return web::requestIdentificationMiddleware(context, next);
-         } , "RequestIdentification" );
+      webapp.addMiddleware(web::requestIdentificationMiddleware, "RequestIdentification" );
 
       // Add Cache-control middleware
-      webapp.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next) {
-            return web::cacheControlMiddleware(context, next);
-         } , "CacheControl" );
+      webapp.addMiddleware(web::cacheControlMiddleware, "CacheControl" );
 
       // Add middleware to validate the content-type header before executing authentication and authorization processes
-      webapp.addMiddleware(
-         [](const http::HttpContext& context, const http::RequestHandler& next) {
-            return web::contentTypeMiddleware(context,next);
-         } , "ContentType" );
+      webapp.addMiddleware(web::contentTypeMiddleware, "ContentType" );
 
       // Session
       webapp.useSession(

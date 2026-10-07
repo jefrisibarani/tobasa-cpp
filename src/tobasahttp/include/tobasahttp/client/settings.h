@@ -28,7 +28,7 @@ private:
    int32_t        _connectionPoolSize     {1};
 
    // mTLS client
-  // ------------------------------------------------
+   // ------------------------------------------------
    std::string    _certificateFile        {}; // client.crt
    std::string    _privateKeyFile         {}; // client.key
    std::string    _privateKeyPassword     {};
@@ -36,22 +36,23 @@ private:
    /// Certificate Authorities certificates in PEM format 
    std::string    _caVerificationFile     {}; // ca.pem
    bool           _verifyPeer             { false };
+   
    /// TLS in server mode
    bool           _serverMode             { false };
 
 public:
    SettingsClient(
-      std::string address = "localhost",
+      std::string address = "127.0.0.1",
       uint16_t port = 8084,
       asio::ip::tcp protocol = asio::ip::tcp::v4() )
       : BaseType(address, port, protocol)
    {}
 
-   // ------------------------------------------------
-   // default 1, max 1000
+   /// Maximum number of connections the client pool may create.
+   /// Default 1, max 1000
    SettingsClient& connectionPoolSize(int32_t val) &
    {
-      _connectionPoolSize = self().clampValue(val, (int32_t)1, (int32_t)1000, (int32_t)1);
+      _connectionPoolSize = self().checkValue(val, (int32_t)1, (int32_t)1000, (int32_t)1);
       return self();
    }
    SettingsClient&& connectionPoolSize(int32_t val) &&
@@ -60,7 +61,8 @@ public:
    }
    [[nodiscard]] int32_t connectionPoolSize() const { return _connectionPoolSize; }
 
-   // ------------------------------------------------
+
+   /// Path to a PEM file with trusted CA certificates; used when peer verification is enabled.
    SettingsClient& caVerificationFile(std::string val) &
    {
       _caVerificationFile = std::move(val);
@@ -72,7 +74,8 @@ public:
    }
    std::string caVerificationFile() const { return _caVerificationFile; }
 
-   // ------------------------------------------------
+   
+   /// Verify the server certificate; this requires an existing CA file set with caVerificationFile().
    SettingsClient& verifyPeer(bool val) &
    {
       _verifyPeer = val;
@@ -85,7 +88,7 @@ public:
    bool verifyPeer() const { return _verifyPeer; }
 
 
-   // ------------------------------------------------
+   /// Path to the client certificate in PEM format; used with privateKeyFile() for mutual TLS.
    SettingsClient& certificateFile(std::string val) &
    {
       _certificateFile = std::move(val);
@@ -98,7 +101,8 @@ public:
    [[nodiscard]]
    std::string certificateFile() const { return _certificateFile; }
 
-   // ------------------------------------------------
+   
+   /// Path to the client's PEM private key; used with certificateFile() for mutual TLS.
    SettingsClient& privateKeyFile(std::string val) &
    {
       _privateKeyFile = std::move(val);
@@ -111,7 +115,8 @@ public:
    [[nodiscard]]
    std::string privateKeyFile() const { return _privateKeyFile; }
 
-   // ------------------------------------------------
+   
+   /// Password used to load an encrypted private key file.
    SettingsClient& privateKeyPassword(std::string val) &
    {
       _privateKeyPassword = std::move(val);

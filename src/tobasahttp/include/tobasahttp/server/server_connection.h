@@ -231,12 +231,17 @@ public:
       if (_sseState)
          return;
 
-      this->_logger.trace("[{}] [conn:{}] Sending response to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
+      _httpContext->response()->prepareFileRangeResponse(*_httpContext->request());
+
+      if (this->_settings.logVerbose())
+         this->_logger.trace("[{}] [conn:{}] Sending response to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
 
       if (!_httpContext->response()->preparedForCompression()) 
       {
          auto accept = _httpContext->request()->headers().value("Accept-Encoding");
          _httpContext->response()->prepareForCompression(compressionRule(accept));
+         if (_httpContext->response()->compressionEnabled())
+            this->_logger.trace("[{}] [conn:{}] Sending compressed response to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
       }
 
       ResponseSerializer serializer( _httpContext->response() );
@@ -478,8 +483,7 @@ protected:
                      // Redirect multipart parsing into a request handler (middleware)
                      if (    !self->_settings.enableMultipartParsing() 
                           && !self->_parser.contentDone() 
-                          && self->_parser.hasMultipart()
-                          /* && self->_parser.hasContentLength() && self->_parser.contentLength()*/ )
+                          && self->_parser.hasMultipart()  )
                      {
                         // create MultipartBodyReader with last _parser's state, to be used on MultipartBodyReader's read() 
                         // Note: Body reader use readBody() to retrieve data
@@ -836,8 +840,8 @@ protected:
 
       bool keepAlive = this->_httpContext->keepAlive();
 
-      // if maxRequestsPerConnection  is 0, do not check
-      if ( (_currentRequestId >= this->_settings.maxRequestsPerConnection())  && (this->_settings.maxRequestsPerConnection() != 0) )
+      // if maxRequestsPerConnection is 0, do not check
+      if ( (this->_settings.maxRequestsPerConnection() != 0) && (_currentRequestId >= this->_settings.maxRequestsPerConnection()) )
       {
          this->_logger.info("[{}] [conn:{}] Reached maximum requests per connection, closing connection", this->logHttpType(), this->id());
          keepAlive = false;
@@ -1820,6 +1824,32 @@ protected:
          }
       }
 
+      if (streamData->hasMultipartBody &&
+          this->_http2Option &&
+          !this->_http2Option->enableMultipartParsing)
+      {
+          // Middleware may run on a worker thread. Drain queued DATA on the connection thread.
+         auto weakSelf = std::weak_ptr<ServerConnection>(this->selfPtr());
+         httpContext->bodyReaderReadyHandler([weakSelf, streamId]()
+         {
+            if (auto self = weakSelf.lock())
+            {
+               asio::post(self->executor(), [self, streamId]()
+               {
+                  if (!self->_http2Session)
+                     return;
+
+                  auto result = self->_http2Session->multipartHandlerReady(streamId);
+                  if (!result.success())
+                  {
+                     self->_logger.error("[{}] [conn:{}] [http2] Failed to drain multipart DATA for stream {}: {}",
+                        self->logHttpType(), self->id(), streamId, result.message());
+                  }
+               });
+            }
+         });
+      }
+
       this->_http2Session->addHttpContext(httpContext);
 
       return handleHttp2Request(httpContext, streamId);
@@ -1885,10 +1915,14 @@ protected:
             return result;
          }
 
+         ctx->response()->prepareFileRangeResponse(*ctx->request());
+
          if (!ctx->response()->preparedForCompression()) 
          {
             auto accept = ctx->request()->headers().value("Accept-Encoding");
             ctx->response()->prepareForCompression( self->compressionRule(accept) );
+            if (ctx->response()->compressionEnabled())
+               self->_logger.trace("[{}] [conn:{}] Sending compressed response to {}", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
          }
 
          return self->_http2Session->submitResponse(ctx, sid);

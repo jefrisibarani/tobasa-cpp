@@ -45,6 +45,8 @@ WebSocket async read returns EOF/reset
                 +--> WebSocketState is eventually released
 ```
 
+See [Working with WebSocket](../src/tobasahttp/doc/work_with_websocket.md) for the WebSocket API and context usage.
+
 For a WebSocket close frame, the flow is similar, except `onClose()` is called instead of `onError()`.
 
 ```text

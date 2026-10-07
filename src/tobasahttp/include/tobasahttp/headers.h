@@ -1,10 +1,18 @@
 #pragma once
 
+#include <string_view>
 #include "tobasahttp/field.h"
 #include "tobasahttp/header_names.h"
 
 namespace tbs {
 namespace http {
+
+struct HeaderValue
+{
+   size_t count {0};
+   std::string value;
+};
+
 
 /** 
  * \ingroup HTTP
@@ -30,6 +38,8 @@ public:
       auto name = headerNameToString(code);
       return find(name);
    }
+
+   HeaderValue findHeader(std::string_view name);
 
 };
 

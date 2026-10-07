@@ -68,10 +68,12 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
    // We also move parser into this callback
    auto nextHandler = _nextHandler;
    auto dataHandler = 
-      [weakContext = std::weak_ptr<http::Context>{context}, nextHandler = std::move(nextHandler), mparser=std::move(parser)](const uint8_t *data, size_t totalData) 
+      [weakContext = std::weak_ptr<http::Context>{context}, 
+       nextHandler = std::move(nextHandler), 
+       mparser=std::move(parser)](const uint8_t *data, size_t totalData) 
       {
-         auto context = weakContext.lock();
-         if (!context)
+         auto ctx = weakContext.lock();
+         if (!ctx)
             return http::parser::Info{false, "HTTP context is no longer available", 0, {}, 0};
 
          auto info = mparser->parse(data, totalData);
@@ -80,17 +82,16 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
             if ( mparser->done() )
             {
                info.message("multipart-done");
-
-               context->request()->multipartBody(std::move( mparser->multipartBody() ) );
-               context->getBodyReader()->done(true);
+               ctx->request()->multipartBody(std::move( mparser->multipartBody() ) );
+               ctx->getBodyReader()->done(true);
                if (nextHandler)
                {
                   // resume pipeline
-                  auto nextStatus = nextHandler(context);
-                  context->complete(nextStatus);
+                  auto nextStatus = nextHandler(ctx);
+                  ctx->complete(nextStatus);
                } 
                else
-                  context->complete(); // default ends with RequestStatus::handled
+                  ctx->complete(); // default ends with RequestStatus::handled
             }
          }
          // when info.error() occurred, ServerConnection will handle the cleanups
@@ -99,6 +100,7 @@ http::RequestStatus MultipartMiddleware::invoke(const http::HttpContext& context
 
 
    context->getBodyReader()->read(std::move(dataHandler));
+   context->bodyReaderReady();
 
    // Instead of next(context), we return async status.
    // This way ServerConnection will not write a response immediately, 

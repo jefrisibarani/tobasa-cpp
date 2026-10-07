@@ -88,6 +88,7 @@ public:
 
 
 
+/// Create a Result of the specified type, passing arguments to its constructor.
 template <class ResultType, typename... Params>
 [[nodiscard]]
 std::shared_ptr<Result> makeResult(Params&&... args)
@@ -97,6 +98,7 @@ std::shared_ptr<Result> makeResult(Params&&... args)
    );
 }
 
+/// Create a base Result, passing arguments to its constructor.
 template <typename... Params>
 [[nodiscard]]
 std::shared_ptr<Result> makeResult(Params&&... args)
@@ -106,7 +108,8 @@ std::shared_ptr<Result> makeResult(Params&&... args)
 
 
 /**
- * Status Page Result with html content
+ * A result that returns an HTML status page.
+ * The page shows the HTTP status and an optional message.
  */
 class StatusResult : public Result
 {
@@ -133,22 +136,29 @@ statusResultHtml(Params&&... args)
    );
 }
 
-
 /**
- * File Result
+ * A result that sends a file.
+ * The content type is inferred from the file name unless supplied.
+ * Byte-range requests are disabled by default.
  */
 class FileResult : public Result
 {
 private:
    std::string _filePath;
+   bool        _enableFileRange = false;
 
 public:
-   FileResult(const std::string& filePath);
-   FileResult(const std::string& filePath, const std::string& contentType);
+   static const bool EnableFileRangeResponse = true;
+
+   FileResult(const std::string& filePath, bool enableFileRange=false);
+   FileResult(const std::string& filePath, const std::string& contentType, bool enableFileRange=false);
    virtual std::string className() { return "http::FileResult"; }
    virtual void toResponse(std::shared_ptr<Response> response, ResultContentBuilder contentBuilder=nullptr);
 };
 
+
+/// Create a FileResult that sends a file. The content type is inferred unless supplied.
+/// Byte-range requests are disabled unless the optional flag is true.
 template <typename... Params>
 [[nodiscard]]
 std::shared_ptr<http::Result>
@@ -161,7 +171,8 @@ fileResult(Params&&... args)
 
 
 /**
- * Raw Bytes Result
+ * A result that sends a byte span as the response body.
+ * An optional content type can be supplied.
  */
 class RawBytesResult : public Result
 {
@@ -175,6 +186,7 @@ public:
    virtual void toResponse(std::shared_ptr<Response> response, ResultContentBuilder contentBuilder=nullptr);
 };
 
+/// Create a RawBytesResult that sends the supplied bytes. A content type may be provided.
 template <typename... Params>
 [[nodiscard]]
 std::shared_ptr<http::Result>

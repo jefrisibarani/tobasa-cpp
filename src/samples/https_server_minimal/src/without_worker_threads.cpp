@@ -9,8 +9,6 @@ void runHttpsServer()
    // server running context
    asio::io_context ioContext;
 
-   // We have to set log target for tbs::Logger
-   tbs::Logger::setTarget(new tbs::log::CoutLogSink()) ;
    // logger
    log::StdoutLogger logger;
    logger.setLevel(log::Level::TraceMask);
@@ -18,13 +16,13 @@ void runHttpsServer()
    tbs::Logger::logI("Starting Application");
    // setting for https server
    http::SettingsTls settings("0.0.0.0", 8085);
-   settings.logVerbose(true);
-   settings.maxRequestsPerConnection(0); // disable 
+   settings.logVerbose(false);
+   settings.maxRequestsPerConnection(0);
    settings.certificateChainFile("localhost.crt");
    settings.privateKeyFile("localhost.key");
    settings.tmpDhFile("dh2048.pem");
 
-   http::SecureServerDefault serverHttps(ioContext, std::move(settings), logger);
+   http::SecureServerDefault serverHttps(ioContext, settings, logger);
 
    // set server request handler
    serverHttps.requestHandler(

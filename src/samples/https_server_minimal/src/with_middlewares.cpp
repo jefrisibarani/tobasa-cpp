@@ -96,7 +96,10 @@ http::RequestStatus middlewareMultipart(const http::HttpContext& context, http::
    parser->contentLength(contentLength);
 
    if (context->getBodyReader()->chunkedMultipart())
+   {
+      // Tell parser to deal with Chunked Multipart
       parser->chunkedMultipart(true);
+   }
 
    auto ctype = context->request()->contentType();
    if (!ctype.empty())
@@ -113,14 +116,20 @@ http::RequestStatus middlewareMultipart(const http::HttpContext& context, http::
       }
    }
 
+   // MultipartBodyReader's read() will trigger async call to retrieve all data.
+   // we return http::RequestStatus::async, so ServerConnection will not prematurely write() response to client.
+   // When parsing done we inform ServerConnection to write() by calling HttpContext's complete()
+   //
+   // The trick is to call next middleware and informing ServerConnection, after we got all data.
+   // We also move parser into this callback
    auto nextHandlerForAsync = std::move(nextHandler);
    auto dataHandler =
       [weakContext = std::weak_ptr<http::Context>{context},
        nextHandler = std::move(nextHandlerForAsync),
        mparser = std::move(parser)](const uint8_t* data, size_t totalData)
       {
-         auto currentContext = weakContext.lock();
-         if (!currentContext)
+         auto ctx = weakContext.lock();
+         if (!ctx)
             return http::parser::Info{false, "HTTP context is no longer available", 0, {}, 0};
 
          auto info = mparser->parse(data, totalData);
@@ -129,24 +138,24 @@ http::RequestStatus middlewareMultipart(const http::HttpContext& context, http::
             if ( mparser->done() )
             {
                info.message("multipart-done");
-
-               currentContext->request()->multipartBody(std::move(mparser->multipartBody()));
-               currentContext->getBodyReader()->done(true);
+               ctx->request()->multipartBody(std::move(mparser->multipartBody()));
+               ctx->getBodyReader()->done(true);
                if (nextHandler)
                {
                   // resume pipeline
-                  auto nextStatus = nextHandler(currentContext);
-                  currentContext->complete(nextStatus);
+                  auto nextStatus = nextHandler(ctx);
+                  ctx->complete(nextStatus);
                }
                else
-                  currentContext->complete(); // default ends with RequestStatus::handled
+                  ctx->complete(); // default ends with RequestStatus::handled
             }
          }
-
+         // when info.error() occurred, ServerConnection will handle the cleanups
          return info;
       };
 
    context->getBodyReader()->read(std::move(dataHandler));
+   context->bodyReaderReady();
 
    // Instead of next(context), we return async status.
    // This way ServerConnection will not write a response immediately, 
@@ -326,16 +335,25 @@ http::RequestStatus handleRoute(const http::HttpContext& requestContext)
 //
 // we preprocess the request, then route it, and any exception in
 // the middle is caught and turned into an HTTP error page.
-http::RequestStatus handleHttpRequest(const http::HttpContext& context)
+http::RequestStatus handleHttpRequest(const http::HttpContext& context, bool serverSideMultipart)
 {
-   auto pipeline = composeMiddlewares(
-                     {
-                        middlewareMultipart,
-                        middlewareExceptionHandler
-                     },
-                     handleRoute );
+   if (serverSideMultipart)
+   {
+      // Do not activate middlewareMultipart when server-side multipart parser enabled 
+      auto pipeline = composeMiddlewares( { middlewareExceptionHandler }, handleRoute );
+      return pipeline(context);
+   }
+   else
+   {
+      auto pipeline = composeMiddlewares(
+                        {
+                           middlewareMultipart,
+                           middlewareExceptionHandler
+                        },
+                        handleRoute );
 
-   return pipeline(context);
+      return pipeline(context);
+   }
 }
 
 
@@ -350,28 +368,33 @@ int main()
 
       asio::io_context ioContext;
 
-      Logger::setTarget(new log::CoutLogSink());
       log::StdoutLogger logger;
       logger.setLevel(log::Level::TraceMask);
 
       http::SettingsTls settings;
       settings
-         .logVerbose(true)
+         .logVerbose(false)
 #ifdef TOBASA_HTTP_USE_HTTP2
-         .http2Enabled(true)
-         .logVerboseHttp2(true)
+         .http2Enabled(false)
+         .logVerboseHttp2(false)
 #endif
          .port(8085)
          .address("0.0.0.0")
          .certificateChainFile("localhost.crt")
          .privateKeyFile("localhost.key")
          .tmpDhFile("dh2048.pem")
-         .enableMultipartParsing(false)
+         .enableMultipartParsing(true) // set to false, to use multipart middleware
          .temporaryDir("./tmp")
          ;
 
-      http::SecureServerDefault serverHttps(ioContext, std::move(settings), logger);
-      serverHttps.requestHandler(handleHttpRequest);
+      http::SecureServerDefault serverHttps(ioContext, settings, logger);
+      bool serverSideMultipart = settings.enableMultipartParsing();
+
+      serverHttps.requestHandler(
+         [serverSideMultipart](const http::HttpContext& context) {
+            return handleHttpRequest(context, serverSideMultipart);
+         }
+      );
 
       asio::signal_set breakSignals{ ioContext, SIGINT };
       breakSignals.async_wait(

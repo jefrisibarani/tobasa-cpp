@@ -30,7 +30,7 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
    {
       case NGHTTP2_DATA:
       {
-        if (httpSession->option()->logVerbose)
+         if (httpSession->option()->logVerbose)
            Logger::logT("[{}] [conn:{}] [http2] Receive (DATA)", LOGTYPE, httpSession->connId());
 
          auto streamData = httpSession->findStream(frame->hd.stream_id);
@@ -41,6 +41,9 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
              !streamData->isWebSocketConnect() &&
              !streamData->requestDispatched)
          {
+            if (httpSession->option()->logVerbose)
+               Logger::logT("[{}] [conn:{}] [http2] handling webSocket data", LOGTYPE, httpSession->connId());
+
             streamData->requestDispatched = true;
             auto result = httpSession->handleRequest(frame->hd.stream_id);
             if (!result.success())
@@ -67,7 +70,7 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
             {
                http::HttpStatus status;
                if (!httpSession->validateMethod(streamData->requestHeader.method, status) &&
-               !streamData->isWebSocketConnect() )
+                   !streamData->isWebSocketConnect() )
                {
                   Logger::logW("[{}] [conn:{}] [http2] METHOD not allowed: {}", LOGTYPE, httpSession->connId(), streamData->requestHeader.method);
                   nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id, NGHTTP2_INTERNAL_ERROR);
@@ -75,22 +78,25 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
                }
             }
 
+            // Multipart parsing with middleware
+            // ----------------------------------
             if (frame->hd.flags & NGHTTP2_FLAG_END_HEADERS &&
                 streamData->hasMultipartBody &&
-                !httpSession->option()->enableMultipartParsing &&
+                !httpSession->option()->enableMultipartParsing && 
                 !streamData->requestDispatched)
             {
+               Logger::logT("[{}] [conn:{}] [http2] handling multipart for middleware", LOGTYPE, httpSession->connId());
                streamData->requestDispatched = true;
                auto result = httpSession->handleRequest(frame->hd.stream_id);
                if (!result.success())
                   return NGHTTP2_ERR_CALLBACK_FAILURE;
             }
 
-         // WebSocket request
+            // WebSocket request
+            // ----------------------------------
             if (streamData->isWebSocketConnect() && !streamData->requestDispatched)
             {
-            
-               Logger::logT("[{}] [conn:{}] [http2] Receive WebSocket CONNECT", LOGTYPE, httpSession->connId());
+               Logger::logT("[{}] [conn:{}] [http2] handling webSocket header", LOGTYPE, httpSession->connId());
                streamData->requestDispatched = true;
                auto result = httpSession->handleRequest(frame->hd.stream_id);
                if (!result.success())
@@ -183,7 +189,7 @@ int onFrameRecvCallback(nghttp2_session* session, const nghttp2_frame* frame, vo
             //    }
             //    return 0;
             // }
-#endif // if 0         
+#endif // if 0
          }
 
 
@@ -431,29 +437,41 @@ int onDataChunkRecvCallback(nghttp2_session *session, uint8_t flags,
    {
       if (httpSession->isWebSocketStream(streamId))
       {
+         // Pass DATA to the WebSocket handler registered for this stream.
          auto wsStream = httpSession->findWebSocketStream(streamId);
          if (wsStream && wsStream->onData)
             wsStream->onData(data, len);
       }
       else if (streamData->hasMultipartBody)
       {
-         streamData->requestBody.append(reinterpret_cast<const char*>(data), len);
-
+         // The multipart middleware parses this body when server-side parsing is disabled.
          if (!httpSession->option()->enableMultipartParsing)
          {
-            auto httpContext = httpSession->findHttpContext(streamId);
-            if (httpContext && httpContext->getBodyReader())
+            if (!streamData->multipartHandlerReady)
             {
-               auto info = httpContext->getBodyReader()->feed(
-                  tbs::span<const char>(reinterpret_cast<const char*>(data), len), len);
-
-               if (!info.success())
+               // http server request handler runs inside worker thread.
+               // The worker may not have registered the multipart handler yet.
+               // Save this chunk until the handler is ready.
+               streamData->pendingMultipartData.emplace_back(reinterpret_cast<const char*>(data), len);
+            }
+            else
+            {
+               // The middleware handler is ready, so pass this chunk to the body reader.
+               auto httpContext = httpSession->findHttpContext(streamId);
+               if (httpContext && httpContext->getBodyReader())
                {
-                  Logger::logE("[{}] [conn:{}] [http2] multipart body reader rejected DATA chunk for stream {}: {}",
-                     LOGTYPE, httpSession->connId(), streamId, std::string(info.message()));
+                  auto info = httpContext->getBodyReader()->feed(
+                     tbs::span<const char>(reinterpret_cast<const char*>(data), len), len);
+
+                  if (!info.success())
+                  {
+                     Logger::logE("[{}] [conn:{}] [http2] multipart body reader rejected DATA chunk for stream {}: {}",
+                        LOGTYPE, httpSession->connId(), streamId, std::string(info.message()));
+                  }
                }
             }
          }
+         // The HTTP server parses the body when server-side parsing is enabled.
          else
          {
             auto result = streamData->multipartParser().parse(data, len);
@@ -465,7 +483,10 @@ int onDataChunkRecvCallback(nghttp2_session *session, uint8_t flags,
          }
       }
       else
+      {
+         // Accumulate DATA chunks for non-multipart requests.
          streamData->requestBody.append(reinterpret_cast<const char*>(data), len);
+      }
    }
 
    return 0;
@@ -550,12 +571,7 @@ int sendDataCallback(nghttp2_session *session, nghttp2_frame *frame,
    if (! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-   auto* httpContext = static_cast<http::Context*>(source->ptr);
-   if (httpContext == nullptr || httpContext->closed()) {
-      throw http::Exception("invalid http context pointer", frame->hd.stream_id);
-   }
-
-   auto response = httpContext->response();
+   (void)source;
 
    size_t padlen = frame->data.padlen;
    std::ostream sendBufferStream(&httpSession->sendBuffer());
@@ -569,17 +585,38 @@ int sendDataCallback(nghttp2_session *session, nghttp2_frame *frame,
       sendBufferStream << static_cast<uint8_t>(padlen - 1);
    }
 
-   int64_t readCount=0;
+   int64_t readCount = 0;
    // If data was prepared by dataSourceReadCallback, use it
    if (httpSession->hasPendingData()) {
       readCount = httpSession->usePendingData();
    }
    else if (length)
    {
-      http::ResponseSerializer serializer(response);
-      readCount = serializer.serializeHttp2(&httpSession->sendBuffer(), length);
-      if (readCount < 0 )
-         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+      auto httpContext = httpSession->findHttpContext(frame->hd.stream_id);
+      if (!httpContext || httpContext->closed())
+      {
+         if (httpSession->findStream(frame->hd.stream_id) != nullptr)
+         {
+            Logger::logE("[{}] [conn:{}] [http2] Missing response context for active stream {} in sendDataCallback",
+               LOGTYPE, httpSession->connId(), frame->hd.stream_id);
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+         }
+
+         std::vector<char> discardedData(length);
+         sendBufferStream.write(discardedData.data(), static_cast<std::streamsize>(length));
+         readCount = static_cast<int64_t>(length);
+      }
+      else
+      {
+         http::ResponseSerializer serializer(httpContext->response());
+         readCount = serializer.serializeHttp2(&httpSession->sendBuffer(), length);
+         if (readCount < 0 )
+         {
+            Logger::logE("[{}] [conn:{}] [http2] Response serializer failed in sendDataCallback for stream {}: {}",
+               LOGTYPE, httpSession->connId(), frame->hd.stream_id, readCount);
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+         }
+      }
    }
 
    if (padlen > 0) 
@@ -613,20 +650,13 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
    if (! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
 
+   (void)source;
+
+   // Websocket stream
    if (httpSession->isWebSocketStream(streamId))
       return readWebSocketData(httpSession, streamId, buf, length, dataFlags);
 
-   auto* httpContext = static_cast<http::Context*>(source->ptr);
-   if (httpContext == nullptr || httpContext->closed()) {
-      throw http::Exception("invalid http context pointer", streamId);
-   }
-
-   auto response  = httpContext->response();
-
-
-   // -------------------------------------------------------
-   // Server-Sent Events (SSE)
-   // -------------------------------------------------------
+   // SSE Stream
    if (httpSession->isSseStream(streamId))
    {
       *dataFlags &= ~NGHTTP2_DATA_FLAG_EOF;
@@ -643,16 +673,24 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
       return readCount;
    }
 
+   auto httpContext = httpSession->findHttpContext(streamId);
+   if (!httpContext || httpContext->closed()) 
+   {
+      *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+      return 0;
+   }
+
+   auto response  = httpContext->response();
+
    // Prepare payload into session->_dataPendingVec by calling serializer into a temporary streambuf
    http::ResponseSerializer serializer(response);
    asio::streambuf tmpBuf;
 
-   // Request a larger buffer from the serializer so gzip deflation produces
-   // more output per call (reduces many small produce/write cycles).
-   const size_t NO_COPY_MIN_WANT = 8092; // 8KB
-   size_t want = std::max(length, NO_COPY_MIN_WANT);
-   int64_t written = serializer.serializeHttp2(&tmpBuf, want);
-   if (written < 0) {
+   int64_t written = serializer.serializeHttp2(&tmpBuf, length);
+   if (written < 0) 
+   {
+      Logger::logE("[{}] [conn:{}] [http2] Response serializer failed in dataSourceReadCallback for stream {}: {}",
+         LOGTYPE, httpSession->connId(), streamId, written);
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
    }
 
@@ -717,7 +755,7 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
    return static_cast<nghttp2_ssize>(totalWritten);
 }
 
-#else
+#else // not defined TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
 
 nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId, 
    uint8_t* buf, size_t length, uint32_t* dataFlags, nghttp2_data_source* source, void* userData)
@@ -726,22 +764,31 @@ nghttp2_ssize dataSourceReadCallback(nghttp2_session* session, int32_t streamId,
    if ( ! httpSession)
       return NGHTTP2_ERR_CALLBACK_FAILURE;
 
+   (void)source;
+
+   // Websocket stream
    if (httpSession->isWebSocketStream(streamId))
       return readWebSocketData(httpSession, streamId, buf, length, dataFlags);
 
+   // SSE Stream
    if (httpSession->isSseStream(streamId))
       return readSseData(httpSession, streamId, buf, length, dataFlags);
 
-   auto* httpContext = static_cast<http::Context*>(source->ptr);
-   if (httpContext == nullptr || httpContext->closed()) {
-      throw http::Exception("invalid http context pointer", streamId);
+   auto httpContext = httpSession->findHttpContext(streamId);
+   if (!httpContext || httpContext->closed()) 
+   {
+      *dataFlags |= NGHTTP2_DATA_FLAG_EOF;
+      return 0;
    }
 
    auto response = httpContext->response();
    http::ResponseSerializer serializer(response);
    
    auto readCount = serializer.serializeHttp2(buf, length, dataFlags);
-   if (readCount < 0 ) {
+   if (readCount < 0 ) 
+   {
+      Logger::logE("[{}] [conn:{}] [http2] Response serializer failed in dataSourceReadCallback for stream {}: {}",
+         LOGTYPE, httpSession->connId(), streamId, readCount);
       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
    }
 
@@ -830,6 +877,30 @@ Result Http2Session::handleRequest(int32_t streamId)
    return {};
 }
 
+Result Http2Session::multipartHandlerReady(int32_t streamId)
+{
+   auto streamData = findStream(streamId);
+   auto httpContext = findHttpContext(streamId);
+   if (!streamData || !httpContext || !httpContext->getBodyReader())
+      return Result::fail("Multipart body reader is not available", streamId);
+
+   streamData->multipartHandlerReady = true;
+   while (!streamData->pendingMultipartData.empty())
+   {
+      auto chunk = std::move(streamData->pendingMultipartData.front());
+      streamData->pendingMultipartData.pop_front();
+      auto info = httpContext->getBodyReader()->feed(
+         tbs::span<const char>(chunk.data(), chunk.size()), chunk.size());
+      if (!info.success())
+      {
+         streamData->pendingMultipartData.clear();
+         return Result::fail(std::string(info.message()), streamId);
+      }
+   }
+
+   return {};
+}
+
 Result Http2Session::submitResponse(http::HttpContext httpContext, int streamId)
 {
    auto response = httpContext->response();
@@ -869,11 +940,11 @@ Result Http2Session::submitResponse(http::HttpContext httpContext, int streamId)
    }
 
    nghttp2_data_provider2 dataProvider {};
-   dataProvider.source.ptr = httpContext.get(); // Pass the raw pointer as user data
    dataProvider.read_callback = cb::dataSourceReadCallback;
 
+   auto* responseDataProvider = response->isHeadRequest() ? nullptr : &dataProvider;
    int rv = nghttp2_submit_response2(this->rawSession(), 
-               streamId, nva.data(), nva.size(), &dataProvider);
+               streamId, nva.data(), nva.size(), responseDataProvider);
 
    if (rv < 0)
       return Result(rv, "", streamId);

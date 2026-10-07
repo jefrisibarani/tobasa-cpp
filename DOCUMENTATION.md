@@ -1,17 +1,14 @@
 # Documentation index
 
-This page lists the main documentation in this repository. The documents are
-grouped by their purpose so it is easier to find a starting point.
+This index groups the repository's main documents by topic.
 
 ## Development notes
 
-These notes describe internal request, startup, and connection-lifecycle
-flows. They are useful when changing the HTTP or WebSocket implementation.
+These technical notes explain internal request handling, startup, and connection cleanup in the HTTP server and WebSocket code.
 
 | Document | What it covers |
 | --- | --- |
 | [`http_connection_cleanup_flow.md`](dev_notes/http_connection_cleanup_flow.md) | How an HTTP connection is removed after the browser closes it or the socket reports an error. |
-| [`http_response_and_result_class.md`](dev_notes/http_response_and_result_class.md) | When to use `http::Response` and when a controller should return `http::Result`. |
 | [`http_server_request_handling_flow.md`](dev_notes/http_server_request_handling_flow.md) | Low-level HTTP/1.x parsing, connection registration, and request processing. |
 | [`sse_connection_cleanup_flow.md`](dev_notes/sse_connection_cleanup_flow.md) | How an SSE connection is removed after the client disconnects. |
 | [`webservice_app_start_flow.md`](dev_notes/webservice_app_start_flow.md) | How the application server is assembled and started from `main.cpp`. |
@@ -39,8 +36,22 @@ These module-level guides describe the main reusable libraries in the project.
 | Module | Document | What it covers |
 | --- | --- | --- |
 | Tobasa core | [`src/tobasa/README.md`](src/tobasa/README.md) | Shared utilities, config, logging, file helpers, and the common framework foundation. |
-| Tobasa Web | [`src/tobasaweb/README.md`](src/tobasaweb/README.md) | Web framework concepts, routing, middleware, controller patterns, and app structure. |
 | Tobasa LIS | [`src/tobasalis/README.md`](src/tobasalis/README.md) | LIS2-A2 and HL7 instrument communication, protocol handling, and device connectivity. |
+
+## Tobasa Web
+
+These documents cover the Tobasa Web framework, its request pipeline, and its developer APIs.
+
+| Document | What it covers |
+| --- | --- |
+| [`README.md`](src/tobasaweb/README.md) | Web framework concepts, routing, middleware, controller patterns, and app structure. |
+| [`controller.md`](src/tobasaweb/doc/controller.md) | The controller pattern, route registration, and the controller lifecycle in Tobasa Web. |
+| [`middleware.md`](src/tobasaweb/doc/middleware.md) | The middleware pipeline and how requests move through Tobasa Web. |
+| [`built-in-middlewares.md`](src/tobasaweb/doc/built-in-middlewares.md) | The built-in session, authentication, authorization, and multipart middleware and how to configure them. |
+| [`router.md`](src/tobasaweb/doc/router.md) | Route matching and request dispatch in Tobasa Web. |
+| [`registering_route.md`](src/tobasaweb/doc/registering_route.md) | How to register a controller route and what each route parameter controls. |
+| [`service_client_base.md`](src/tobasaweb/doc/service_client_base.md) | How controllers and middleware receive and use the app's database service factory. |
+| [`http_response_and_result_class.md`](src/tobasaweb/doc/http_response_and_result_class.md) | Choosing between `http::Response` and `http::Result`, and how results become responses. |
 
 ## Tobasa HTTP
 
@@ -51,7 +62,9 @@ request handling, connection lifecycle, and WebSocket usage.
 | --- | --- |
 | [`README.md`](src/tobasahttp/README.md) | Library overview, protocols, features, dependencies, and architecture. |
 | [`http_server.md`](src/tobasahttp/doc/http_server.md) | Server capabilities, configuration, and the boundary between the transport library and application code. |
-| [`http_server_connection_handling.md`](src/tobasahttp/doc/http_server_connection_handling.md) | Accepting clients, HTTP/1 and HTTP/2 request processing, timeouts, WebSockets, SSE, and connection cleanup. |
+| [`http_server_connection_and_request_lifetime.md`](src/tobasahttp/doc/http_server_connection_and_request_lifetime.md) | Accepting clients, HTTP/1 and HTTP/2 request processing, timeouts, WebSockets, SSE, and connection cleanup. |
+| [`http_server_compression.md`](src/tobasahttp/doc/http_server_compression.md) | Gzip eligibility, server settings, protocol behavior, byte ranges, and cache variation. |
+| [`http_server_resumable_download.md`](src/tobasahttp/doc/http_server_resumable_download.md) | Opt-in byte ranges, `If-Range` validators, and resuming file downloads over HTTP/1 and HTTP/2. |
 | [`http_parser.md`](src/tobasahttp/doc/http_parser.md) | Incremental HTTP/1.x parsing, message framing, parser lifetime, and results. |
 | [`parsing_multipart_internally.md`](src/tobasahttp/doc/parsing_multipart_internally.md) | How the HTTP server parses multipart form fields and uploaded files internally. |
 | [`parsing_multipart_with_middleware.md`](src/tobasahttp/doc/parsing_multipart_with_middleware.md) | Multipart parsing through `MultipartMiddleware` and asynchronous request-body reading. |
@@ -98,7 +111,7 @@ These README files explain the sample applications under `src/samples`.
   [`prepared_statement.md`](src/tobasasql/doc/prepared_statement.md).
 - To see module-level background and usage notes, read the module README files
   for [`tobasa`](src/tobasa/README.md), [`tobasahttp`](src/tobasahttp/README.md),
-  [`tobasaweb`](src/tobasaweb/README.md), [`tobasadicom`](src/tobasadicom/README.md),
-  [`tobasalis`](src/tobasalis/README.md), and [`tobasasql`](src/tobasasql/README.md).
+  [`tobasaweb`](src/tobasaweb/README.md), [`tobasalis`](src/tobasalis/README.md),
+  and [`tobasasql`](src/tobasasql/README.md).
 - To see working application examples, browse the
   [`src/samples`](src/samples/) README files listed above.

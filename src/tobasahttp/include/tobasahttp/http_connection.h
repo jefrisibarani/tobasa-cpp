@@ -192,21 +192,21 @@ protected:
    void timeoutRead(int32_t value)
    {
       _timeoutRead.value = value;
-      _timeoutRead.type = TimerType::read;
+      _timeoutRead.type  = TimerType::read;
       _timeoutRead.name  = "Read";
    }
 
    void timeoutWrite(int32_t value)
    {
       _timeoutWrite.value = value;
-      _timeoutWrite.type = TimerType::write;
+      _timeoutWrite.type  = TimerType::write;
       _timeoutWrite.name  = "Write";
    }
 
    void timeoutProcessing(int32_t value)
    {
       _timeoutProcessing.value = value;
-      _timeoutProcessing.type = TimerType::process;
+      _timeoutProcessing.type  = TimerType::process;
       _timeoutProcessing.name  = "Process";
    }
 

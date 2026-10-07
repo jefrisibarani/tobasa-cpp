@@ -66,6 +66,7 @@ private:
 
    /// Reads the request body incrementally, including multipart request data.
    std::shared_ptr<MultipartBodyReader>      _bodyReader = nullptr;
+   std::function<void()>                     _bodyReaderReadyHandler = nullptr;
 
    /// Called when the request handler reports that request processing is done.
    std::function<void(RequestStatus)>        _onCompleteHandler = nullptr;
@@ -128,6 +129,11 @@ public:
 
    /// Sets the reader used to consume the request body, including multipart data.
    void setBodyReader(std::shared_ptr<MultipartBodyReader> reader);
+
+   /// Registers a callback for the HTTP server after a body reader handler is installed.
+   void bodyReaderReadyHandler(std::function<void()> handler);
+   /// Call Body reader ready handler
+   void bodyReaderReady();
 
    /// Only called by ServerConnection
    void onCompleteHandler(std::function<void(RequestStatus)> handler);

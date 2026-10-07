@@ -9,7 +9,7 @@
 namespace tbs {
 namespace http {
 
-const int32_t HTTP_TIMEOUT_NOLIMIT              = 60*60*24;         // 24 hours
+const int32_t HTTP_TIMEOUT_MAX_ALLOWED          = 60*60*24;         // 24 hours
 const int32_t HTTP_TIMEOUT_MIN                  = 10;               // 10 s
 const int32_t HTTP_TIMEOUT_MAX                  = 60*60;            // 1 hour
 const int32_t HTTP_TIMEOUT_DEFAULT              = 60;               // 60 s
@@ -27,11 +27,11 @@ const size_t  HTTP_HEADER_MAX_SIZE_MAX          = 1024*1024;        // 1 MB
 const size_t  HTTP_HEADER_MAX_SIZE_DEFAULT      = 1024*64;          // 64 KB
 
 const size_t  HTTP_WS_MSG_MAX_SIZE_MIN          = 1024*4;           // 4 KB
-const size_t  HTTP_WS_MSG_MAX_SIZE_MAX          = 1024*1024;        // 1 MB
-const size_t  HTTP_WS_MSG_MAX_SIZE_DEFAULT      = 1024*8;           // 8 KB
+const size_t  HTTP_WS_MSG_MAX_SIZE_MAX          = 1024*1024*10;     // 10 MB
+const size_t  HTTP_WS_MSG_MAX_SIZE_DEFAULT      = 1024*1024;        // 1 MB
 
-const size_t  HTTP_CLIENT_BODY_MAX_SIZE_MAX     = 1024*1024 * 50;  // 50 MB
-const size_t  HTTP_CLIENT_BODY_MAX_SIZE_DEFAULT = 0;               // unlimited
+const size_t  HTTP_CLIENT_BODY_MAX_SIZE_MAX     = 1024*1024 * 50;   // 50 MB
+const size_t  HTTP_CLIENT_BODY_MAX_SIZE_DEFAULT = 0;                // unlimited
 
 /** \addtogroup HTTP
  * @{
@@ -87,9 +87,12 @@ public:
       : _address  { address }
       , _port     { port }
       , _protocol { protocol }
-   {}
+   {
+      if (_port ==0 ) 
+         _port = 8084;
+   }
 
-   // ------------------------------------------------
+   /// Set the TCP listening port. A value of 0 selects the default port, 8084.
    Derived& port(uint16_t p) &
    {
       _port = (p == 0) ? 8084 : p;
@@ -102,7 +105,8 @@ public:
    [[nodiscard]]
    uint16_t port() const { return _port; }
 
-   // ------------------------------------------------
+
+   /// Set the IP version used by the TCP listener (IPv4 or IPv6).
    Derived& protocol(asio::ip::tcp p) &
    {
       _protocol = p;
@@ -114,7 +118,8 @@ public:
    }
    [[nodiscard]] asio::ip::tcp protocol() const { return _protocol; }
 
-   // ------------------------------------------------
+
+   /// Set the numeric IP address for the listener; host names are not resolved.
    Derived& address(std::string val) &
    {
       _address = std::move(val);
@@ -127,12 +132,12 @@ public:
    [[nodiscard]]
    const std::string& address() const { return _address; }
 
-   // ------------------------------------------------
-   // HTTP write timeout in seconds
-   // default 60s, min 10s, max 1 hour, set value to 0 disable limit 
+
+   /// HTTP write timeout in seconds
+   /// default 60s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
    Derived& timeoutWrite(int32_t val) &
    {
-      _timeoutWrite = clampTimeOut(val, HTTP_TIMEOUT_DEFAULT);
+      _timeoutWrite = checkTimeout(val, HTTP_TIMEOUT_DEFAULT);
       return self();
    }
    Derived&& timeoutWrite(int32_t val) &&
@@ -142,12 +147,12 @@ public:
    // HTTP write timeout in seconds, default 60s, min 10s, max 1 hour
    [[nodiscard]] int32_t timeoutWrite() const { return _timeoutWrite; }
 
-   // ------------------------------------------------
-   // HTTP read timeout in seconds
-   // default 60s, min 10s, max 1 hour, set value to 0 disable limit 
+
+   /// HTTP read timeout in seconds
+   /// default 60s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
    Derived& timeoutRead(int32_t val) &
    {
-      _timeoutRead = clampTimeOut(val, HTTP_TIMEOUT_DEFAULT);
+      _timeoutRead = checkTimeout(val, HTTP_TIMEOUT_DEFAULT);
       return self();
    }
    Derived&& timeoutRead(int32_t val) &&
@@ -156,12 +161,12 @@ public:
    }
    [[nodiscard]] int32_t timeoutRead() const { return _timeoutRead; }
 
-   // ------------------------------------------------
-   // HTTP processing timeout in seconds
-   // default 120s, min 10s, max 1 hour, set value to 0 disable limit
+
+   /// HTTP processing timeout in seconds
+   /// default 120s, min 10s, max 1 hour. 0 converted to HTTP_TIMEOUT_MAX_ALLOWED
    Derived& timeoutProcessing(int32_t val) &
    {
-      _timeoutProcessing = clampTimeOut(val, HTTP_PROCESSING_TIMEOUT_DEFAULT);
+      _timeoutProcessing = checkTimeout(val, HTTP_PROCESSING_TIMEOUT_DEFAULT);
       return self();
    }
    Derived&& timeoutProcessing(int32_t val) &&
@@ -170,12 +175,12 @@ public:
    }
    [[nodiscard]] int32_t timeoutProcessing() const { return _timeoutProcessing; }
 
-   // ------------------------------------------------
-   // HTTP socket receive/read buffer size
-   // default 64KB, min 16 KB, max 8 MB
+
+   /// HTTP socket receive/read buffer size
+   /// default 64KB, min 16 KB, max 8 MB
    Derived& readBufferSize(std::size_t val) &
    {
-      _readBufferSize = clampValue(val, HTTP_BUFFER_SIZE_MIN, HTTP_READ_BUFFER_SIZE_MAX, HTTP_READ_BUFFER_SIZE_DEFAULT);
+      _readBufferSize = checkValue(val, HTTP_BUFFER_SIZE_MIN, HTTP_READ_BUFFER_SIZE_MAX, HTTP_READ_BUFFER_SIZE_DEFAULT);
       return self();
    }
    Derived&& readBufferSize(std::size_t val) &&
@@ -184,12 +189,12 @@ public:
    }
    [[nodiscard]] std::size_t readBufferSize() const { return _readBufferSize; }
 
-   // ------------------------------------------------
-   // HTTP socket send/write buffer size
-   // default 64KB, min 16 KB, max 8 MB
+
+   /// HTTP socket send/write buffer size
+   /// default 64KB, min 16 KB, max 8 MB
    Derived& sendBufferSize(std::size_t val) &
    {
-      _sendBufferSize = clampValue(val, HTTP_BUFFER_SIZE_MIN, HTTP_SEND_BUFFER_SIZE_MAX, HTTP_SEND_BUFFER_SIZE_DEFAULT);
+      _sendBufferSize = checkValue(val, HTTP_BUFFER_SIZE_MIN, HTTP_SEND_BUFFER_SIZE_MAX, HTTP_SEND_BUFFER_SIZE_DEFAULT);
       return self();
    }
    Derived&& sendBufferSize(std::size_t val) &&
@@ -198,12 +203,12 @@ public:
    }
    [[nodiscard]] std::size_t sendBufferSize() const { return _sendBufferSize; }
 
-   // ------------------------------------------------
-   // HTTP header maximum size
-   // default 64KB, min 16 KB, max 1 MB
+
+   /// Maximum request-header size accepted by the parser, in bytes.
+   /// default 64KB, min 16 KB, max 1 MB
    Derived& maxHeaderSize(std::size_t val) &
    {
-      _maxHeaderSize = clampValue(val, HTTP_BUFFER_SIZE_MIN, HTTP_HEADER_MAX_SIZE_MAX, HTTP_HEADER_MAX_SIZE_DEFAULT);
+      _maxHeaderSize = checkValue(val, HTTP_BUFFER_SIZE_MIN, HTTP_HEADER_MAX_SIZE_MAX, HTTP_HEADER_MAX_SIZE_DEFAULT);
       return self();
    }
    Derived&& maxHeaderSize(std::size_t val) &&
@@ -212,12 +217,12 @@ public:
    }
    [[nodiscard]] std::size_t maxHeaderSize() const { return _maxHeaderSize; }
    
-   // ------------------------------------------------
-   // Maximum HTTP requests per connection
-   // default 100, max 100000, 0 to disable
+
+   /// Maximum number of HTTP/1 requests served on one connection.
+   /// default 100, max 34464, 0 to disable check
    Derived & maxRequestsPerConnection(uint16_t val) &
    {
-      _maxRequestsPerConnection = self().clampValue(val, (uint16_t)0, (uint16_t)100000, (uint16_t)100);
+      _maxRequestsPerConnection = self().checkValue(val, (uint16_t)0, (uint16_t)34464, (uint16_t)100);
       return self();
    }
    Derived&& maxRequestsPerConnection(uint16_t val) &&
@@ -226,7 +231,8 @@ public:
    }
    [[nodiscard]] uint16_t maxRequestsPerConnection() const { return _maxRequestsPerConnection; }
 
-   // ------------------------------------------------
+
+   /// Set the TLS-mode flag used for connection type reporting; this does not enable TLS.
    Derived& tlsMode(bool val) &
    {
       _tlsMode = val;
@@ -238,7 +244,8 @@ public:
    }
    [[nodiscard]] bool tlsMode() const { return _tlsMode; }
 
-   // ------------------------------------------------
+   
+   /// Enable detailed HTTP logging. Disabled by default.
    Derived& logVerbose(bool val) &
    {
       _logVerbose = val;
@@ -250,8 +257,9 @@ public:
    }
    [[nodiscard]] bool logVerbose() const { return _logVerbose; }
 
-   // ------------------------------------------------
+   
 #ifdef TOBASA_HTTP_USE_HTTP2
+   /// Enable detailed HTTP/2 logging. Disabled by default.
    Derived& logVerboseHttp2(bool val) &
    {
       _logVerboseHttp2 = val;
@@ -263,7 +271,8 @@ public:
    }
    [[nodiscard]] bool logVerboseHttp2() const { return _logVerboseHttp2; }
 
-
+   
+   /// Enable HTTP/2 negotiation for TLS connections. Enabled by default when HTTP/2 support is built.
    Derived& http2Enabled(bool val) &
    {
       _http2Enabled = val;
@@ -277,7 +286,7 @@ public:
 #endif
 
 
-   // ------------------------------------------------
+   /// Directory for temporary files created while parsing multipart uploads. Defaults to "./tmp".
    Derived& temporaryDir(std::string val) &
    {
       _temporaryDir = std::move(val);
@@ -289,7 +298,8 @@ public:
    }
    [[nodiscard]] std::string temporaryDir() const { return _temporaryDir; }
 
-   // ------------------------------------------------
+   
+   /// Enable built-in multipart parsing. If disabled, the application must read multipart bodies.
    Derived& enableMultipartParsing(bool val) &
    {
       _enableMultipartParsing = val;
@@ -301,11 +311,13 @@ public:
    }
    [[nodiscard]] bool enableMultipartParsing() const { return _enableMultipartParsing; }
 
+
 protected:
-   int32_t clampTimeOut(int32_t val, int32_t def)
+
+   int32_t checkTimeout(int32_t val, int32_t def)
    {
       if (val == 0)
-         return HTTP_TIMEOUT_NOLIMIT;
+         return HTTP_TIMEOUT_MAX_ALLOWED;
 
       if (val >= HTTP_TIMEOUT_MIN && val <= HTTP_TIMEOUT_MAX)
          return val;
@@ -314,7 +326,7 @@ protected:
    }
 
    template<typename T>
-   T clampValue(T value, T min, T max, T def)
+   T checkValue(T value, T min, T max, T def)
    {
       if (value >= min && value <= max)
          return value;

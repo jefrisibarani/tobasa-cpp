@@ -1,136 +1,56 @@
-# Internal Multipart Parsing
+# Parse Multipart Requests Inside the HTTP Server
 
-This page describes how the HTTP server parses multipart requests itself, without asking middleware to parse the body.
+With internal parsing enabled, the HTTP parser consumes the whole request body before it calls your request handler. It gives the handler a parsed `MultipartBody`: ordinary fields are in memory, and uploaded file contents are in temporary files.
 
-## The Flow
+## Enable internal parsing
 
-1. **Internal parsing is enabled.** It is enabled by default with `enableMultipartParsing(true)`.
+`enableMultipartParsing` is `true` by default. The handler can read the parsed body from the request:
 
-2. **The server receives the request headers.** The HTTP parser checks the `Content-Type` header. For `multipart/form-data`, it reads the boundary value. The boundary marks where each form field or file begins and ends.
+```cpp
+auto body = context->request()->multipartBody();
+if (!body)
+{
+   context->response()->httpStatus(http::StatusCode::BAD_REQUEST);
+   return http::RequestStatus::handled;
+}
 
-3. **The parser reads the body as data arrives.** It does not wait for the whole request body before starting multipart parsing. For a request with `Transfer-Encoding: chunked`, the HTTP parser first removes the chunk sizes and framing, then passes each chunk's data to the multipart parser. Chunked transfer is just how the HTTP body is delivered; the multipart boundary still marks the form parts.
-
-4. **The multipart parser handles each part.** It reads each part's headers and content. Ordinary form fields are kept in memory. File contents are written to temporary files as they arrive, rather than keeping the whole upload in memory.
-
-5. **The parser waits for the end of the request body.** It continues reading and parsing until the multipart closing boundary is found and, for chunked requests, the final HTTP chunk and any trailers are consumed.
-
-6. **The server gives the parsed result to the request handler.** Once parsing is complete, the server attaches the `MultipartBody` to the request and calls the handler. The handler can then read the form fields and access uploaded files through their temporary-file locations.
-
-In short: the server parses the upload while receiving it, but the normal request handler is called after the complete multipart request has been received and parsed.
-
-## Functions Involved
-
-The main path is:
-
-`ServerConnection::read()` -> `Parser::parse()` -> `Parser::parseWithOwnParser()` -> `Parser::processHeader()` -> `Parser::checkNeedProcessBody()` -> `Parser::processBody()`
-
-1. `SettingsBase::enableMultipartParsing()` controls the setting. It defaults to `true`. `HttpConnection` passes the setting into its `Parser` when it is constructed.
-
-2. `ServerConnection::read()` receives bytes from the socket and calls `Parser::parse(bytesTransferred)`.
-
-3. `Parser::parse()` calls `parseWithOwnParser()`. When the HTTP headers are complete, `processHeader()` checks the content type, creates a `MultipartParser`, reads the multipart boundary, and records whether the body is chunked or has a content length.
-
-4. `checkNeedProcessBody()` chooses the internal parsing path because multipart parsing is enabled. It calls `processBody()` to handle the body data.
-
-5. `processBody()` selects how to read the body:
-	- With `Content-Length`, it calls `retrieveMultipartBody()`, which passes the available body bytes to `MultipartParser::parse()`.
-	- With `Transfer-Encoding: chunked`, it calls `retrieveChunkedBody()`. That function reads each HTTP chunk's size and framing, then passes only the chunk data to `MultipartParser::parse()`. It calls `chunkedMultipart(true)` to tell the multipart parser that the body length is not known in advance.
-
-6. Inside `MultipartParser::parse()`, the parser finds multipart boundaries and reads each part's headers with `parseHeaders()`. It calls `MultipartContext::initializePart()` to determine whether the part is a normal field or a file. As part data arrives, it adds field data to the part's `body` or writes file data to its temporary file. `MultipartContext::savePart()` adds a completed part to the `MultipartBody`. A tail buffer preserves bytes that might be the start of a boundary split across reads.
-
-7. When the final multipart boundary is found, `MultipartParser::parse()` marks multipart parsing complete. For chunked requests, `retrieveChunkedBody()` continues until the final HTTP chunk and trailers are consumed too.
-
-8. `ServerConnection::read()` keeps reading while the HTTP parser reports that the body is incomplete. Once complete, it moves `Parser::multipartBody()` onto the request and calls `handleRequest()`.
-
-The middleware path is different: when `enableMultipartParsing(false)` is set, the server creates a `MultipartBodyReader` and returns control to the request handler to consume the body. That path is not the internal parsing flow described above.
-
-## Full Call Stack
-
-The following shows the request-time path when internal multipart parsing is enabled. The parser may stop at any point when it needs more socket data; the server starts another read and the same path continues with the new bytes.
-
-```text
-ServerConnection::read()
-	socket read completes
-	Parser::parse(bytesTransferred)
-		Parser::parseWithOwnParser(bytesTransferred)
-			Parser::parseRequestStartLine(...)
-			Parser::retrieveHeaders(...)
-				parseHeaders(...)
-			Parser::processHeader(...)
-				Parser::parseContentLength(...)
-				Parser::parseChunkedEncoding()
-				MediaType::parse(...)
-				MultipartParser::applyBoundary(...)
-				Parser::checkNeedProcessBody(...)
-					Parser::processBody(...)
-						+-- Content-Length body
-						|     Parser::retrieveMultipartBody(...)
-						|       MultipartParser::parse(data, size)
-						|
-						+-- Chunked body
-									Parser::retrieveChunkedBody(...)
-										read chunk size and framing
-										MultipartParser::chunkedMultipart(true)
-										MultipartParser::parse(chunkData, chunkSize)
-
-MultipartParser::parse(data, size)
-	find the multipart boundary
-	parseHeaders(...)                         [part headers]
-	MultipartContext::initializePart()        [field or file]
-	collect part data until the next boundary
-		normal field: append to Part::body
-		file: write to the temporary file
-	MultipartContext::savePart(...)           [add completed part]
-	MultipartContext::prepareForNextPart(...)  [repeat for next part]
-	mark done at the final multipart boundary
-
-ServerConnection::read() continues after Parser::parse() returns
-	if the HTTP body is incomplete:
-		ServerConnection::read()                [request more socket data]
-	if the HTTP body is complete:
-		Parser::multipartBody()                  [move completed multipart data]
-		Request::multipartBody(...)
-		ServerConnection::handleRequest()
+auto title = body->value("title");
+auto upload = body->find("file");
+if (upload && upload->isFile)
+{
+   // Use upload->location while this request is active.
+}
 ```
 
-If parsing fails, `Parser::parse()` returns an unsuccessful result and `ServerConnection::read()` sends it to `ServerConnection::handleRequestError()` instead of attaching a multipart body or calling the normal request handler.
+For a plain `HttpServer`, internal parsing is enabled by default and can be selected explicitly through `http::Settings`:
 
-## Flowchart
-
-```mermaid
-flowchart TD
-	A["Socket read completes"] --> B["ServerConnection::read()"]
-	B --> C["Parser::parse()"]
-	C --> D{"HTTP headers complete?"}
-	D -- No --> E["Read more socket data"] --> A
-	D -- Yes --> F["Parser::processHeader()"]
-	F --> G{"multipart/form-data?"}
-	G -- No --> H["Use normal HTTP body handling"]
-	G -- Yes --> I{"Multipart boundary valid?"}
-	I -- No --> X["Return parser error"]
-	X --> Y["ServerConnection::handleRequestError()"]
-	I -- Yes --> J["Parser::checkNeedProcessBody()"]
-	J --> K["Parser::processBody()"]
-	K --> L{"Chunked transfer?"}
-	L -- Yes --> M["retrieveChunkedBody(): remove HTTP chunk framing"]
-	L -- No --> N["retrieveMultipartBody(): pass body bytes"]
-	M --> O["MultipartParser::parse(payload)"]
-	N --> O
-	O --> P["Parse part headers and find multipart boundaries"]
-	P --> Q{"File part?"}
-	Q -- Yes --> R["Write file data to temporary file"]
-	Q -- No --> S["Append field data to Part::body"]
-	R --> T["Save completed part and continue"]
-	S --> T
-	T --> U{"Final multipart boundary found?"}
-	U -- No --> V{"More body data available?"}
-	V -- Yes --> O
-	V -- No --> E
-	U -- Yes --> W{"HTTP body framing complete?"}
-	W -- No --> Z["Continue chunk parsing through final chunk and trailers"]
-	Z --> AA{"Need more socket data?"}
-	AA -- Yes --> E
-	AA -- No --> W
-	W -- Yes --> AB["Attach MultipartBody to Request"]
-	AB --> AC["ServerConnection::handleRequest()"]
+```cpp
+http::Settings settings;
+settings.enableMultipartParsing(true);
 ```
+
+The same setting is available in Webapp configuration at `webapp.httpServer.enableMultipartParsing`. When it is `false`, the server does not use this internal path. A Webapp can instead install `MultipartMiddleware`; see [parsing_multipart_with_middleware.md](parsing_multipart_with_middleware.md).
+
+## What the server does
+
+The HTTP parser checks `Content-Type` for `multipart/form-data`, reads its boundary, and selects the body framing from `Content-Length` or `Transfer-Encoding: chunked`. It feeds arriving body data to `MultipartParser` as socket reads complete; it does not buffer the entire upload in memory first.
+
+HTTP chunk framing and multipart boundaries are separate layers. For chunked requests, the HTTP parser removes each chunk's size and framing before the multipart parser sees the payload. The multipart parser keeps a short tail between reads so it can recognize a boundary split across buffers. For both body modes, the server waits for the final multipart boundary; with chunked transfer, it also finishes reading the final HTTP chunk and trailers before calling the handler.
+
+After the body is complete, the server moves the parsed body onto the request and calls the normal request handler. If parsing fails, the handler is not called. The parser result goes to `ServerConnection::handleRequestError()`; an error without a specific HTTP status becomes `400 Bad Request`. Errors with an explicit status keep that status.
+
+## Read fields and manage uploaded files
+
+`MultipartBody::value(name)` returns the first matching part's in-memory body. It returns an empty string when the part is absent, empty, or a file part, so use `find(name)` when presence or part type matters. `find()` also returns only the first matching part; use `parts()` if repeated field names are meaningful.
+
+For a file part, `fileName` is supplied by the client and must not be trusted as a filesystem path. `location` is the server-generated temporary file path. Copy the file to an application-owned destination while handling the request. At request completion, the server calls `MultipartBody::cleanup(true)`: it deletes temporary files and clears the parts. Keeping a `MultipartBodyPtr` does not keep its parts or uploaded files available after cleanup. The app server follows this pattern in [api_users_controller.cpp](../../app_server/src/core/api_users_controller.cpp).
+
+The temporary directory comes from `http::Settings::temporaryDir`; its default is `./tmp`. Ensure the server process can create and write files there. Field values are held in memory, while file bytes are streamed to disk, so large regular fields can still consume memory.
+
+## Boundaries and malformed bodies
+
+The `Content-Type` header must include a valid multipart boundary. The current validator rejects an empty boundary, one longer than 70 characters, or one ending in a space. It accepts the boundary after finding an allowed character rather than validating every character, so do not treat it as a complete validation of untrusted input.
+
+When `Content-Length` is present, the parser checks that the received body length agrees with it and that the closing boundary is present. Missing closing boundaries and excess body data are parse errors. File creation failures also fail parsing. In these cases, the server sends an error response and closes the connection instead of calling the handler.
+
+The setting is declared in [settings.h](../include/tobasahttp/settings.h). The parser path is implemented in [http_parser.cpp](../src/tobasahttp/http_parser.cpp), [multipart_parser.cpp](../src/tobasahttp/multipart_parser.cpp), and [server_connection.h](../include/tobasahttp/server/server_connection.h).

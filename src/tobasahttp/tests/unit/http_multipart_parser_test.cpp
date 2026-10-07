@@ -8,6 +8,8 @@
 #include <string>
 #include <system_error>
 
+#include "tobasa/span.h"
+#include "tobasahttp/multipart_body_reader.h"
 #include "tobasahttp/multipart_parser.h"
 
 namespace {
@@ -136,4 +138,19 @@ TEST(TobasaHttpMultipartParserTest, ParsesFileAcrossInputFragments)
    const auto filePath = part->location;
    multipartBody->cleanup(true);
    EXPECT_FALSE(fs::exists(filePath));
+}
+
+TEST(TobasaHttpMultipartParserTest, FeedWithoutHandlerIsDeferredNotRejected)
+{
+   auto reader = std::make_shared<tbs::http::MultipartBodyReader>(
+      []() {},
+      tbs::span<const char>{""},
+      0,
+      0);
+
+   const std::string body = "hello";
+   auto info = reader->feed(tbs::span<const char>(body.data(), body.size()), body.size());
+
+   EXPECT_FALSE(info.success());
+   EXPECT_EQ(info.message(), "multipart body handler not ready");
 }

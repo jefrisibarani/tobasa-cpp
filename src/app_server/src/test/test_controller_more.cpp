@@ -177,8 +177,7 @@ http::ResultPtr TestController::onUpload(const web::RouteArgument& arg)
       auto part  = body->find("profileImage");
       if (part && part->isFile)
       {
-         //return htmlResult(part->fileName);
-         return http::fileResult(part->location);
+         return http::fileResult(part->location, FileResult::EnableFileRangeResponse);
       }
    }
 

@@ -1,6 +1,6 @@
-# HTTP Request Handling Flow (simplified)
+# HTTP Request Path: Listener to Controller
 
-This is the practical request path from browser to controller, based on the actual wiring in `tobasahttp`, `tobasaweb`, and `app_server`.
+This note traces an HTTP request from the listener through middleware and routing to the controller, following the wiring in `tobasahttp`, `tobasaweb`, and `app_server`.
 
 ## 1. Browser request enters the server
 
@@ -25,6 +25,8 @@ When the parser has enough bytes to build a full request:
 
 This is the key point where the app’s HTTP pipeline starts.
 
+See [HTTP Parser](../src/tobasahttp/doc/http_parser.md) for parsing and message-completion details.
+
 ## 3. Request handler is the middleware chain
 
 The confgured server request handler is not a direct controller call. It is a chained pipeline built by `WebService` and `MiddlewareManager`.
@@ -36,6 +38,8 @@ The actual wiring is:
   - `_pWebService->serverHttpRequestHandler()` when the service owns the request handler
 - `WebService::serverHttpRequestHandler()` creates a `tbs::http::RequestHandler` that calls `MiddlewareManager::invoke()`
 - `MiddlewareManager::doInvoke()` builds the middleware chain and then invokes the first middleware handler
+
+See [Application Server Architecture](../src/app_server/doc/server_architecture.md) for the app-server wiring and startup flow.
 
 That means the server is effectively doing:
 
@@ -68,6 +72,8 @@ This is classic middleware chaining:
 Exception -> DBCheck -> Multipart -> HeaderRule -> RequestID -> Cache -> ContentType -> Session -> Auth -> Authz -> Router -> Controller
 ```
 
+See [Middleware in Tobasa Web](../src/tobasaweb/doc/middleware.md) for chain order and `next(context)` behavior.
+
 If a middleware handles the request itself, it may return `handled` without calling `next(context)`.
 
 ## 5. Router resolves the route and picks the controller
@@ -90,6 +96,8 @@ When the router executes its matched handler:
 
 This is the actual controller hook point.
 
+See [Route Dispatch in Tobasa Web](../src/tobasaweb/doc/router.md) for route matching and handler dispatch details.
+
 ## 6. How a controller is registered
 
 In `app_server/src/main.cpp`, controllers are added like this:
@@ -103,6 +111,8 @@ In `app_server/src/main.cpp`, controllers are added like this:
 Each controller derives from `web::ControllerBase` and implements `bindHandler()`. The factory then links the registered route functions into the router.
 
 In other words, the controller is not called directly by the server. It is registered with the router, and the router calls it when the request matches its path and method.
+
+See [Controllers in Tobasa Web](../src/tobasaweb/doc/controller.md) for controller setup, route binding, and lifetime details.
 
 ## 7. The simplified flow
 
@@ -151,7 +161,9 @@ After the controller prepares the result:
 
 For SSE and WebSocket there are upgrade paths, but normal HTTP request handling remains the middleware -> router -> controller sequence above.
 
-## 9. Practical Model
+See [HTTP server connection and request lifetime](../src/tobasahttp/doc/http_server_connection_and_request_lifetime.md) and [HTTP response compression](../src/tobasahttp/doc/http_server_compression.md) for related details.
+
+## 9. How the Layers Fit Together
 
 - `tobasahttp` owns transport parsing and HTTP message lifecycle
 - `tobasaweb` owns middleware + routing + controller registration
@@ -160,3 +172,5 @@ For SSE and WebSocket there are upgrade paths, but normal HTTP request handling 
 The browser calls the server socket; the server parses HTTP; the middleware chain runs; the router selects a controller; the controller returns a result; then the response is written back.
 
 HTTP parsing happens in the transport layer, middleware decides request processing, the router matches the URL/method to a controller, and the controller produces the HTTP result that gets written back to the client.
+
+See [Application Server Architecture](../src/app_server/doc/server_architecture.md) for how these layers are assembled.

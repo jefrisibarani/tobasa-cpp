@@ -57,7 +57,7 @@ public:
       _tlsMode = true;
    }
 
-   // ------------------------------------------------
+   /// Path to the server certificate chain in PEM format; if missing, the default TLS asset callback is used.
    SettingsTls& certificateChainFile(std::string val) &
    {
       _certificateChainFile = std::move(val);
@@ -70,7 +70,8 @@ public:
    [[nodiscard]]
    std::string certificateChainFile() const { return _certificateChainFile; }
 
-   // ------------------------------------------------
+   
+   /// Path to the server private key in PEM format; if missing, the default TLS asset callback is used.
    SettingsTls& privateKeyFile(std::string val) &
    {
       _privateKeyFile = std::move(val);
@@ -83,7 +84,8 @@ public:
    [[nodiscard]]
    std::string privateKeyFile() const { return _privateKeyFile; }
 
-   // ------------------------------------------------
+   
+   /// Password used to load an encrypted server private key.
    SettingsTls& privateKeyPassword(std::string val) &
    {
       _privateKeyPassword = std::move(val);
@@ -96,20 +98,8 @@ public:
    [[nodiscard]]
    std::string privateKeyPassword() const { return _privateKeyPassword; }
 
-   // // ------------------------------------------------
-   // SettingsTls& caVerificationFile(std::string val) &
-   // {
-   //    _caVerificationFile = std::move(val);
-   //    return self();
-   // }
-   // SettingsTls&& caVerificationFile(std::string val) &&
-   // {
-   //    return std::move( self().caVerificationFile( std::move( val ) ) );
-   // }
-   // [[nodiscard]]
-   // std::string caVerificationFile() const { return _caVerificationFile; }
 
-   // ------------------------------------------------
+   /// Path to the temporary Diffie-Hellman parameters file; if missing, the default TLS asset callback is used.
    SettingsTls& tmpDhFile(std::string val) &
    {
       _tmpDhFile = std::move(val);
@@ -122,7 +112,8 @@ public:
    [[nodiscard]]
    std::string tmpDhFile() const { return _tmpDhFile; }
 
-   // ------------------------------------------------
+   
+   /// Set per-host TLS certificates selected by the client's SNI hostname.
    SettingsTls& hostCertificates(std::vector<HostCertificate>val) &
    {
       _hosCertificates = std::move(val);
@@ -135,21 +126,8 @@ public:
    [[nodiscard]]
    std::vector<HostCertificate>& hostCertificates() { return _hosCertificates; }
 
-   // // ------------------------------------------------
-   // SettingsTls& verifyPeer(bool val) &
-   // {
-   //    _verifyPeer = val;
-   //    return self();
-   // }
-   // SettingsTls&& verifyPeer(bool val) &&
-   // {
-   //    return std::move( self().verifyPeer( val ) );
-   // }
-   // [[nodiscard]]
-   // bool verifyPeer() const {
-   //     return _verifyPeer; }
 
-   // ------------------------------------------------
+   /// Set the server-mode flag. Currently, this value does not affect TLS setup.
    SettingsTls& serverMode(bool val) &
    {
       _serverMode = val;
@@ -161,7 +139,9 @@ public:
    }
    [[nodiscard]] bool serverMode() const { return _serverMode; }
 
-   // ------------------------------------------------
+
+
+   /// Supply certificate, private-key, or DH bytes when the corresponding file is missing.
    SettingsTls& defaultTlsAssetCallback(DefaultTlsAssetCallback cb) &
    {
       _defaultTlsAssetCallback = std::move(cb);

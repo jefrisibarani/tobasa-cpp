@@ -86,7 +86,7 @@ parser::Info MultipartBodyReader::feed(span<const char> buffer, size_t totalData
    if (_dataHandler)
       return _dataHandler(reinterpret_cast<const uint8_t *>(buffer.data()), totalData);
    else
-      return {false,"no handler", 0, {} ,0 };
+      return {false,"multipart body handler not ready", 0, {} ,0 };
 }
 
 parser::Info MultipartBodyReader::parseChunkedData(const uint8_t *data, size_t totalData)

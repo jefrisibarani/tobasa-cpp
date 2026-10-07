@@ -17,7 +17,6 @@ int main()
 
       asio::io_context ioContext;
 
-      tbs::Logger::setTarget(new tbs::log::CoutLogSink());
       log::StdoutLogger logger;
       logger.setLevel(log::Level::TraceMask);
 
@@ -26,7 +25,7 @@ int main()
       settings.privateKeyFile("localhost.key");
       settings.tmpDhFile("dh2048.pem");
 
-      http::SecureServerDefault serverHttps(ioContext, std::move(settings), logger);
+      http::SecureServerDefault serverHttps(ioContext, settings, logger);
       serverHttps.requestHandler(
          [](const http::HttpContext& context)
          {

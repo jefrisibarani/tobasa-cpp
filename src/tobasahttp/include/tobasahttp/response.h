@@ -46,6 +46,7 @@ struct CompressionRule
 };
 
 class Response;
+class Request;
 
 /**
  * @brief Data source for an HTTP response.
@@ -74,11 +75,13 @@ public:
    size_t            dataSize {0};
    size_t            readLeft {0};
    size_t            totalTransferred {0};
+   size_t            sourceOffset {0};
    std::string       filePath {}; // only for error message
 
    void connect(std::shared_ptr<Response> response);
 
    void writerCallback(ResponseWriterCb cb);
+   bool hasWriterCallback() const;
 #ifdef TOBASA_HTTP_USE_HTTP2
    void writerCallback2(ResponseWriterCb2 cb);
 #endif
@@ -122,6 +125,9 @@ private:
    bool     _gzipStreamingActive       { false };
 
    bool     _preparedForCompression    { false };
+
+   bool     _enableFileRange           { false };
+
 public:
    Response(HttpVersion httpVersion);
    ~Response();
@@ -147,6 +153,16 @@ public:
    /// Use this method, content() or rawBytesContent() to set the content
    /// \param fullPath The full path to the file
    void fileContent(const std::string& fullPath);
+
+   /// Enable or disable byte-range requests for this response. Disabled by default.
+   void enableFileRangeResponse(bool value);
+
+   /// Return whether byte-range requests are enabled for this response.
+   bool fileRangeResponseEnabled() const;
+
+   /// Apply the request's byte range to this response. The server calls this before sending.
+   void prepareFileRangeResponse(Request& request);
+
 
    /// Set response content from raw bytes data
    /// We must set the content before sending the response

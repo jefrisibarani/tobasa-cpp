@@ -48,8 +48,6 @@ void runHttpsServer()
    // Worker pool for blocking operations
    asio::thread_pool workerPool(workerThreads);
 
-   // We have to set log target for tbs::Logger
-   tbs::Logger::setTarget(new tbs::log::CoutLogSink()) ;
    // logger
    log::StdoutLogger logger;
    logger.setLevel(log::Level::TraceMask);
@@ -58,13 +56,13 @@ void runHttpsServer()
 
    // setting for https server
    http::SettingsTls settings("0.0.0.0", 8085);
-   settings.logVerbose(true);
-   settings.maxRequestsPerConnection(0); // disable 
+   settings.logVerbose(false);
+   settings.maxRequestsPerConnection(0);
    settings.certificateChainFile("localhost.crt");
    settings.privateKeyFile("localhost.key");
    settings.tmpDhFile("dh2048.pem");
 
-   http::SecureServerDefault serverHttps(ioContext, std::move(settings), logger);
+   http::SecureServerDefault serverHttps(ioContext, settings, logger);
 
    // set server request handler
    serverHttps.requestHandler(
@@ -96,7 +94,9 @@ void runHttpsServer()
                }
             });
 
-         return tbs::http::RequestStatus::async; // important
+         // Return async so the server waits instead of sending the response
+         // before the worker finishes. ctx->complete() resumes response handling.
+         return tbs::http::RequestStatus::async;
       });
 
    // Starts server in async

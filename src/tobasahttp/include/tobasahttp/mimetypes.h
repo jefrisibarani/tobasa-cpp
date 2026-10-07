@@ -87,8 +87,14 @@ inline const char* fromExtension( std::string_view ext)
    if (ext == "3gp" )    return "video/3gpp";
    if (ext == "3g2" )    return "video/3gpp2";
    if (ext == "7z" )     return "application/x-7z-compressed";
+   
+   if (ext == "log" )    return "text/plain";
+   if (ext == "md" )     return "text/markdown";
+   if (ext == "conf" )   return "text/plain";
+   if (ext == "txt" )    return "text/plain";
+   if (ext == "exe" )    return "application/vnd.microsoft.portable-executable";
 
-   return "application/text";
+   return "application/octet-stream";
 }
 
 /** @}*/

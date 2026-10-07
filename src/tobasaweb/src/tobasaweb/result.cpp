@@ -99,8 +99,9 @@ std::string StatusResult::buildContent()
 }
 
 
-FileResult::FileResult(const std::string& filePath)
+FileResult::FileResult(const std::string& filePath, bool enableFileRange)
    : _filePath {filePath}
+   , _enableFileRange {enableFileRange}
 {
    _ignoreContentBuilder = true;
 
@@ -109,8 +110,9 @@ FileResult::FileResult(const std::string& filePath)
    _contentType = http::mimetypes::fromExtension(ext);
 }
 
-FileResult::FileResult(const std::string& filePath, const std::string& contentType)
+FileResult::FileResult(const std::string& filePath, const std::string& contentType, bool enableFileRange)
    : _filePath {filePath}
+   , _enableFileRange {enableFileRange}
 {
    _ignoreContentBuilder = true;
 
@@ -133,6 +135,7 @@ void FileResult::toResponse(std::shared_ptr<Response> response, ResultContentBui
 
    // set response to get content from a file
    response->fileContent(_filePath);
+   response->enableFileRangeResponse(_enableFileRange);
 }
 
 

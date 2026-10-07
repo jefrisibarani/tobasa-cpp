@@ -33,20 +33,22 @@ does not negotiate HTTP/2 over cleartext TCP.
 
 - HTTP/1 over TCP and HTTPS over TLS.
 - HTTP/2 over HTTPS when built with `TOBASA_HTTP_USE_HTTP2` and enabled in
-	settings. The CMake option is on by default, but the build also needs the
-	nghttp2 dependency.
+   settings. The CMake option is on by default, but the build also needs the
+   nghttp2 dependency.
 - The methods `GET`, `POST`, `PUT`, `DELETE`, `HEAD`, `OPTIONS`, and `CONNECT`.
-	`TRACE` and `PATCH` are not enabled in the server's method list.
+   `TRACE` and `PATCH` are not enabled in the server's method list.
 - Keep-alive connections. By default, a connection is closed after 100 HTTP/1
-	requests; set `maxRequestsPerConnection(0)` to remove that limit.
+   requests; set `maxRequestsPerConnection(0)` to remove that limit.
 - Multipart form parsing, including file parts. Temporary files use the
-	configured temporary directory.
+   configured temporary directory.
 - Response compression, enabled by default for selected MIME types and
-	responses of at least 1 KB.
+   responses of at least 1 KB.
+- File responses can opt in to byte-range requests for `GET`, allowing downloads
+   to resume after interruption.
 - WebSocket and Server-Sent Events (SSE) handling through the request context.
-	The application must provide the WebSocket or SSE context and callbacks.
+   The application must provide the WebSocket or SSE context and callbacks.
 - Read, write, and request-processing timeouts, plus configurable socket
-	buffers and maximum header size.
+   buffers and maximum header size.
 - An optional per-IP connection rate limiter. It is off by default.
 
 For HTTP/1, the server processes requests on a connection in order. With
@@ -55,17 +57,17 @@ HTTP/2, different request streams can be active on one connection.
 ## What it is not
 
 - It is not a complete web framework. There is no built-in URL route table;
-	register a request handler and dispatch paths in your application.
+   register a request handler and dispatch paths in your application.
 - It does not automatically serve a directory of static files. The sample
-	implements file serving in its own handler.
+   implements file serving in its own handler.
 - It does not supply application authentication, authorization, account
-	management, or database rules. Add those in application code or middleware.
+   management, or database rules. Add those in application code or middleware.
 - It is not an HTTP/3 server. The implemented network paths are HTTP/1 and
-	optional HTTP/2 over TLS.
+   optional HTTP/2 over TLS.
 - It does not resolve host names when binding. Although the settings
-	constructors use `localhost` as their address text by default, the listener
-	calls `asio::ip::make_address()`, which expects a numeric IP address. Set an
-	address such as `127.0.0.1`, `::1`, or `0.0.0.0` explicitly.
+   constructors use `localhost` as their address text by default, the listener
+   calls `asio::ip::make_address()`, which expects a numeric IP address. Set an
+   address such as `127.0.0.1`, `::1`, or `0.0.0.0` explicitly.
 
 ## Configure it
 
@@ -102,8 +104,8 @@ Example settings:
 asio::io_context io;
 http::Settings settings("127.0.0.1", 8084);
 settings.maxRequestsPerConnection(100)
-				.timeoutRead(60)
-				.enableMultipartParsing(true);
+            .timeoutRead(60)
+            .enableMultipartParsing(true);
 
 http::PlainServerDefault server(io, std::move(settings), logger);
 ```
@@ -119,9 +121,9 @@ sets the response, and returns a `RequestStatus`:
 
 ```cpp
 server.requestHandler([](const http::HttpContext& context) {
-	 context->response()->content("Hello");
-	 context->response()->httpStatus(http::StatusCode::OK);
-	 return http::RequestStatus::handled;
+    context->response()->content("Hello");
+    context->response()->httpStatus(http::StatusCode::OK);
+    return http::RequestStatus::handled;
 });
 ```
 
@@ -144,15 +146,15 @@ and the combined HTTP/HTTPS example in
 ## A few useful details
 
 - `RequestStatus::handled` sends the response prepared by the handler.
-	`notHandled` produces a not-found response. `async` lets the application
-	finish request processing later by completing the context.
+   `notHandled` produces a not-found response. `async` lets the application
+   finish request processing later by completing the context.
 - In the optional rate limiter, the check runs as each TCP connection is
-	accepted. Despite the setting names, it limits new connections per IP and
-	time window; it does not count individual HTTP requests on a reused
-	keep-alive connection.
+   accepted. Despite the setting names, it limits new connections per IP and
+   time window; it does not count individual HTTP requests on a reused
+   keep-alive connection.
 - The library can track active connections and report their IDs and connection
-	information through `totalConnections()`, `lastConnectionId()`, and
-	`currentConnectionsInfo()`.
+   information through `totalConnections()`, `lastConnectionId()`, and
+   `currentConnectionsInfo()`.
 - The server validates supported methods, but request routing and important
-	application checks remain yours. In particular, validate paths before
-	opening files, and enforce access rules in the handler.
+   application checks remain yours. In particular, validate paths before
+   opening files, and enforce access rules in the handler.
