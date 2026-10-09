@@ -382,7 +382,6 @@ int main()
          .address("0.0.0.0")
          .certificateChainFile("localhost.crt")
          .privateKeyFile("localhost.key")
-         .tmpDhFile("dh2048.pem")
          .enableMultipartParsing(true) // set to false, to use multipart middleware
          .temporaryDir("./tmp")
          ;

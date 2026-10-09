@@ -60,7 +60,6 @@ void runHttpsServer()
    settings.maxRequestsPerConnection(0);
    settings.certificateChainFile("localhost.crt");
    settings.privateKeyFile("localhost.key");
-   settings.tmpDhFile("dh2048.pem");
 
    http::SecureServerDefault serverHttps(ioContext, settings, logger);
 

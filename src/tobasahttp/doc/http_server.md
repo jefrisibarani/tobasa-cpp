@@ -46,8 +46,12 @@ The listener expects a numeric IP address such as `127.0.0.1`, `::1`, or
 `0.0.0.0`; it does not resolve host names. Configure settings before creating
 the server because the server keeps its own copy. For HTTPS, use
 `SettingsTls` and provide a certificate chain and private key. TLS settings
-also support SNI certificates and loading TLS assets from memory. See
-[`settings.md`](settings.md) for settings and limits.
+also support SNI certificates and loading TLS assets from memory. Temporary
+Diffie-Hellman parameters are optional: if `tmpDhFile()` does not name an
+existing file, the server uses a non-empty `tmp_dh` asset from the callback;
+if the span is empty, including when no callback is set, DH parameters remain
+unset. See [`settings.md`](settings.md) for the TLS asset callback and other
+settings.
 
 ## Handle requests
 

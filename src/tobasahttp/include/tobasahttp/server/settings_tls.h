@@ -99,7 +99,7 @@ public:
    std::string privateKeyPassword() const { return _privateKeyPassword; }
 
 
-   /// Path to the temporary Diffie-Hellman parameters file; if missing, the default TLS asset callback is used.
+   /// Optional path to temporary Diffie-Hellman parameters; if missing, non-empty default DH bytes are used, otherwise DH remains unset.
    SettingsTls& tmpDhFile(std::string val) &
    {
       _tmpDhFile = std::move(val);
@@ -141,7 +141,7 @@ public:
 
 
 
-   /// Supply certificate, private-key, or DH bytes when the corresponding file is missing.
+   /// Supply certificate, private-key, or DH bytes when the corresponding file is missing; an empty DH span leaves DH unset.
    SettingsTls& defaultTlsAssetCallback(DefaultTlsAssetCallback cb) &
    {
       _defaultTlsAssetCallback = std::move(cb);

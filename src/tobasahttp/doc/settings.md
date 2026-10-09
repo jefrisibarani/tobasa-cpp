@@ -160,15 +160,18 @@ use HTTP/1 instead. The option has no effect in builds without HTTP/2 support.
 | `certificateChainFile()` | Empty | Path to the certificate chain file. |
 | `privateKeyFile()` | Empty | Path to the private key file. |
 | `privateKeyPassword()` | Empty | Password for an encrypted private key. |
-| `tmpDhFile()` | Empty | Path to a temporary Diffie-Hellman parameter file. |
+| `tmpDhFile()` | Empty | Optional path to a temporary Diffie-Hellman parameter file. If missing, the server uses non-empty default DH bytes; otherwise it leaves DH unset. |
 | `hostCertificates()` | Empty list | Additional certificates selected by SNI hostname. Each `HostCertificate` has a `hostname`, `certificateChainFile`, `privateKeyFile`, and `password`. |
-| `defaultTlsAssetCallback()` | Empty callback | Supplies certificate-chain, private-key, or DH bytes when the configured file path does not exist. |
+| `defaultTlsAssetCallback()` | Empty callback | Supplies certificate-chain, private-key, or DH bytes when the corresponding file does not exist. An empty span for DH is allowed and leaves DH unset. |
 | `serverMode()` | `true` | Currently stored but not read by the server's TLS setup; changing it does not change the server mode. |
 
 For a standalone TLS server, provide usable certificate and private-key files,
 or provide a callback that supplies those assets when the file paths do not
-exist. The callback is also used for DH parameters when the DH file path does
-not exist. With `hostCertificates()`, the server selects a matching entry by
+exist. Temporary DH parameters are optional: when the DH file is missing, the
+server uses the callback's DH span if non-empty, and otherwise leaves DH
+parameters unset. With no callback, the span is empty. This applies to the
+default TLS context and SNI contexts.
+With `hostCertificates()`, the server selects a matching entry by
 the client's SNI hostname; missing per-host certificate or key files use the
 default assets. Keep the bytes returned by the callback valid while TLS setup
 loads them. Certificate provisioning is the application's responsibility. See

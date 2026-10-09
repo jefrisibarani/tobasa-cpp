@@ -68,20 +68,16 @@ void setupCertificateforSNI(
       
       if (path::exists(tmpDhFile))
          ctx->use_tmp_dh_file(tmpDhFile);
-      else{
+      else if (!defaulTmpDh.empty()) {
          ctx->use_tmp_dh( asio::buffer(defaulTmpDh.data(), defaulTmpDh.size()) );
       }
 
-      if (!entry.password.empty()) {
+      if (!entry.password.empty()) 
+      {
          ctx->set_password_callback([password=entry.password](std::size_t /*max_length*/, asio::ssl::context::password_purpose /*purpose*/) {
                return password; // provide privateKeyFile password
          });
       }
-
-      // SSL_CTX* newCtx = SSL_CTX_new(TLS_server_method());
-      // SSL_CTX_use_certificate_chain_file(newCtx, entry.certificateChainFile.c_str());
-      // SSL_CTX_use_PrivateKey_file(newCtx, entry.privateKeyFile.c_str(), SSL_FILETYPE_PEM);
-      // tlsCertMap[entry.hostname] = newCtx;
 
 #ifdef TOBASA_HTTP_USE_HTTP2
       // Configure HTTP/2 TLS context 

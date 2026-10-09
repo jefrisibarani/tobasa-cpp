@@ -182,7 +182,8 @@ private:
          else
          {
             auto tmpDh = _settings.getDefaultTlsAsset(TlsAsset::tmp_dh);
-            _tlsContex.use_tmp_dh(asio::buffer(tmpDh.data(), tmpDh.size()));
+            if (!tmpDh.empty())
+               _tlsContex.use_tmp_dh(asio::buffer(tmpDh.data(), tmpDh.size()));
          }
 
          // Register SNI callback with raw OpenSSL

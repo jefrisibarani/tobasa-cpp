@@ -23,7 +23,6 @@ int main()
       http::SettingsTls settings("0.0.0.0", 8085);
       settings.certificateChainFile("localhost.crt");
       settings.privateKeyFile("localhost.key");
-      settings.tmpDhFile("dh2048.pem");
 
       http::SecureServerDefault serverHttps(ioContext, settings, logger);
       serverHttps.requestHandler(

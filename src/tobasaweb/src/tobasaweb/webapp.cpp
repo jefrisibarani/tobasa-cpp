@@ -548,7 +548,6 @@ void Webapp::runHttpServer()
       .hostCertificates(http::conf::toHostCertificates(httpdconf.tls.hostCertificates))
       .certificateChainFile( httpdconf.tls.certificateChainFile)
       .privateKeyFile( httpdconf.tls.privateKeyFile)
-      .tmpDhFile( httpdconf.tls.tmpDhFile)
 #ifdef TOBASA_HTTP_USE_HTTP2
       .http2Enabled(httpdconf.http2Enabled)
       .logVerboseHttp2(httpdconf.logVerboseHttp2)
