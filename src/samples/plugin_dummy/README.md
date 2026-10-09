@@ -1,9 +1,5 @@
 # DummyPlugin
 
-A simple example plugin demonstrating the Tobasa plugin architecture.
-
-## Overview
-
 DummyPlugin is a minimal implementation of the Tobasa plugin system, showing:
 - How to create a plugin class inheriting from `tbs::Plugin`
 - Implementing required `load()` and `unload()` methods

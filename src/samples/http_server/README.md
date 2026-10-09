@@ -38,13 +38,6 @@ The servers listen on all network interfaces:
 - HTTP: `http://localhost:8084`
 - HTTPS: `https://localhost:8085`
 
-The HTTPS certificate is for local testing. Use `-k` with `curl` to skip
-certificate verification:
-
-```text
-curl.exe http://localhost:8084/
-curl.exe -k https://localhost:8085/
-```
 
 Press `Ctrl+C` to stop both servers. The sample stops the servers and releases
 the WebSocket context before it stops the I/O context.

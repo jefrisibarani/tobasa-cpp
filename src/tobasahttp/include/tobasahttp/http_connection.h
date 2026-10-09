@@ -80,6 +80,8 @@ protected:
    asio::ip::tcp::endpoint _remoteEndpoint;
 
 public:
+   /// Starts transport setup, such as a TLS handshake, and reports completion.
+   /// Set by Connection starter
    OnStartHandler          onStart;
 
 public:

@@ -1,17 +1,14 @@
 # HTTPS Client Sample
 
-A simple HTTPS client example using the Tobasa framework.
-
-## Overview
-
-This sample demonstrates how to make secure HTTPS requests to remote servers. It shows how to use the `tobasahttp` library to create a client with TLS/SSL support.
+This sample sends HTTPS requests to a local server at `127.0.0.1:8085` using
+`SecureClientDefault`.
 
 ## Features
 
 - HTTPS/TLS connection support
 - HTTP/1.1 protocol
 - JSON request and response handling
-- Certificate validation
+- Peer certificate validation is disabled in this sample
 
 ## Building
 
@@ -26,18 +23,14 @@ The compiled executable will be in `_output/https_client/debug/`
 
 ## Usage Example
 
-The client connects to a remote HTTPS endpoint and sends a request:
+Start an HTTPS server on `127.0.0.1:8085`, then run the sample. It sends GET
+requests to `/api/version` and a POST request to `/api/users/authenticate`.
 
-```bash
-./https_client https://api.example.com/endpoint
-```
-
-## Features
-
-- Supports GET and POST requests
-- Handles JSON payloads
-- Automatic TLS certificate verification
-- Connection pooling
+In `src/main.cpp`, `verifyPeer(false)` leaves TLS encryption enabled but skips
+server certificate and hostname validation. To enable validation, set
+`verifyPeer(true)`. OpenSSL's default CA paths are used; set
+`caVerificationFile()` only when you need to trust an additional CA or use a
+custom CA bundle. The configured server name must match the certificate.
 
 
 ## License

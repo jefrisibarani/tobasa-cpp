@@ -1,14 +1,10 @@
 #include <tobasa/datetime.h>
-//#include <tobasa/logger.h>  // for tbs::Logger
+#include <mutex>
 #include "tobasahttp/client/http_client.h"
 
 void runClient(int totalRequest, bool asyncMode)
 {
    using namespace tbs;
-
-   // set actual log target for tbs::logger
-   //tbs::Logger::setTarget(new tbs::log::CoutLogSink());
-   //TobasaLogger logger;  // use tbs::Logger internally
 
    log::StdoutLogger logger;
    logger.setLevel(log::Level::TraceMask);
@@ -19,6 +15,7 @@ void runClient(int totalRequest, bool asyncMode)
       .port(8085)
       .tlsMode(true)
       .logVerbose(true)
+      .verifyPeer(false)            // TLS is encrypted, but the server certificate is not checked
       .connectionPoolSize(4)        // create max 4 connections
       .maxRequestsPerConnection(0); // disable
 
@@ -27,38 +24,14 @@ void runClient(int totalRequest, bool asyncMode)
    // With a maximum of 4 connections, in async mode, 100 requests will
    // create 4 connections, each handling about 25 requests.
 
-   // In async mode, shutdown() must be called,
-   // otherwise the client will keep running.
-   // It is safe to shutdown when no connections remain.
-   // This can be checked in onConnectFailed() and onConnectionClosed() handlers.
-   auto checkShutdown = [&]() {
-      auto nConn = client.totalConnections();
-      if( nConn == 0 )
-      {
-         logger.info("Shutting down Client");
-         client.shutdown();
-      }
-   };
+   // shutdown() drains submitted requests before run() returns.
 
-   // Setup handlers
-   // ----------------------------------
-   client.onConnectionError( [&](const http::ErrorData& error) {
-      logger.error(error.message);
-   });
-
-   // check if we need to shutdown and log error
-   client.onConnectFailed( [&](const std::string& message) {
-      logger.error(message);
-      checkShutdown();
-   });
-
-   // check if we need to shutdown
-   client.onConnectionClosed([&](http::ConnectionId connId) {
-      checkShutdown();
-   });
-
-   auto processResponse = [&](const http::ClientResponsePtr& response)
+   std::mutex outputMutex;
+   auto processResponse = [&outputMutex](const http::ClientResponsePtr& response)
    {
+      // just to protect the whole output block, so it prints as one block
+      std::lock_guard<std::mutex> lock(outputMutex);
+
       std::cout << "---------------------------------------------------" << std::endl;
       std::cout << "   Http Ver major  : " << response->majorVersion()   << std::endl;
       std::cout << "   Http Ver minor  : " << response->minorVersion()   << std::endl;
@@ -92,8 +65,10 @@ void runClient(int totalRequest, bool asyncMode)
             resource = "/api/version" + std::to_string(i);
 
          auto res = client.get(resource);
-         if (res)
-            processResponse(res);
+         if (res.responseReceived())
+            processResponse(res.response);
+         else
+            logger.error("Request failed: {}", res.error.message);
       }
 
       auto res = client.post("/api/users/authenticate",
@@ -104,8 +79,10 @@ void runClient(int totalRequest, bool asyncMode)
          } )-"
       );
 
-      if (res)
-         processResponse(res);
+      if (res.responseReceived())
+         processResponse(res.response);
+      else
+         logger.error("Request failed: {}", res.error.message);
 
       // client.shutdown(); // no need
    }
@@ -118,12 +95,15 @@ void runClient(int totalRequest, bool asyncMode)
          if (i>0)
             resource = "/api/version" + std::to_string(i);
          
-         client.get(resource, [&](const http::ClientResponsePtr& response) {
-            processResponse(response);
+         client.get(resource, [&](const http::ClientResult& result) {
+            if (result.responseReceived())
+               processResponse(result.response);
+            else
+               logger.error("Request failed: {}", result.error.message);
          });
       }
 
-      // in async request, client will run until shutdown() called
+      client.shutdown();
       client.run(2);
    }
 }
@@ -132,8 +112,8 @@ int main(int argc, char* argv[])
 {
    try
    {
-      int totalRequest = 10;
-      bool asyncMode = true;
+      int totalRequest = 100;
+      bool asyncMode = false;
 
       if (! tbs::DateTime::initTimezoneData())
          return 1;

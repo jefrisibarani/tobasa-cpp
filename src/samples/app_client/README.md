@@ -1,8 +1,5 @@
 # App Client Sample
 
-A client application example that connects to the Tobasa app server.
-
-## Overview
 
 This sample demonstrates how to build a client that communicates with the app_server REST API. It shows how to make HTTP requests, handle responses, and work with JSON data.
 
@@ -43,7 +40,11 @@ The client connects to the app_server and performs various API requests:
 
 ## Configuration
 
-Configure the server connection in `appsettings.json`:
+Configure the server connection in `appsettings.json`. With `verifyPeer: true`,
+the client validates the server certificate chain and hostname using OpenSSL's
+default CA paths. `caVerificationFile` is optional and adds a custom CA bundle
+when the server uses a CA not present in those defaults. The sample config uses
+`myCA.pem` for its local server certificate.
 
 ## License
 

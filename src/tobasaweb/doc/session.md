@@ -1,6 +1,6 @@
 # HTTP Sessions in Tobasa Web
 
-The mental model is simple: the browser sends a session ID cookie; Tobasa Web uses that ID to find JSON stored on the server. The cookie carries an identifier, not the session data and not proof that the user is authenticated.
+The browser sends a session ID cookie; Tobasa Web uses that ID to find JSON stored on the server. The cookie carries an identifier, not the session data and not proof that the user is authenticated.
 
 `Webapp::useSession()` adds `SessionMiddleware` to the request chain. After it has processed a request, a handler can use the session ID attached to `http::Request`:
 

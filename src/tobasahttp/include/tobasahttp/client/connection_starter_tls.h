@@ -12,6 +12,7 @@
 #endif
 
 #include <asio/ssl.hpp>
+#include <asio/ssl/host_name_verification.hpp>
 #include "tobasahttp/server/tls_helper.h"
 
 
@@ -87,10 +88,15 @@ public:
 
       Socket tlsSocket(std::move(socket), _tlsContex);
 
-      if ( _settings.verifyPeer() && path::exists(_settings.caVerificationFile()) )
+      if (_settings.verifyPeer())
       {
+         auto host = _settings.address();
          tlsSocket.set_verify_callback(
-            std::bind(&ClientConnectionStarterTls::onVerifyTls, this, std::placeholders::_1, std::placeholders::_2));
+            [this, host = std::move(host)](bool preverified, asio::ssl::verify_context& context)
+            {
+               asio::ssl::host_name_verification verifyHost(host);
+               return this->onVerifyTls(verifyHost(preverified, context), context);
+            });
       }
 
       // create connection, and setup onStart callback
@@ -148,39 +154,27 @@ private:
                   return password;
                });
             } 
-
          }
 
-
-         if (  _settings.verifyPeer() && path::exists(_settings.caVerificationFile()) ) 
+         if (_settings.verifyPeer())
          {
+            // Load OpenSSL's configured default CA locations first.
             _tlsContex.set_default_verify_paths();
-            // Load the certificates for one or more trusted certification authorities from a file.
-            _tlsContex.load_verify_file(_settings.caVerificationFile());
-            _tlsContex.set_verify_mode(
-                 asio::ssl::verify_peer
-               | asio::ssl::verify_fail_if_no_peer_cert
-               | asio::ssl::verify_client_once);
+
+            if (!_settings.caVerificationFile().empty())
+            {
+               if (!path::exists(_settings.caVerificationFile()))
+                  throw http::Exception("CA verification file does not exist");
+
+               // Add the optional custom CA bundle to the trusted certificates.
+               _tlsContex.load_verify_file(_settings.caVerificationFile());
+            }
+
+            _tlsContex.set_verify_mode(asio::ssl::verify_peer);
          }
          else {
             _tlsContex.set_verify_mode(asio::ssl::verify_none );
          }
-
-      // #ifdef TOBASA_HTTP_USE_HTTP2
-      //    if (_settings.http2Enabled())
-      //    {
-      //       // Advertise ALPN protocols
-      //       unsigned int len;
-      //       auto alpnProtos = http2::getAlpnProtos(len);
-      //       auto rval = SSL_CTX_set_alpn_protos(_tlsContex.native_handle(), alpnProtos, len );
-      //       if ( rval != 0 ) 
-      //       {
-      //          _logger.debug("[{}] Setting up TLS context has failed: ", logHttpType(), "can not set alpn protos" );
-      //          throw std::runtime_error( "failed to set ALPN protocols" );
-      //       }
-      //    }
-      //  #endif
-
       }
       catch(const std::exception& ex)
       {
@@ -189,28 +183,19 @@ private:
       }
    }
 
-   bool onVerifyTls(bool preverified, asio::ssl::verify_context& ctx)
+   bool onVerifyTls(bool verified, asio::ssl::verify_context& ctx)
    {
-      // TODO_JEFRI: Complete this!
-
-      // The verify callback can be used to check whether the certificate that is
-      // being presented is valid for the peer. For example, RFC 2818 describes
-      // the steps involved in doing this for HTTPS. Consult the OpenSSL
-      // documentation for more details. Note that the callback is called once
-      // for each certificate in the certificate chain, starting from the root
-      // certificate authority.
-
-      // In this example we will simply print the certificate's subject name.
+      // Log the result after certificate-chain and hostname verification.
       char subjectName[256];
       X509 *cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
       X509_NAME_oneline(X509_get_subject_name(cert), subjectName, 256);
 
-      if (!preverified)
+      if (!verified)
          _logger.debug("[{}] SSL verification failed, subject name: {}", logHttpType(), subjectName);
       else
          _logger.debug("[{}] SSL verified successfully, subject name: {}", logHttpType(), subjectName);
 
-      return preverified;
+      return verified;
    }
 
 private:

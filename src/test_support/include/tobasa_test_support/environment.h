@@ -13,5 +13,19 @@ std::string loadEnvironmentValue(
    const std::string& name,
    const std::string& dotEnvFilePath);
 
+class ScopedEnvironmentVariable
+{
+   std::string _name;
+   std::string _previousValue;
+   bool _hadPreviousValue;
+
+public:
+   ScopedEnvironmentVariable(const std::string& name, const std::string& value);
+   ~ScopedEnvironmentVariable() noexcept;
+
+   ScopedEnvironmentVariable(const ScopedEnvironmentVariable&) = delete;
+   ScopedEnvironmentVariable& operator=(const ScopedEnvironmentVariable&) = delete;
+};
+
 } // namespace test_support
 } // namespace tbs

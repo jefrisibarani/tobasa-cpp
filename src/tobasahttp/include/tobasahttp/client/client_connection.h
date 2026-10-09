@@ -1,9 +1,10 @@
 #pragma once
 
-//#include "tobasahttp/client/common.h"
 #include "tobasahttp/http_connection.h"
 #include "tobasahttp/exception.h"
 #include "tobasahttp/util.h"
+#include "tobasahttp/client/request.h"
+#include "tobasahttp/client/request_serializer.h"
 #include "tobasahttp/client/response.h"
 
 namespace tbs {
@@ -35,15 +36,24 @@ public:
    using Logger   = typename Traits::Logger;
 
 private:
-   ClientResponseHandler    _responseHandler;
+   ClientResponseHandler          _responseHandler;
+   ClientRequestErrorHandler      _requestErrorHandler;
    /// request to send
-   std::unique_ptr<Request> _pRequest;
+   std::unique_ptr<ClientRequest> _pRequest;
 
    std::function<void()>    _responseHandledCb;
    bool                     _busy {false};
    size_t                   _requestsHandled {0};
    size_t                   _maxRequests {200};
    std::atomic<uint32_t>    _currentRequestId { 0 };
+
+   void reportRequestError(const ErrorData& error)
+   {
+      auto handler = std::move(_requestErrorHandler);
+      _requestErrorHandler = nullptr;
+      if (handler)
+         handler(error);
+   }
 
 public:
 
@@ -79,17 +89,20 @@ public:
 
       // call onStart handler, passing socket and the callback
       this->onStart(this->_socket,
-         [this, self = this->shared_from_this()] (const std::error_code& error)
+         [self = this->selfPtr()] (const std::error_code& error)
          {
-            this->_remoteEndpoint = this->_socket.lowest_layer().remote_endpoint();
-
-            if (!error)
+            asio::dispatch(self->executor(), [self, error]
             {
-               this->_logger.debug("[{}] [conn:{}] Start sending request to {}", this->logHttpType(), this->id(), toString(this->_remoteEndpoint));
-               write();
-            }
-            else
-               this->processError(self->id(), error, ErrorType::system, "ClientConnection");
+               self->_remoteEndpoint = self->_socket.lowest_layer().remote_endpoint();
+
+               if (!error)
+               {
+                  self->_logger.debug("[{}] [conn:{}] Start sending request to {}", self->logHttpType(), self->id(), toString(self->_remoteEndpoint));
+                  self->write();
+               }
+               else
+                  self->processError(self->id(), error, ErrorType::system, "ClientConnection");
+            });
          }
       );
   }
@@ -101,7 +114,7 @@ public:
          this->_pRequest->contentType(), this->_pRequest->contentLength() );
 
       std::ostream sendStream(&this->_sendBuffer);
-      RequestSerializer serializer(* this->_pRequest);
+      RequestSerializer serializer(*this->_pRequest);
 
       auto rawRequest = serializer.getString();
       sendStream << std::move(rawRequest);
@@ -133,16 +146,37 @@ public:
       this->startTimer(this->timeoutWrite());
    }
 
-   /// Set request to be send to server
-   void request(std::unique_ptr<Request> request)
+   void request(
+      std::unique_ptr<ClientRequest> request,
+      ClientResponseHandler handler,
+      ClientRequestErrorHandler errorHandler)
    {
-      _pRequest = std::move(request);
+      _pRequest            = std::move(request);
+      _responseHandler     = std::move(handler);
+      _requestErrorHandler = std::move(errorHandler);
    }
 
-   /// Set request to be send to server
-   void request(Request&& request)
+   void sendRequest(
+      std::unique_ptr<ClientRequest> request,
+      ClientResponseHandler handler,
+      ClientRequestErrorHandler errorHandler)
    {
-      _pRequest = std::make_unique<Request>( std::forward<Request>( request ));
+      auto self = this->selfPtr();
+      asio::dispatch(this->executor(),
+         [self, request = std::move(request), handler = std::move(handler),
+          errorHandler = std::move(errorHandler)]() mutable
+         {
+            if (self->closed())
+               return;
+
+            self->_pRequest            = std::move(request);
+            self->_responseHandler     = std::move(handler);
+            self->_requestErrorHandler = std::move(errorHandler);
+            self->_parser.parsingId(++self->_currentRequestId);
+            self->_processingStopWatch.start();
+            self->_processingStopWatch.lap(self->_parser.parsingId(), "start");
+            self->write();
+         });
    }
 
    void responseHandledCb(std::function<void()> cb)
@@ -168,6 +202,52 @@ public:
 
 protected:
 
+   std::function<void(typename HttpConnection<Traits>::Timer&)> createTimerHandler(
+      TimerType timerType,
+      int32_t timerWaitId,
+      int32_t timeoutSeconds) override
+   {
+      auto defaultHandler = HttpConnection<Traits>::createTimerHandler(
+         timerType, timerWaitId, timeoutSeconds);
+
+      return [this, timerType, timeoutSeconds,
+              defaultHandler = std::move(defaultHandler)](auto& timer)
+      {
+         const auto message = tbsfmt::format("{} Timer expired after {} seconds",
+            timerTypeToString(timerType), timeoutSeconds);
+         
+         reportRequestError(ErrorData{
+            message, ErrorType::system, ERROR_CODE_DATA_FAIL, this->id(), "ClientConnection"});
+         
+         defaultHandler(timer);
+      };
+   }
+
+   void processError(
+      ConnectionId connId,
+      const std::string& message,
+      ErrorType errorType,
+      int32_t code,
+      const std::string& source = "") override
+   {
+      reportRequestError(ErrorData{message, errorType, code, connId, source});
+      HttpConnection<Traits>::processError(connId, message, errorType, code, source);
+   }
+
+   void processError(
+      ConnectionId connId,
+      const std::error_code& error,
+      ErrorType errorType,
+      const std::string& source = "") override
+   {
+      if (error != asio::error::operation_aborted)
+      {
+         reportRequestError(ErrorData{
+            error.message(), errorType, error.value(), connId, source});
+      }
+      HttpConnection<Traits>::processError(connId, error, errorType, source);
+   }
+
    virtual void read()
    {
       if ( ! this->_parser.isReading() )
@@ -184,7 +264,7 @@ protected:
 
                   if ( !error )
                   {
-                     // connection might be already closed(because of timed out or any other reasons)
+                     // connection might be already closed (because of timed out or any other reasons)
                      // when this handler run. so we stop here.
                      if ( self->closed() )
                      {
@@ -245,24 +325,25 @@ protected:
          HttpStatus status(static_cast<StatusCode>(this->_parser.statusCode()), this->_parser.statusMessage());
          resp->httpStatus  ( std::move(status) );
 
-         _responseHandler(resp);
+         bool keepAlive = shouldKeepAlive(resp);
+         if (_requestsHandled >= this->_settings.maxRequestsPerConnection() &&
+             this->_settings.maxRequestsPerConnection() != 0)
+            keepAlive = false;
 
-         if (_requestsHandled >= this->_settings.maxRequestsPerConnection() && this->_settings.maxRequestsPerConnection()!=0 )
-         {
-            this->processCompleted(this->id(), "Request completed");
-            return;
-         }
-
-         if (shouldKeepAlive(resp))
-         {
-            if (_responseHandledCb)
-               _responseHandledCb();   // return to pool
-
-            // we are in keep-alive connection
+         if (keepAlive)
             this->_parser.prepareForNextMessage();
-            auto curentRequestId = ++_currentRequestId;   // get new request id  
-            this->_parser.parsingId( curentRequestId);    // set new request id  as parsing id
-            this->_processingStopWatch.lap(curentRequestId, "start" );
+
+         auto responseHandler = std::move(_responseHandler);
+         _responseHandler     = nullptr;
+         _requestErrorHandler = nullptr;
+
+         if (responseHandler)
+            responseHandler(resp);
+
+         if (keepAlive)
+         {
+            if (!this->closed() && _responseHandledCb)
+               _responseHandledCb();
          }
          else
          {

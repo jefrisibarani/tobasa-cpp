@@ -60,5 +60,35 @@ std::string loadEnvironmentValue(
    return loadDotEnvValue(dotEnvFilePath, name);
 }
 
+ScopedEnvironmentVariable::ScopedEnvironmentVariable(
+   const std::string& name,
+   const std::string& value)
+   : _name {name}
+   , _hadPreviousValue {std::getenv(name.c_str()) != nullptr}
+{
+   if (_hadPreviousValue)
+      _previousValue = std::getenv(name.c_str());
+
+#if defined(_WIN32)
+   if (_putenv_s(_name.c_str(), value.c_str()) != 0)
+      throw std::runtime_error("Failed to set process environment variable");
+#else
+   if (::setenv(_name.c_str(), value.c_str(), 1) != 0)
+      throw std::runtime_error("Failed to set process environment variable");
+#endif
+}
+
+ScopedEnvironmentVariable::~ScopedEnvironmentVariable() noexcept
+{
+#if defined(_WIN32)
+   _putenv_s(_name.c_str(), _hadPreviousValue ? _previousValue.c_str() : "");
+#else
+   if (_hadPreviousValue)
+      ::setenv(_name.c_str(), _previousValue.c_str(), 1);
+   else
+      ::unsetenv(_name.c_str());
+#endif
+}
+
 } // namespace test_support
 } // namespace tbs

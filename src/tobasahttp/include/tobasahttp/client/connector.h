@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <asio.hpp>
 #include <tobasa/non_copyable.h>
 #include "tobasahttp/client/client_connection.h"
@@ -35,7 +36,7 @@ protected:
    Logger&                    _logger;
    ConnectionStarter          _starter;
    Executor                   _executor;
-   bool                       _stopped = false;
+   std::atomic_bool           _stopped {false};
 
 public:
 

@@ -27,8 +27,6 @@ public:
 private:
    int32_t        _connectionPoolSize     {1};
 
-   // mTLS client
-   // ------------------------------------------------
    std::string    _certificateFile        {}; // client.crt
    std::string    _privateKeyFile         {}; // client.key
    std::string    _privateKeyPassword     {};
@@ -62,7 +60,7 @@ public:
    [[nodiscard]] int32_t connectionPoolSize() const { return _connectionPoolSize; }
 
 
-   /// Path to a PEM file with trusted CA certificates; used when peer verification is enabled.
+   /// Optional PEM file with additional trusted CA certificates.
    SettingsClient& caVerificationFile(std::string val) &
    {
       _caVerificationFile = std::move(val);
@@ -75,7 +73,7 @@ public:
    std::string caVerificationFile() const { return _caVerificationFile; }
 
    
-   /// Verify the server certificate; this requires an existing CA file set with caVerificationFile().
+   /// Verify the server certificate using OpenSSL's default CA paths and any configured CA file.
    SettingsClient& verifyPeer(bool val) &
    {
       _verifyPeer = val;

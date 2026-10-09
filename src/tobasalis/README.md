@@ -1,11 +1,7 @@
 
  # Tobasa LIS Library
 
-C++ library for integrating laboratory instruments using industry-standard LIS protocols.
-
-## Overview
-
-Tobasa LIS provides production-grade communication with laboratory analyzers and medical devices. It implements LIS2-A2 (ASTM) and HL7 message protocols over serial and TCP transports. The library handles protocol parsing, message framing, and device connectivity so your application can focus on result processing and integration logic.
+Tobasa LIS provides communication with laboratory analyzers and medical devices. It implements LIS2-A2 (ASTM) and HL7 message protocols over serial and TCP transports. The library handles protocol parsing, message framing, and device connectivity so your application can focus on result processing and integration logic.
 
 ## Features
 

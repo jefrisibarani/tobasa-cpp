@@ -33,8 +33,6 @@ namespace http {
 class Request : public Message
 {
 private:
-   friend class RequestSerializer;
-
    std::string _method      {};     // GET, POST
    std::string _path        {};     // path (does not inlude query component)
    std::string _target      {};
@@ -185,20 +183,6 @@ public:
    /// we use Parser id as request id
    void id(uint32_t value) { _id = value; }
    uint32_t id() const { return _id; } 
-};
-
-/** 
- * Http Request serializer.
- * Serialise http request into std::string
- */
-class RequestSerializer
-{
-private:
-   Request& _request;
-
-public:
-   RequestSerializer(Request& request);
-   std::string getString();
 };
 
 /** @}*/

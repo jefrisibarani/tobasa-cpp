@@ -250,50 +250,5 @@ bool Request::isHeadRequest()
    return _isHeadRequest;
 }
 
-RequestSerializer::RequestSerializer(Request& request)
-   : _request(request)
-{}
-
-std::string RequestSerializer::getString()
-{
-   if ( _request._content.size() > 0) {
-      _request.addHeader("Content-Length", std::to_string(_request._content.size()) );
-   }
-
-   // HEAD method is similar to GET, but we should not return the body of the response
-   if (_request._isHeadRequest )
-   {
-      // empty response body for HEAD Request
-      _request._content = "";
-   }   
-
-   // first, build a request line (eg. GET /version/index.html HTTP/1.1 )
-   std::stringstream stream;
-   stream 	<< _request._method
-            << " "
-            << _request._path
-            << " HTTP/"
-            << _request._majorVersion
-            << "."
-            << _request._minorVersion
-            << "\r\n" ;
-
-   // add headers
-   for ( size_t i = 0; i < _request._headers.size(); i++ )
-   {
-      auto f = _request._headers.field(i);
-      if ( f != nullptr )
-         stream <<  f->name() << ": " << f->value() << "\r\n";
-   }
-
-   stream << "\r\n";
-
-   // add body
-   if ( _request._content.size() > 0 )
-      stream << std::string(_request._content.data(), _request._content.size());
-
-   return std::move(stream.str());
-}
-
 } // namespace http
 } // namespace tbs

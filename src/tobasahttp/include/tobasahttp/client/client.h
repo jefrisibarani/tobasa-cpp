@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <deque>
+#include <mutex>
 #include <asio/io_context.hpp>
 #include <tobasa/non_copyable.h>
 #include "tobasahttp/headers.h"
@@ -56,36 +57,8 @@ namespace http {
       // With a maximum of 4 connections, in async mode, 100 requests will
       // create 4 connections, each handling about 25 requests.
 
-      // In async mode, shutdown() must be called,
-      // otherwise the client will keep running.
-      // It is safe to shutdown when no connections remain.
-      // This can be checked in onConnectFailed() and onConnectionClosed() handlers.
-      auto checkShutdown = [&]() {
-         auto nConn = client.totalConnections();
-         if( nConn == 0 )
-         {
-            logger.info("Shutting down Client");
-            client.shutdown();
-         }
-      };
-
-      // Setup handlers
-      // ----------------------------------
-
-      client.onConnectionError( [&](const http::ErrorData& error) {
-         logger.error(error.message);
-      });
-
-      // check if we need to shutdown and log error
-      client.onConnectFailed( [&](const std::string& message) {
-         logger.error(message);
-         checkShutdown();
-      });
-
-      // check if we need to shutdown
-      client.onConnectionClosed([&](http::ConnectionId connId) {
-         checkShutdown();
-      });
+      // Call shutdown() after submitting the batch. The client drains all
+      // submitted requests before run() returns.
 
       auto processResponse = [&](const http::ClientResponsePtr& response)
       {
@@ -108,9 +81,11 @@ namespace http {
          // run 100 Sync requests
          for (int i=0;i<100;i++)
          {
-            auto res = client.get( "/api/version");
-            if (res)
-               processResponse(res);
+            auto result = client.get( "/api/version");
+            if (result.responseReceived())
+               processResponse(result.response);
+            else
+               logger.error("Request failed: {}", result.error.message);
          }
       }
       else
@@ -119,12 +94,15 @@ namespace http {
          std::string resource = "/api/version";
          for (int i=0;i<100;i++)
          {
-            client.get("/api/version", [&](const http::ClientResponsePtr& response) {
-               processResponse(response);
+            client.get("/api/version", [&](const http::ClientResult& result) {
+               if (result.responseReceived())
+                  processResponse(result.response);
+               else
+                  logger.error("Request failed: {}", result.error.message);
             });
          }
 
-         // in async request, client will run until shutdown() called
+         client.shutdown();
          client.run();
       }
    \endcode
@@ -134,7 +112,7 @@ namespace http {
 template <class Traits>
 class Client : private NonCopyable
 {
-private:   
+private:
    using Settings            = typename Traits::Settings;
    using Logger              = typename Traits::Logger;
    using Connection          = ClientConnection<Traits>;
@@ -145,38 +123,52 @@ private:
    using WorkGuard           = asio::executor_work_guard<AsioExecutor>;
 
 private:
-   IoContextPtr              _pIoContext;
-   Settings                  _settings;
-   Logger&                   _logger;
-   ConnectionMgr<Traits>     _connManager;
-   Connector<Traits>         _connector;
-   Executor                  _clientExecutor;
+   IoContextPtr               _pIoContext;
+   Settings                   _settings;
+   Logger&                    _logger;
+   ConnectionMgr<Traits>      _connManager;
+   Connector<Traits>          _connector;
+   Executor                   _clientExecutor;
    std::unique_ptr<WorkGuard> _workGuard;
+   std::mutex                 _modeMutex;
+   std::mutex                 _callbackMutex;
 
-   OnConnectFailed           _onConnectFailed;
-   OnConnectionTimeOut       _onConnectionTimeOut;
-   OnConnectionError         _onConnectionError;
-   OnConnectionClosed        _onConnectionClosed;
+   OnConnectFailed            _onConnectFailed;
+   OnConnectionTimeOut        _onConnectionTimeOut;
+   OnConnectionError          _onConnectionError;
+   OnConnectionClosed         _onConnectionClosed;
    
-   bool                      _internalIoCtx;
+   bool                       _internalIoCtx;
 
-   std::deque<ConnectionPtr> _idleConnections;
-   size_t                    _maxConnections    = 2;
-   size_t                    _activeConnections = 0;
+   std::deque<ConnectionPtr>  _idleConnections;
+   size_t                     _maxConnections    {2};
+   size_t                     _activeConnections {0};
 
-   Headers                   _defaultHeaders;
+   Headers                    _defaultHeaders;
 
-   std::deque< std::pair<ClientRequest, ClientResponseHandler> > _pendingRequests;
+   struct PendingRequest
+   {
+      ClientRequest              request;
+      ClientResponseHandler      responseHandler;
+      ClientRequestErrorHandler  errorHandler;
+   };
 
-   enum class Mode {
+   std::deque<PendingRequest>    _pendingRequests;
+
+   enum class Mode 
+   {
       None,
       Sync,
       Async
    };
 
-   Mode _mode = Mode::None;
+   Mode   _mode                {Mode::None};
+   bool   _shutdownRequested   {false};
+   bool   _shutdownComplete    {false};
+   size_t _outstandingRequests {0};
 
 private:
+
    asio::io_context& ioContext()
    {
       return *_pIoContext;
@@ -201,14 +193,21 @@ private:
       return nullptr;
    }
 
+   
+   /**
+    * Gives a completed connection to the oldest pending request, or returns
+    * it to the idle pool when no request is waiting. Called on the client
+    * strand.
+    */
    void releaseConnection(ConnectionPtr conn)
    {
       if (!_pendingRequests.empty())
       {
-         auto [req, handler] = std::move(_pendingRequests.front());
+         auto pending = std::move(_pendingRequests.front());
          _pendingRequests.pop_front();
 
-         sendRequest(conn, std::move(req));
+         sendRequest(conn, std::move(pending.request),
+            std::move(pending.responseHandler), std::move(pending.errorHandler));
 
          return;
       }
@@ -220,21 +219,18 @@ private:
       }
    }
 
-   std::unique_ptr<Request> buildRequest(ClientRequest req)
+   /**
+    * Converts a ClientRequest into the HTTP/1 request sent on the socket.
+    * Adds Host and keep-alive headers, then copies the client defaults and
+    * request-specific headers.
+    */
+   std::unique_ptr<ClientRequest> buildRequest(ClientRequest req)
    {
-      auto httpReq = std::make_unique<Request>(HttpVersion::one);
+      auto httpReq = std::make_unique<ClientRequest>(std::move(req));
 
       std::string host = tbsfmt::format("{}:{}", _settings.address(), _settings.port());
       httpReq->addHeader("Host", host);
       httpReq->addHeader("Connection", "keep-alive");
-      
-      httpReq->method(req.method());
-      httpReq->target(req.target());
-
-      if (!req.content().empty())
-      {
-         httpReq->content(req.content());
-      }
 
       for (auto h : _defaultHeaders.getValues() ) {
          httpReq->addHeader(h->name(), h->value());
@@ -247,16 +243,25 @@ private:
       return httpReq;
    }
 
-   void sendRequest(ConnectionPtr conn, ClientRequest req)
+   /**
+    * Builds and sends a request on an existing connection. Marks the
+    * connection busy and passes the request's response handler to it.
+    * Called on the client strand.
+    */
+   void sendRequest(
+      ConnectionPtr conn,
+      ClientRequest req,
+      ClientResponseHandler handler,
+      ClientRequestErrorHandler errorHandler = nullptr)
    {
       auto request = buildRequest(std::move(req));
       conn->markBusy();
-      conn->request(std::move(request));
-      conn->start();
+      conn->sendRequest(std::move(request), std::move(handler), std::move(errorHandler));
    }
 
    void ensureMode(Mode requested)
    {
+      std::lock_guard<std::mutex> lock(_modeMutex);
       if (_mode == Mode::None)
       {
          _mode = requested;
@@ -268,6 +273,74 @@ private:
          throw std::logic_error("Client: cannot mix synchronous and asynchronous requests");
       }
    }
+
+   void ensureAsyncRequestAccepted()
+   {
+      std::lock_guard<std::mutex> lock(_modeMutex);
+      if (_shutdownRequested)
+         throw std::logic_error("Client: cannot submit requests after shutdown has started");
+
+      if (_mode == Mode::None)
+         _mode = Mode::Async;
+      else if (_mode != Mode::Async)
+         throw std::logic_error("Client: cannot mix synchronous and asynchronous requests");
+
+      ++_outstandingRequests;
+   }
+
+   void clearCallbacks()
+   {
+      std::lock_guard<std::mutex> lock(_callbackMutex);
+      _onConnectFailed     = nullptr;
+      _onConnectionTimeOut = nullptr;
+      _onConnectionError   = nullptr;
+      _onConnectionClosed  = nullptr;
+   }
+
+   void finishAsyncShutdown()
+   {
+      {
+         std::lock_guard<std::mutex> lock(_modeMutex);
+         if (!_shutdownRequested || _shutdownComplete || _outstandingRequests != 0)
+            return;
+
+         _shutdownComplete = true;
+      }
+
+      stop();
+      clearCallbacks();
+   }
+
+   void completeAsyncRequest()
+   {
+      bool shouldShutdown = false;
+      {
+         std::lock_guard<std::mutex> lock(_modeMutex);
+         if (_outstandingRequests > 0)
+            --_outstandingRequests;
+
+         shouldShutdown = _shutdownRequested && _outstandingRequests == 0;
+      }
+
+      if (shouldShutdown)
+         finishAsyncShutdown();
+   }
+
+   void resetAsyncShutdownAfterRun()
+   {
+      std::lock_guard<std::mutex> lock(_modeMutex);
+      if (_shutdownComplete)
+      {
+         _mode = Mode::None;
+         _shutdownRequested = false;
+         _shutdownComplete = false;
+      }
+   }
+
+
+   /// Get executor/strand, in single threaded, the type is asio::any_io_executor.
+   /// in multithreaded the type is asio::strand<asio::any_io_executor>
+   auto & executor() noexcept { return _clientExecutor; }
 
 public:
 
@@ -283,22 +356,63 @@ public:
       _logger.trace("[{}] Client initialized", logHttpType());
 
       _connManager.onConnectionTimeOut([this](const TimeOutData& data) {
-         handleConnectionTimeOut(data);
+         asio::post(_clientExecutor, [this, data] {
+            handleConnectionTimeOut(data);
+         });
       });
       
       _connManager.onConnectionError([this](const http::ErrorData& error) {
-         handleConnectionError(error);
+         asio::post(_clientExecutor, [this, error] {
+            handleConnectionError(error);
+         });
       });
 
       _connManager.onConnectionClosed([this](ConnectionId connId) {
-         handleConnectionClosed(connId);
+         asio::post(_clientExecutor, [this, connId] {
+            handleConnectionClosed(connId);
+         });
       });
 
       _maxConnections = _settings.connectionPoolSize();
    }
 
+   /**
+    * Shuts down the client. In asynchronous mode, this is non-blocking: it
+    * rejects new requests, drains all accepted requests and their result
+    * handlers, then closes the connections so run() can return. Call it after
+    * submitting the requests to process. Outside asynchronous mode, shutdown
+    * stops the client immediately. Use stop() to cancel asynchronous work.
+    */
    void shutdown()
    {
+      bool asyncMode = false;
+
+      {
+         std::lock_guard<std::mutex> lock(_modeMutex);
+         if (_shutdownRequested)
+            return;
+
+         _shutdownRequested = true;
+         asyncMode = _mode == Mode::Async;
+      }
+
+      if (asyncMode)
+      {
+         asio::dispatch(_clientExecutor, [this] {
+            bool shouldShutdown = false;
+            
+            {
+               std::lock_guard<std::mutex> lock(_modeMutex);
+               shouldShutdown = _outstandingRequests == 0;
+            }
+
+            if (shouldShutdown)
+               finishAsyncShutdown();
+         });
+
+         return;
+      }
+
       stop();
 
       if (_internalIoCtx && _pIoContext)
@@ -307,30 +421,58 @@ public:
             _pIoContext->stop();
       }
 
-      _mode = Mode::None;
-
-      _onConnectFailed     = nullptr;
-      _onConnectionTimeOut = nullptr;
-      _onConnectionError   = nullptr;
-      _onConnectionClosed  = nullptr;
+      clearCallbacks();
+      {
+         std::lock_guard<std::mutex> lock(_modeMutex);
+         _mode = Mode::None;
+         _shutdownRequested = false;
+      }
    }
+
 
    virtual ~Client()
    {
-      shutdown();
+      stop();
+
+      if (_internalIoCtx && _pIoContext && !_pIoContext->stopped())
+         _pIoContext->stop();
+
+      clearCallbacks();
+
       _logger.trace("[{}] Client destroyed", logHttpType());
    }
 
-   void onConnectFailed(OnConnectFailed handler)         { _onConnectFailed     = std::move(handler); }
-   void onConnectionTimeOut(OnTimeOut handler)           { _onConnectionTimeOut = std::move(handler); }
-   void onConnectionError(OnConnectionError handler)     { _onConnectionError   = std::move(handler); }   
-   void onConnectionClosed(OnConnectionClosed handler)   { _onConnectionClosed  = std::move(handler); }   
 
+   /// Sets an optional global callback for failed connection attempts.
+   /// The associated request also receives the failure through its ClientResult.
+   void onConnectFailed(OnConnectFailed handler)
+   {
+      std::lock_guard<std::mutex> lock(_callbackMutex);
+      _onConnectFailed = std::move(handler);
+   }
 
-   /// Get executor/strand, in single threaded, the type is asio::any_io_executor.
-   /// in multithreaded the type is asio::strand<asio::any_io_executor>
-   auto & executor() noexcept { return _clientExecutor; }
+   /// Sets an optional global callback for connection timeouts.
+   void onConnectionTimeOut(OnTimeOut handler)
+   {
+      std::lock_guard<std::mutex> lock(_callbackMutex);
+      _onConnectionTimeOut = std::move(handler);
+   }
 
+   /// Sets an optional global callback for connection errors.
+   void onConnectionError(OnConnectionError handler)
+   {
+      std::lock_guard<std::mutex> lock(_callbackMutex);
+      _onConnectionError = std::move(handler);
+   }
+
+   /// Sets an optional global callback when a managed connection closes.
+   void onConnectionClosed(OnConnectionClosed handler)
+   {
+      std::lock_guard<std::mutex> lock(_callbackMutex);
+      _onConnectionClosed = std::move(handler);
+   }
+
+   /// Adds a default header to every request sent by this client.
    void addHeader(const std::string& key,const std::string& value)
    {
       _defaultHeaders.add(key, value);
@@ -341,25 +483,38 @@ public:
    // ---------------------------------------
 
    /// Async GET
-   void get(const std::string& resource, ClientResponseHandler handler)
+   void get(const std::string& resource, ClientResultHandler handler)
    {
       ClientRequest r("GET", resource);
       execute(std::move(r), std::move(handler));
    }
 
-   /// Async DEL
-   void del(const std::string& resource, ClientResponseHandler handler)
+   /// Async HEAD
+   void head(const std::string& resource, ClientResultHandler handler)
    {
-      ClientRequest r("DEL", resource);
+      ClientRequest r("HEAD", resource);
+      execute(std::move(r), std::move(handler));
+   }
+
+   /// Async OPTIONS
+   void options(const std::string& resource, ClientResultHandler handler)
+   {
+      ClientRequest r("OPTIONS", resource);
+      execute(std::move(r), std::move(handler));
+   }
+
+   /// Async DEL
+   void del(const std::string& resource, ClientResultHandler handler)
+   {
+      ClientRequest r("DELETE", resource);
       execute(std::move(r), std::move(handler));
    }
 
    /// Async POST
    void post(const std::string& resource,
           const std::string& data,
-          ClientResponseHandler handler,
+          ClientResultHandler handler,
           const std::string& contentType="application/json")
-
    {
       ClientRequest r("POST", resource);
       r.content(data);
@@ -371,9 +526,8 @@ public:
    /// Async PUT
    void put(const std::string& resource,
           const std::string& data,
-          ClientResponseHandler handler,
+          ClientResultHandler handler,
           const std::string& contentType="application/json")
-
    {
       ClientRequest r("PUT", resource);
       r.content(data);
@@ -388,21 +542,35 @@ public:
    // ---------------------------------------
 
    /// Sync GET
-   ClientResponsePtr get(const std::string& resource)
+   ClientResult get(const std::string& resource)
    {
       ClientRequest r("GET", resource);
       return execute(std::move(r));
    }
 
-   /// Sync DEL
-   ClientResponsePtr del(const std::string& resource)
+   /// Sync HEAD
+   ClientResult head(const std::string& resource)
    {
-      ClientRequest r("DEL", resource);
+      ClientRequest r("HEAD", resource);
+      return execute(std::move(r));
+   }
+
+   /// Sync OPTIONS
+   ClientResult options(const std::string& resource)
+   {
+      ClientRequest r("OPTIONS", resource);
+      return execute(std::move(r));
+   }
+
+   /// Sync DEL
+   ClientResult del(const std::string& resource)
+   {
+      ClientRequest r("DELETE", resource);
       return execute(std::move(r));
    }
 
    /// Sync POST
-   ClientResponsePtr post(const std::string& resource,
+   ClientResult post(const std::string& resource,
                   const std::string& data,
                   const std::string& contentType="application/json")
    {
@@ -414,7 +582,7 @@ public:
    }
 
    /// Sync PUT
-   ClientResponsePtr put(const std::string& resource,
+   ClientResult put(const std::string& resource,
                   const std::string& data,
                   const std::string& contentType="application/json")
    {
@@ -425,11 +593,13 @@ public:
       return execute(std::move(r));
    }
 
-
-   // ---------------------------------------
-
-   /// Perform synchronous request
-   ClientResponsePtr execute(ClientRequest req)
+   
+   /**
+    * Executes a synchronous request and returns either its response or the
+    * error that prevented a response from being received.
+    * The client must not be running in asynchronous mode.
+    */
+   ClientResult execute(ClientRequest req)
    {
       ensureMode(Mode::Sync);
 
@@ -439,70 +609,116 @@ public:
       if (_workGuard)
          throw std::logic_error("Client: cannot use sync request while async run() is active");
 
-      ClientResponsePtr resp;
+      ClientResult result;
+
       ioContext().restart();
 
-      asio::post(_clientExecutor/*ioContext()*/, 
-         [this, &resp, req=std::move(req)]() mutable
+      asio::post(_clientExecutor,
+         [this, &result, req=std::move(req)]() mutable
       {
+         auto responseHandler = [this, &result](const ClientResponsePtr& response)
+         {
+            result.response = response;
+            // we got response, immediately stop io_context
+            // thus stopping client http connection, and finished the running thread
+            ioContext().stop();
+         };
+
+         auto errorHandler = [this, &result](const ErrorData& error)
+         {
+            result.error = error;
+         };
+
          try
          {
-            doExecute(std::move(req),
-               [&](ClientResponsePtr response) {
-                  resp = std::move(response);
-                  // we got response, immediately stop io_context
-                  // thus stopping client http connection, and finished the running thread
-                  ioContext().stop();
-               });
+            doExecute(std::move(req), std::move(responseHandler), std::move(errorHandler));
          }
-         catch(const std::exception& ex)
+         catch (const std::exception& ex)
          {
-            _logger.trace("[{}] Error occured when executing HTTP client execute : {}", logHttpType(), ex.what());
+            result.error = ErrorData{ ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, 0, "Client" };
             ioContext().stop();
          }
       });
 
       ioContext().run();
-      return std::move(resp);  
+
+      return result;
    }
 
-   /// Perform asynchronous request
-   void execute(ClientRequest req, ClientResponseHandler handler)
+   /**
+    * Schedules a request and reports either its response or request error to
+    * the supplied handler. Call run() to process the I/O.
+    */
+   void execute(ClientRequest req, ClientResultHandler handler)
    {
-      ensureMode(Mode::Async);
+      ensureAsyncRequestAccepted();
 
-      asio::dispatch(_clientExecutor/*ioContext()*/, 
-         [this, req=std::move(req), hndlr = std::move(handler)]() mutable
+      auto deliverResult = [this, handler](ClientResult result)
+      {
+         if (handler)
+         {
+            try
+            {
+               handler(result);
+            }
+            catch (...)
+            {
+               asio::dispatch(_clientExecutor, [this] { completeAsyncRequest(); });
+               throw;
+            }
+         }
+         asio::dispatch(_clientExecutor, [this] { completeAsyncRequest(); });
+      };
+
+      auto responseHandler = [deliverResult](const ClientResponsePtr& response)
+      {
+         deliverResult(ClientResult{response, {}});
+      };
+
+      auto errorHandler = [deliverResult](const ErrorData& error)
+      {
+         deliverResult(ClientResult{nullptr, error});
+      };
+
+      // Run inline if already on the client strand; otherwise schedule there.
+      asio::dispatch(_clientExecutor,
+       [this, req = std::move(req),
+        responseHandler = std::move(responseHandler),
+        errorHandler    = std::move(errorHandler),
+        deliverResult   = std::move(deliverResult)]() mutable
       {
          try
          {
             auto conn = acquireConnection();
             if (conn)
             {
-               sendRequest(conn, std::move(req));
+               sendRequest(conn, std::move(req), std::move(responseHandler), std::move(errorHandler));
                return;
             }
 
             if (_activeConnections < _maxConnections)
             {
-               doExecute(std::move(req), std::move(hndlr));
+               doExecute(std::move(req), std::move(responseHandler), std::move(errorHandler));
                return;
             }
 
-            _pendingRequests.emplace_back(std::move(req), std::move(hndlr));
-
-            //_logger.debug("[{}] request queued (pending={})", logHttpType(), _pendingRequests.size());
+            _pendingRequests.push_back(PendingRequest{
+               std::move(req), std::move(responseHandler), std::move(errorHandler)});
          }
-         catch(const std::exception& ex)
+         catch (const std::exception& ex)
          {
-            _logger.trace("[{}] Error occured when executing HTTP client execute : {}", logHttpType(), ex.what());
-            ioContext().stop();
+            deliverResult(ClientResult{nullptr, ErrorData{
+               ex.what(), ErrorType::exception, ERROR_CODE_EXCEPTION, 0, "Client"}});
          }
       });
    }
 
-   /// Run client in async mode
-   /// Async request is non-blocking, must call run()
+   /**
+   * Runs the asynchronous client's I/O loop and blocks until it stops. Uses
+   * the calling thread when threads <= 1; otherwise starts and joins the
+   * requested number of workers. shutdown() drains submitted requests and
+   * then stops the loop.
+    */
    void run(std::size_t threads = 1)
    {
       _logger.debug("[{}] Run with {} thread", logHttpType(), threads );
@@ -513,9 +729,11 @@ public:
       _workGuard = std::make_unique<WorkGuard>(_pIoContext->get_executor());
 
       ioContext().restart();
+
       if (threads <= 1)
       {
          ioContext().run();
+         resetAsyncShutdownAfterRun();
          return;
       }
 
@@ -532,8 +750,16 @@ public:
 
       for (auto& t : workers)
          t.join();
+
+      resetAsyncShutdownAfterRun();
    }
 
+   
+   /**
+   * Immediately cancels connection attempts and closes managed connections.
+   * Unlike shutdown(), this does not drain pending requests or explicitly
+   * stop the client's I/O context.
+    */
    void stop()
    {
       _connector.stop();
@@ -543,6 +769,7 @@ public:
          _workGuard.reset();
    }
 
+   /// Returns the number of managed connections.
    size_t totalConnections() 
    {
       return _connManager.totalConnections();
@@ -552,14 +779,28 @@ protected:
 
    void handleConnectionTimeOut(const TimeOutData& data)
    {
-      if (_onConnectionTimeOut)
-         _onConnectionTimeOut(data);
+      OnTimeOut handler;
+
+      {
+         std::lock_guard<std::mutex> lock(_callbackMutex);
+         handler = _onConnectionTimeOut;
+      }
+
+      if (handler)
+         handler(data);
    }
 
    void handleConnectionError(const http::ErrorData& error)
    {
-      if (_onConnectionError)
-         _onConnectionError(error);
+      OnConnectionError handler;
+
+      {
+         std::lock_guard<std::mutex> lock(_callbackMutex);
+         handler = _onConnectionError;
+      }
+
+      if (handler)
+         handler(error);
    }
 
    void handleConnectionClosed(ConnectionId connId)
@@ -567,61 +808,113 @@ protected:
       if (_activeConnections > 0)
          _activeConnections--;
 
-      while (!_pendingRequests.empty() &&
-            _activeConnections < _maxConnections)
+      while (!_pendingRequests.empty() && _activeConnections < _maxConnections)
       {
-         auto [request, handler] = std::move(_pendingRequests.front());
+         auto pending = std::move(_pendingRequests.front());
          _pendingRequests.pop_front();
 
-         doExecute(std::move(request), std::move(handler));
+         doExecute(std::move(pending.request),
+            std::move(pending.responseHandler), std::move(pending.errorHandler));
       }
 
-      if (_onConnectionClosed)
-         _onConnectionClosed(connId);
+      OnConnectionClosed handler;
+      {
+         std::lock_guard<std::mutex> lock(_callbackMutex);
+         handler = _onConnectionClosed;
+      }
+      if (handler)
+         handler(connId);
    }
 
-   void handleConnectionFailed(const std::string& message)
+   void handleConnectionFailed(
+      const std::string& message,
+      ClientRequestErrorHandler errorHandler = nullptr)
    {
       if (_activeConnections > 0)
          _activeConnections--;
 
-      if (_onConnectFailed)
-         _onConnectFailed(message);
+      OnConnectFailed handler;
+      {
+         std::lock_guard<std::mutex> lock(_callbackMutex);
+         handler = _onConnectFailed;
+      }
+      if (handler)
+         handler(message);
+
+      if (errorHandler)
+      {
+         errorHandler(ErrorData{
+            message, ErrorType::system, ERROR_CODE_DATA_FAIL, 0, "Connector"});
+      }
+
+      while (!_pendingRequests.empty() &&
+             _activeConnections < _maxConnections &&
+             !ioContext().stopped())
+      {
+         auto pending = std::move(_pendingRequests.front());
+         _pendingRequests.pop_front();
+
+         doExecute(std::move(pending.request),
+            std::move(pending.responseHandler), std::move(pending.errorHandler));
+      }
    }
 
-   virtual void doExecute(
+
+   /**
+    * Sends a request on an idle connection or starts a new connection.
+    * New connections are resolved and connected by Connector, then registered
+    * with the connection manager before their first request is sent. This
+    * method runs on the client strand, which owns the pool state.
+    */
+   void doExecute(
       ClientRequest req,
-      ClientResponseHandler handler = nullptr)
+      ClientResponseHandler handler,
+      ClientRequestErrorHandler errorHandler)
    {
       auto conn = acquireConnection();
       if (conn)
       {
-         sendRequest(conn, std::move(req));
+         sendRequest(conn, std::move(req), std::move(handler), std::move(errorHandler));
          return;
       }
 
       _activeConnections++;  
 
-      _connector.start(handler,
+      _connector.start({},
          // OnConnectionCreated handler
-         [this, req=std::move(req)] (ConnectionPtr conn)
+         [this, req=std::move(req), handler=std::move(handler), errorHandler]
+         (ConnectionPtr conn) mutable
          {
-            auto request = buildRequest(std::move(req));
-            conn->markBusy();
-            conn->request(std::move(request));
-            
-            conn->responseHandledCb([this,conn=conn]() 
+            asio::post(_clientExecutor,
+               [this, conn=std::move(conn), req=std::move(req),
+                handler=std::move(handler), errorHandler=std::move(errorHandler)]() mutable
             {
-               conn->markIdle();
-               releaseConnection(conn);
-            });
+               auto request = buildRequest(std::move(req));
+               conn->markBusy();
+               conn->request(std::move(request), std::move(handler), std::move(errorHandler));
 
-            _connManager.addConnection( std::move(conn) );
+               conn->responseHandledCb([this, conn]
+               {
+                  asio::post(_clientExecutor, [this, conn]
+                  {
+                     if (conn->closed())
+                        return;
+
+                     conn->markIdle();
+                     releaseConnection(conn);
+                  });
+               });
+
+               _connManager.addConnection(std::move(conn));
+            });
          },
          // OnConnectFailed handler
-         [this] (const std::string& message)
+         [this, errorHandler] (const std::string& message)
          {
-            handleConnectionFailed(message);
+            asio::post(_clientExecutor, [this, message, errorHandler]
+            {
+               handleConnectionFailed(message, errorHandler);
+            });
          }
       );
    }

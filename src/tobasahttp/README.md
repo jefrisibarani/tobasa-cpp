@@ -1,72 +1,64 @@
- # Tobasa HTTP Library
+# Tobasa HTTP
 
-A high-performance C++ library for building HTTP/HTTPS servers and clients with async I/O support.
+`tobasahttp` is Tobasa's HTTP transport library. It handles network
+connections, HTTP messages, and TLS so applications can focus on what each
+request should do. It is used by higher-level components such as `tobasaweb`,
+which provides routing and middleware.
 
-## Overview
+## HTTP server
 
-Tobasa HTTP provides production-ready HTTP/1.1 and HTTP/2 protocol support built on Asio. \
-It handles low-level network I/O, protocol parsing, TLS encryption, and WebSocket communication,\
-allowing you to focus on application logic.
+The server uses Asio for network communication. The application runs the
+server's event loop. It handles HTTP/1 over plain HTTP or HTTPS, and can use
+HTTP/2 over HTTPS when built with nghttp2. HTTP/2 over plain
+HTTP and HTTP/3 are not supported.
 
-## Features
+- The server accepts `GET`, `POST`, `PUT`, `DELETE`, `HEAD`, `OPTIONS`, and
+  `CONNECT`. `TRACE` and `PATCH` are not enabled.
+- The HTTP/1 parser handles messages incrementally, with bodies framed by
+  content length or chunked transfer encoding.
+- Multipart form data, including file parts, can be parsed internally or left
+  for application middleware.
+- Responses can contain text, files, or raw bytes. Eligible responses can use
+  gzip compression, and file downloads can opt in to single byte ranges.
+- WebSockets and Server-Sent Events are supported. WebSockets use the HTTP/1
+  Upgrade handshake or the HTTP/2 extended CONNECT path.
+- TLS uses OpenSSL and supports certificates, private keys, SNI certificates,
+  and in-memory TLS assets.
+- Server settings include timeouts, header and socket-buffer sizes, multipart
+  temporary files, and an optional per-IP connection limiter.
 
-**Core Protocol Support:**
-- HTTP/1.1 server and client with keep-alive
-- HTTP/2 support (optional, with nghttp2)
-- HTTPS/TLS encryption (OpenSSL)
-- WebSocket protocol utilities
-- Server-Sent Events (SSE)
-- Chunked transfer encoding
-- Content compression (gzip, deflate)
+The module also provides helpers for headers, cookies, query strings, and
+content types.
 
-**Request/Response Handling:**
-- Multipart/form-data parsing
-- Cookie parsing and management
-- Header field validation
-- Query string parsing
-- JSON content-type handling
+## HTTP client
 
-**Performance & Scalability:**
-- Asynchronous I/O using Asio
-- Connection pooling
-- Non-blocking event loop
-- Suitable for REST APIs and embedded servers
+The client sends HTTP/1 requests over plain HTTP or HTTPS and can reuse pooled
+connections. It supports blocking and asynchronous requests, but does not
+currently support HTTP/2.
+
 
 ## Building
 
-The library is built as part of the main build system:
+Build `tobasahttp` as part of the repository's CMake project. See the
+[build guide](../../BUILD.md) for dependency setup. The module uses Tobasa,
+standalone Asio, OpenSSL, and zlib. nghttp2 is needed only when HTTP/2 support
+is enabled; the `TOBASA_HTTP_USE_HTTP2` CMake option is enabled by default.
 
-## Usage
+## Documentation and samples
 
-Tobasahttp is used by higher-level frameworks like `tobasaweb` for routing and middleware. \
-For direct use, see the samples in `src/samples/http_server/` and `src/samples/https_client/`.
+The [HTTP server guide](doc/http_server.md) covers server setup and request
+handling. The [HTTP client guide](doc/http_client.md) describes making
+blocking and asynchronous requests. See the [HTTP/1 parser guide](doc/http_parser.md)
+for message parsing, and the [settings guide](doc/settings.md) for defaults
+and limits. Separate guides cover [compression](doc/http_server_compression.md),
+[resumable downloads](doc/http_server_resumable_download.md), and
+[WebSocket connections](doc/work_with_websocket.md).
 
-## Dependencies
-
-- `tobasa` - Core framework
-- `asio` - Asynchronous I/O library
-- `OpenSSL` - For HTTPS/TLS support
-- `nghttp2` (optional) - For HTTP/2 protocol
-- `zlib` (optional) - For compression
-
-## Architecture
-
-Tobasahttp provides transport-layer primitives:
-- Parser classes for HTTP messages
-- Server and client connection managers
-- TLS certificate/key handling
-- Buffer management for efficient I/O
-
-Higher-level routing, middleware, and controllers are handled by `tobasaweb` framework.
-
-## Performance Notes
-
-- Built for low-latency, high-throughput applications
-- Efficient protocol parsing using state machines
-- Connection pooling reduces overhead
-- Minimal memory allocations in hot paths
+Working examples are available in the [HTTP server sample](../samples/http_server/),
+[minimal HTTPS server sample](../samples/https_server_minimal/), and
+[HTTPS client sample](../samples/https_client/).
 
 ## License
 
-GNU LESSER GENERAL PUBLIC LICENSE
+GNU Lesser General Public License. See the repository's `LICENSE` file.
 

@@ -51,50 +51,35 @@ void runClient()
 
    auto config = Config::getOption<http::conf::Client>("client");
 
+   auto caFilePath = path::executableDir() + path::SEPARATOR + config.caVerificationFile;
+
    SettingsClient settings;
    settings
       .address(config.address)
       .port(config.port)
       .tlsMode(config.tlsMode)
       .verifyPeer(config.verifyPeer)
-      .caVerificationFile(config.caVerificationFile)
+      .caVerificationFile(caFilePath)
       .logVerbose(config.logVerbose)
       .connectionPoolSize(config.connectionPoolSize)
       .maxRequestsPerConnection(config.maxRequestsPerConnection); // set 0 to disable
 
    SecureClient client(std::move(settings), logger);
 
-   auto checkShutdown = [&]() {
-      auto nConn = client.totalConnections();
-      if( nConn == 0 )
-      {
-         logger.info("Shutting down Client");
-         client.shutdown();
-      }
-   };
-
-   client.onConnectionError( [&](const ErrorData& error) {
-      logger.error(error.message);
-   });
-
-   // check if we need to shutdown and log error
-   client.onConnectFailed( [&](const std::string& message) {
-      logger.error(message);
-      checkShutdown();
-   });
-
-   // check if we need to shutdown
-   client.onConnectionClosed([&](ConnectionId connId) {
-      checkShutdown();
-   });
-
    client.addHeader("Accept", "*/*");
    client.addHeader("Connection", "keep-alive");
    client.addHeader("User-Agent", "Tobasa Client");
 
    // run async get request
-   client.get("/version", [&](const ClientResponsePtr& response)
+   client.get("/api/version", [&](const ClientResult& result)
    {
+      if (!result.responseReceived())
+      {
+         logger.error("Request failed: {}", result.error.message);
+         return;
+      }
+
+      const auto& response = result.response;
       std::cout << "---------------------------------------------------" << std::endl;
       std::cout << "   Http Ver major  : " << response->majorVersion()   << std::endl;
       std::cout << "   Http Ver minor  : " << response->minorVersion()   << std::endl;
@@ -113,12 +98,11 @@ void runClient()
       std::cout << "---------------------------------------------------" << std::endl;
    });
 
-   // in async request, client will run until shutdown() called
+   client.shutdown();
    client.run();
-
-
-   // reset Loggers' log target
-   tbs::Logger::destroyInternalLogSink() ;
+   
+   // Clear the logger before the program exits, while spdlog is still active.
+   Logger::destroyInternalLogSink();
 }
 
 int main(int argc, char* argv[])

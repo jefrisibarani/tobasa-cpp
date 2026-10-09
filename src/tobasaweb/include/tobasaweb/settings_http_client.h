@@ -23,14 +23,10 @@ struct Client
    bool tlsMode                   {false};
    bool verifyPeer                {true};
    std::string caVerificationFile {};
-
-   // mTLS client
-
    std::string privateKeyFile     {};
    std::string privateKeyPassword {};
    std::string certificateFile    {};
    
-
    int  timeoutRead               {60};      // seconds
    int  timeoutWrite              {60};      // seconds
    int  timeoutProcessing         {120};     // seconds

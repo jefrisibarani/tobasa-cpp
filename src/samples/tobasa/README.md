@@ -1,9 +1,5 @@
 # Tobasa Plugin Sample
 
-This sample demonstrates how to load and use plugins in the Tobasa framework.
-
-## Overview
-
 The sample application loads a dummy plugin (`plugin_dummy.dll`) and demonstrates the plugin lifecycle:
 - Loading the plugin library
 - Creating and initializing the plugin

@@ -1,9 +1,5 @@
 # Tobasa Web Service Application
 
-A production-grade REST API and web service demonstrating enterprise-level architecture, scalability, and best practices using the Tobasa framework.
-
-## Overview
-
 The **app_server** (webservice) is a complete, deployable web service application built with the Tobasa framework. It demonstrates how to architect a modern REST API with layered controllers, pluggable middleware, JWT/session authentication, database migrations, and multi-protocol support (HTTP/1.1, HTTP/2, WebSocket, TLS). Suitable for immediate adaptation to production workloads.
 
 ## Features

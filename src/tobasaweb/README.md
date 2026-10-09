@@ -1,10 +1,6 @@
 
 # Tobasa Web Library
 
-A production-ready C++ web framework for building REST APIs and server-side applications with routing, middleware, and authentication.
-
-## Overview
-
 Tobasa Web provides comprehensive server-side application infrastructure built on top of the Tobasa ecosystem. It combines HTTP transport (`tobasahttp`), database abstraction (`tobasasql`), and authentication/session management into a cohesive framework for building scalable REST APIs and web services.
 
 The library handles all infrastructure concerns—routing, middleware pipelines, request/response handling, authentication, and database integration—so you can focus on business logic in controllers and services.
@@ -41,6 +37,8 @@ The library handles all infrastructure concerns—routing, middleware pipelines,
 - HTTP/2 support (optional)
 - TLS/HTTPS with certificate management
 - WebSocket support
+- SSE support
+- Respond compression
 - Multipart form data and file uploads
 - Content negotiation
 

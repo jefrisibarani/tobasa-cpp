@@ -15,7 +15,7 @@ namespace http {
 
 
 /**
- * @brief HTTP client request message.
+ * @brief Outbound HTTP client request message.
  * 
  */
 class ClientRequest : public Message
@@ -27,14 +27,23 @@ private:
 
 public:
    ClientRequest(HttpVersion version=HttpVersion::one);
-   ClientRequest(const std::string&, const std::string& target, HttpVersion version=HttpVersion::one);
+   ClientRequest(const std::string& method, const std::string& target, HttpVersion version=HttpVersion::one);
    ~ClientRequest() = default;
 
+   /// Sets the request method.
    void method(const std::string& val);
+   /// Returns the request method.
    std::string method() const;
 
+   /// Sets the complete outbound request target, including its query string.
    void target(const std::string& val);
+   /// Returns the complete outbound request target.
    std::string target() const;
+
+   /// Sets the HTTP version metadata for this request.
+   void httpVersion(HttpVersion version) noexcept;
+   /// Returns the HTTP version metadata for this request.
+   HttpVersion httpVersion() const noexcept;
 };
 
 

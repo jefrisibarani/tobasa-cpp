@@ -36,5 +36,15 @@ std::string ClientRequest::target() const
    return _target;
 }
 
+void ClientRequest::httpVersion(HttpVersion version) noexcept
+{
+   _httpVersion = version;
+}
+
+HttpVersion ClientRequest::httpVersion() const noexcept
+{
+   return _httpVersion;
+}
+
 } // namespace http
 } // namespace tbs
