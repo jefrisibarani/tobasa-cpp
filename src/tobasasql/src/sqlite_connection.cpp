@@ -32,7 +32,9 @@ SqliteConnection& SqliteConnection::operator=(SqliteConnection&& other) noexcept
 {
    if (this != &other)
    {
-      disconnect();
+      if (!disconnect())
+         return *this;
+
       ConnectionCommon::operator=(std::move(other));
 
       _pDatabase    = other._pDatabase;
@@ -155,7 +157,13 @@ bool SqliteConnection::disconnect()
 {
    if (_pDatabase)
    {
-      sqlite3_close(_pDatabase);
+      const int retCode = sqlite3_close_v2(_pDatabase);
+      if (retCode != SQLITE_OK)
+      {
+         onNotifyError(logId() + lastBackendError());
+         return false;
+      }
+
       _pDatabase   = nullptr;
       _isEncrypted = true;
       _connStatus  = ConnectionStatus::bad;

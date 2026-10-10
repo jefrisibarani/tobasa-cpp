@@ -30,6 +30,9 @@ namespace util {
    template <typename... Args>
    std::string formatDate(std::string_view formatStr, Args&&... args)
    {
+      if (formatStr.empty())
+         throw std::runtime_error("Invalid date format string parameter");
+
       return tbsfmt::vformat(formatStr, tbsfmt::make_format_args(args...));
    }
 

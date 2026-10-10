@@ -90,7 +90,7 @@ bool DateTime::usingInMemoryTZDB()
 
 std::string DateTime::getCurrentTimezone()
 {
-   return tbsdate::current_zone()->name();
+   return std::string(tbsdate::current_zone()->name());
 }
 
 

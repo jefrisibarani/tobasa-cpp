@@ -63,7 +63,7 @@ public:
    // TODO_JEFRI:
    SqlResult(ResultImpl&& result, SqlConnection& conn) noexcept
       : _resultImpl(std::move(result))
-      : _conn(conn)
+      , _conn(conn)
    {
       //_resultImpl.connection( &(_conn.connImpl()) );
       _resultImpl.notificationHandler =

@@ -428,7 +428,7 @@ public:
       ParameterDirection direction = ParameterDirection::input)
       : _name{name}
       , _type{type}
-      , _value{value}
+      , _value{}
       , _size{size}
       , _decimalDigits{decimalDigits}
       , _isUnsigned{isUnsigned}
@@ -458,7 +458,6 @@ public:
       else
       {
          // String-like types
-
          if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>)
             _value = std::string(value);
          else if constexpr (std::is_same_v<T, const wchar_t*> || std::is_same_v<T, wchar_t*>)
@@ -467,7 +466,6 @@ public:
             _value = value;
          else if constexpr (std::is_same_v<T, std::wstring>)
             _value = value;
-
          // Binary types 
          else if constexpr (std::is_same_v<T, const void*>) 
          {

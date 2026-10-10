@@ -27,6 +27,9 @@ PgsqlConnection::PgsqlConnection(PgsqlConnection&& other) noexcept
    , _dbOid(            other._dbOid)
    , _needColumnQuoting(other._needColumnQuoting)
 {
+   if (_pPGconn != nullptr)
+      registerNoticeProcessor(pgNoticeProcessor, this);
+
    other._pPGconn           = nullptr;
    other._lastSystemOID     = 0;
    other._dbOid             = 0;
@@ -44,6 +47,9 @@ PgsqlConnection& PgsqlConnection::operator=(PgsqlConnection&& other) noexcept
       _lastSystemOID     = other._lastSystemOID;
       _dbOid             = other._dbOid;
       _needColumnQuoting = other._needColumnQuoting;
+
+      if (_pPGconn != nullptr)
+         registerNoticeProcessor(pgNoticeProcessor, this);
 
       other._pPGconn           = nullptr;
       other._lastSystemOID     = 0;

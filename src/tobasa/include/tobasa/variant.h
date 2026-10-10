@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <variant>
+#include <string>
 
 namespace tbs {
 

@@ -8,8 +8,8 @@ namespace sql {
 
 OdbcConnection::OdbcConnection()
    : ConnectionCommon()
-   , _pDbc(nullptr)
    , _pEnv(nullptr)
+   , _pDbc(nullptr)
 {
    notifierSource = "OdbcConnection";
 }
@@ -32,6 +32,9 @@ OdbcConnection& OdbcConnection::operator=(OdbcConnection&& other) noexcept
    if (this != &other)
    {
       disconnect();
+      if (_pDbc != nullptr || _pEnv != nullptr)
+         return *this;
+
       ConnectionCommon::operator=(std::move(other));
 
       _dbmsName    = std::move(other._dbmsName);
@@ -117,41 +120,47 @@ bool OdbcConnection::connect(const std::string& connString)
 
 bool OdbcConnection::disconnect()
 {
-   if (status() == ConnectionStatus::ok)
+   bool succeeded = true;
+
+   if (_pDbc != SQL_NULL_HDBC)
    {
-      if (_pDbc != SQL_NULL_HDBC)
+      if (_connStatus == ConnectionStatus::ok)
       {
          SQLRETURN rc = SQLDisconnect((SQLHDBC)_pDbc);
          if (!SQL_SUCCEEDED(rc))
          {
             OdbcDiagRecord diag(_pDbc, SQL_HANDLE_DBC, rc);
             onNotifyError(logId() + diag.message());
-         }
-
-         rc = SQLFreeHandle(SQL_HANDLE_DBC, (SQLHDBC)_pDbc);
-         if (!SQL_SUCCEEDED(rc))
-         {
-            OdbcDiagRecord diag(_pDbc, SQL_HANDLE_DBC, rc);
-            onNotifyError(logId() + diag.message());
+            succeeded = false;
          }
       }
 
-      if (_pEnv != SQL_NULL_HENV)
-      {
-         SQLRETURN rc = SQLFreeHandle(SQL_HANDLE_ENV, (SQLHENV)_pEnv);
-         if (!SQL_SUCCEEDED(rc))
-         {
-            OdbcDiagRecord diag(_pEnv, SQL_HANDLE_ENV, rc);
-            onNotifyError(logId() + diag.message());
-         }
-      }
-
-      _pDbc       = nullptr;
-      _pEnv       = nullptr;
       _connStatus = ConnectionStatus::bad;
+
+      SQLRETURN rc = SQLFreeHandle(SQL_HANDLE_DBC, (SQLHDBC)_pDbc);
+      if (!SQL_SUCCEEDED(rc))
+      {
+         OdbcDiagRecord diag(_pDbc, SQL_HANDLE_DBC, rc);
+         onNotifyError(logId() + diag.message());
+         return false;
+      }
+      _pDbc = nullptr;
    }
 
-   return true;
+   if (_pEnv != SQL_NULL_HENV)
+   {
+      SQLRETURN rc = SQLFreeHandle(SQL_HANDLE_ENV, (SQLHENV)_pEnv);
+      if (!SQL_SUCCEEDED(rc))
+      {
+         OdbcDiagRecord diag(_pEnv, SQL_HANDLE_ENV, rc);
+         onNotifyError(logId() + diag.message());
+         return false;
+      }
+      _pEnv = nullptr;
+   }
+
+   _connStatus = ConnectionStatus::bad;
+   return succeeded;
 }
 
 ConnectionStatus OdbcConnection::status()
@@ -181,73 +190,7 @@ int OdbcConnection::execute(const std::string& sql, const SqlParameterCollection
       return cmd.execute();
    else
       return -1;
-   /*
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("execute: {}", sql));
 
-   SQLRETURN rc;
-   SQLHSTMT pStmt = allocateStatement();
-
-   // Convert SqlParameter to OdbcParameter
-   OdbcParameterCollection odbcParams(pStmt, static_cast<short>(parameters.size()));
-   if (parameters.size() > 0)
-   {
-      odbcParams.prepare(sql, parameters);
-      odbcParams.bindParameter();
-      rc = SQLExecute(pStmt);
-   }
-   else
-   {
-      auto sqlcmd = tbs::util::utf8_to_odbcString(sql);
-      rc = SQLExecDirect(pStmt, (SQLTCHAR*)sqlcmd.c_str(), SQL_NTS);
-   }
-
-   if (rc == SQL_NEED_DATA)
-   {
-      // process data-at-execution parameters
-      rc = OdbcCommand::sqlPutData(this, pStmt, parameters);
-   }
-
-   if (SQL_SUCCEEDED(rc) || rc == SQL_NO_DATA)
-   {
-      std::string notitymsg("SQL command executed successfully");
-      OdbcDiagRecord diag;
-      int returnValue = 0;
-
-      if (rc == SQL_SUCCESS_WITH_INFO)
-         diag = statementDiagRecord(pStmt, rc);
-
-      SQLLEN affectedRow;
-      rc = SQLRowCount(pStmt, (SQLLEN*)&affectedRow);
-      statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-      if (SQL_SUCCEEDED(rc))
-      {
-         returnValue = (int)affectedRow;
-         if (diag.message().empty())
-            notitymsg = tbsfmt::format("SQL command executed successfully, affectedRows: {}", affectedRow);
-         else
-            notitymsg = tbsfmt::format("SQL command executed successfully, affectedRows: {}, code: {}, info: {}", affectedRow, diag.code(), diag.message());
-      }
-
-      if (logExecuteStatus()) 
-         onNotifyTrace(logId() + notitymsg);
-
-      //clean statement
-      SQLFreeHandle(SQL_HANDLE_STMT, pStmt);
-
-      // affectedRow by successfull command other than UPDATE, INSERT, and DELETE is -1
-      if (returnValue < 0) {
-         returnValue = 0;
-      }
-
-      return returnValue;
-   }
-   else
-      statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-   return -1;
-   */
 }
 
 std::string OdbcConnection::executeScalar(const std::string& sql, const SqlParameterCollection& parameters)
@@ -260,83 +203,6 @@ std::string OdbcConnection::executeScalar(const std::string& sql, const SqlParam
       return cmd.executeScalar();
    else 
       return "";
-/*
-   if (logSqlQuery())
-      onNotifyDebug(logId() + tbsfmt::format("executeScalar: {}", sql));
-
-   SQLRETURN rc;
-   SQLHSTMT pStmt = allocateStatement();
-
-   // Convert SqlParameter to OdbcParameter
-   OdbcParameterCollection odbcParams(pStmt, static_cast<short>(parameters.size()));
-   if (parameters.size() > 0)
-   {
-      odbcParams.prepare(sql, parameters);
-      odbcParams.bindParameter();
-      rc = SQLExecute(pStmt);
-   }
-   else
-   {
-      auto sqlcmd = tbs::util::utf8_to_odbcString(sql);
-      rc = SQLExecDirect(pStmt, (SQLTCHAR*)sqlcmd.c_str(), SQL_NTS);
-   }
-
-   if (rc == SQL_NEED_DATA)
-   {
-      // process data-at-execution parameters
-      rc = OdbcCommand::sqlPutData(this, pStmt, parameters);
-   }
-
-   if (SQL_SUCCEEDED(rc) || rc == SQL_NO_DATA)
-   {
-      std::string notitymsg("SQL command executed successfully");
-      OdbcDiagRecord diag;
-
-      if (rc == SQL_SUCCESS_WITH_INFO)
-         diag = statementDiagRecord(pStmt, rc);
-
-      SQLLEN affectedRow;
-      rc = SQLRowCount(pStmt, (SQLLEN*)&affectedRow);
-      statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-      if (SQL_SUCCEEDED(rc))
-      {
-         if (diag.message().empty())
-            notitymsg = tbsfmt::format("SQL command executed successfully, affectedRows: {}", affectedRow);
-         else
-            notitymsg = tbsfmt::format("SQL command executed successfully, affectedRows: {}, code: {}, info: {}",
-                              affectedRow, diag.code(), diag.message());
-      }
-
-      if (logExecuteStatus()) 
-         onNotifyTrace(logId() + notitymsg);
-
-      // Get columns count
-      SQLSMALLINT ncol = 0;
-      rc = SQLNumResultCols(pStmt, &ncol);
-      statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-      // get first data
-      rc = SQLFetch(pStmt);
-      statementDiagRecord(pStmt, rc).throwOnError(this);
-
-      if (SQL_SUCCEEDED(rc))
-      {
-         // column index start from 1
-         VariantType vdata = OdbcCommand::getFieldData(this, pStmt, 1);
-
-         // clean statement
-         SQLFreeHandle(SQL_HANDLE_STMT, pStmt);
-         pStmt = nullptr;
-
-         return VariantHelper<>::toString(vdata);
-      }
-   }
-   else
-      statementDiagRecord(pStmt, rc).throwOnNotSucceeded(this);
-
-   return "";
-   */
 }
 
 std::string OdbcConnection::versionString()

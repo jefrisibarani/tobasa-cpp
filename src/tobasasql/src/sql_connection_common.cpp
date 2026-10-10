@@ -14,7 +14,8 @@ ConnectionCommon::ConnectionCommon() noexcept
 }
 
 ConnectionCommon::ConnectionCommon(ConnectionCommon&& other) noexcept
-   : _connStatus(          other._connStatus)
+   : Notifier(std::move(other))
+   , _connStatus(          other._connStatus)
    , _logIdentifier(       std::move(other._logIdentifier))
    , _logSqlQuery(         other._logSqlQuery)
    , _logExecuteStatus(    other._logExecuteStatus)
@@ -31,6 +32,7 @@ ConnectionCommon& ConnectionCommon::operator=(ConnectionCommon&& other) noexcept
 {
    if (this != &other)
    {
+      Notifier::operator=(std::move(other));
       _connStatus          = other._connStatus;
       _logIdentifier       = std::move(other._logIdentifier);
       _logSqlQuery         = other._logSqlQuery;

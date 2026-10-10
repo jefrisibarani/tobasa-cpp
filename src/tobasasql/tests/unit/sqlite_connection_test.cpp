@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "tobasasql/sqlite_connection.h"
 
 namespace {
@@ -32,6 +34,39 @@ TEST(SqliteConnectionTest, InMemoryDatabase)
    EXPECT_EQ(tableNames.size(), 3);
 }
 
+
+TEST(SqliteConnectionTest, MoveConstructionTransfersConnectionAndNotifier)
+{
+   sql::SqliteConnection source;
+   ASSERT_TRUE(source.connect("OpenMemory=True;"));
+
+   bool notified = false;
+   source.notificationHandler = [&notified](const NotifyEventArgs&) { notified = true; };
+
+   sql::SqliteConnection moved(std::move(source));
+
+   EXPECT_EQ(source.status(), sql::ConnectionStatus::bad);
+   EXPECT_EQ(moved.executeScalar("SELECT 1"), "1");
+   moved.onNotifyInfo("move test");
+   EXPECT_TRUE(notified);
+}
+
+TEST(SqliteConnectionTest, MoveAssignmentTransfersConnectionAndReleasesDestination)
+{
+   sql::SqliteConnection destination;
+   ASSERT_TRUE(destination.connect("OpenMemory=True;"));
+   EXPECT_EQ(destination.execute("CREATE TABLE old_connection_table (id INT)"), 0);
+
+   sql::SqliteConnection source;
+   ASSERT_TRUE(source.connect("OpenMemory=True;"));
+   EXPECT_EQ(source.execute("CREATE TABLE moved_connection_table (id INT)"), 0);
+
+   destination = std::move(source);
+
+   EXPECT_EQ(source.status(), sql::ConnectionStatus::bad);
+   EXPECT_TRUE(destination.tableOrViewExists("moved_connection_table", true));
+   EXPECT_FALSE(destination.tableOrViewExists("old_connection_table", true));
+}
 
 
 } // namespace
