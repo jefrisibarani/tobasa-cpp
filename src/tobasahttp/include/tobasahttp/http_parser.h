@@ -199,8 +199,14 @@ public:
    /// Validate Headers callback
    std::function<bool(Parser& parser, HttpStatus& httpStatus)> onValidateHeaders { nullptr };
 
-   /// Validate Headers callback
+   /// Notify when a parsed section is complete: "headers", "body", "body-chunked", or "multipart".
    std::function<void(const std::string& eventType)> onEventDone { nullptr };
+
+   /// Called after headers and message framing are validated, before body parsing starts.
+   std::function<void()> onHeadersReady { nullptr };
+
+   /// Consume decoded body bytes synchronously instead of storing them in content().
+   std::function<void(const uint8_t *data, size_t size)> onBodyData { nullptr };
 
    /// Callback called when processing multipart with chunked transfer encoding
    std::function<Info(const uint8_t *data, size_t totalData)> parseChunkedMultipartHandler { nullptr };
@@ -229,6 +235,7 @@ private:
    bool                 _hasChunkedEncoding  {false};
    bool                 _hasContentLength    {false};
    size_t               _totalParsedBytes    {0};
+   size_t               _contentBytesReceived {0};
 
    StartLineContext     _startLineContext    {};
    ChunkedContext       _chunkedCtx          {};

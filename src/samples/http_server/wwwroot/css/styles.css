@@ -114,6 +114,7 @@ body.home-page {
    display: flex;
    justify-content: space-between;
    align-items: center;
+   flex-wrap: wrap;
    gap: 12px;
    margin-top: 24px;
    padding-top: 18px;
@@ -121,6 +122,8 @@ body.home-page {
    color: var(--muted);
    font-size: 0.9rem;
 }
+
+.home-page .protocol-version { white-space: nowrap; }
 
 .home-page .status {
    display: inline-flex;
@@ -305,19 +308,59 @@ body.multipart-page {
    background: #fff;
 }
 
+.websocket-page #errors { height: 120px; }
+
+.websocket-page #messages {
+   display: flex;
+   flex-direction: column;
+   gap: 8px;
+}
+
 .websocket-page #messages > div,
 .websocket-page #errors > div {
-   padding: 3px 0;
-   border-bottom: 1px solid rgba(217, 226, 241, 0.5);
+   border-radius: 12px;
    word-break: break-word;
 }
 
-.websocket-page #messages > div:last-child,
+.websocket-page #messages > div {
+   max-width: min(82%, 680px);
+   padding: 5px 9px;
+   white-space: pre-wrap;
+}
+
+.websocket-page #errors > div { padding: 3px 0; }
+.websocket-page #errors > div { border-bottom: 1px solid rgba(217, 226, 241, 0.5); }
 .websocket-page #errors > div:last-child { border-bottom: none; }
 
-.websocket-page .message-sent { color: var(--success); }
-.websocket-page .message-recv { color: var(--primary-dark); }
-.websocket-page .message-event { color: var(--muted); }
+.websocket-page .message-sender {
+   display: block;
+   margin-bottom: 2px;
+   color: var(--muted);
+   font-size: 0.72rem;
+   font-weight: 700;
+   line-height: 1.2;
+}
+
+.websocket-page .message-sent {
+   align-self: flex-end;
+   background: #1d4ed8;
+   color: #fff;
+}
+
+.websocket-page .message-recv {
+   align-self: flex-start;
+   background: #e8eef8;
+   color: var(--text);
+}
+
+.websocket-page .message-event {
+   align-self: center;
+   max-width: 100%;
+   background: transparent;
+   color: var(--muted);
+   text-align: center;
+}
+
 .websocket-page .message-error { color: var(--danger); }
 
 .websocket-page .composer {
@@ -471,6 +514,16 @@ body.multipart-page {
    margin-top: 18px;
    justify-content: flex-start;
 }
+
+.multipart-page .response-option {
+   display: inline-flex;
+   align-items: center;
+   gap: 8px;
+   margin-right: 12px;
+   font-weight: 600;
+}
+
+.multipart-page .response-option input { width: auto; margin: 0; }
 
 .multipart-page button {
    appearance: none;

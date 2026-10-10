@@ -418,6 +418,10 @@ public:
     */
    void sendText(  const std::string& data, ConnectionId connId=0, ws::SendErrorHandler callback = nullptr);
 
+   /// Broadcast text to every WebSocket except the specified client.
+   void sendTextExcept(const std::string& data, const WebSocketPtr& excludedClient,
+      ws::SendErrorHandler callback = nullptr);
+
    void sendBinary(const std::string& data, ConnectionId connId=0, ws::SendErrorHandler callback = nullptr);
 
    void sendText(const std::string& data, const std::string& identifier, 

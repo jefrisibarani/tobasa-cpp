@@ -32,6 +32,14 @@ After parsing completes, `headers()`, `content()`, and `multipartBody()` provide
 
 The parser also provides callbacks for request-method validation, header validation, and completed parsing stages. A server can use these hooks to apply its own policy or observe when headers, body, or multipart parsing completes.
 
+`onBodyData`, when set, synchronously receives decoded body bytes instead of
+the parser accumulating them in `content()`. For fixed-length messages, delivery
+stops at the declared `Content-Length`; for chunked messages, the callback gets
+payload bytes only, excluding chunk framing and trailers. The data points into
+the caller-owned read buffer and is valid only for the duration of the
+callback. This hook is opt-in and takes precedence over internal multipart
+parsing, so leave it unset when using the parser's multipart result APIs.
+
 ## Framing and Multipart Notes
 
 - A message must not contain both `Content-Length` and `Transfer-Encoding: chunked`; the parser rejects that combination.

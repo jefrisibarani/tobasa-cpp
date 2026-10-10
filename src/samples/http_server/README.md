@@ -6,10 +6,10 @@ request handler and WebSocket context.
 The sample shows how to:
 
 - serve files from `wwwroot`;
-- handle a multipart file upload;
-- save and browse uploaded files;
+- accept multipart and raw file uploads;
+- download and browse uploaded files;
 - handle WebSocket connections;
-- configure HTTP and HTTPS server settings.
+- use compression and byte ranges for downloads.
 
 ## Build
 
@@ -51,39 +51,59 @@ what to do with each request:
 | Path | What the handler does |
 | --- | --- |
 | `/hello` | Returns a small HTML greeting and demonstrates response headers and cookies. |
-| `/upload` | Handles a multipart upload or returns a non-multipart request body in an HTML page. |
+| `/upload` | Accepts a multipart `POST` with a `profileImage` file. Returns the image or JSON download links. |
+| `/raw_upload` | Accepts a raw file body with a `PUT` request and an `X-File-Name` header. Returns JSON with the saved name and link. |
+| `/raw_uploads/...` | Downloads a raw upload with byte-range support. |
 | `/browse_uploads` and `/browse_uploads/...` | Lists saved upload folders and files, or returns a requested file. |
 | `/websocket_ep` | Starts a WebSocket connection. |
 | `/test_websocket` | Serves the WebSocket browser test page. |
+| `/test_multipart.html` | Serves the multipart upload form. |
+| `/test_raw_upload.html` | Serves the raw upload form. |
 | Any other path | Reads the matching file from `wwwroot`. A path ending in `/` uses `index.html`. |
 
 The handler selects these actions by checking the request path. It does not use
-a separate router. Only `/upload` checks the HTTP method and requires `POST`;
-the other paths are not restricted to a particular method by this handler.
+a separate router. `/upload` requires `POST`, `/raw_upload` requires `PUT`, and
+`/raw_uploads/...` requires `GET`.
 
 ## Uploads
 
 Open `http://localhost:8084/test_multipart.html` in a browser to use the upload
 form. The form sends two files to `/upload`:
 
-- `profileImage`, which the server returns in the response;
+- `profileImage`, which the server saves and provides as a download;
 - `attachment`, which the server also saves.
 
-It also sends `userName` and `userNote`. For a multipart request with a
-`profileImage` file, the server copies each uploaded file into a new,
-timestamp-named folder under `app_data/uploads` beside the executable. It writes
-`userName` and `userNote` to an `info.json` file in that folder. File names are
-cleaned before saving, and duplicate names get a numeric suffix.
+It also sends `userName` and `userNote`. The request must include a file named
+`profileImage`; otherwise the server returns `400 Bad Request`. The server saves
+each file in a new folder under `app_data/uploads` beside the executable and
+writes the form fields to `info.json`. File names are cleaned before saving,
+and duplicate names get a numeric suffix.
 
-The response sends the saved `profileImage` file and uses the content type from
-that multipart part. Multipart temporary files are stored in `./tmp` while
-the request is processed.
+By default, the response is JSON with download links for both saved files. Check
+**Echo profile image** to return the saved `profileImage` bytes directly instead.
+Multipart temporary files are stored in `./tmp` while the request is processed.
 
 You can also send an upload with `curl`:
 
 ```text
 curl.exe -F "userName=Sam" -F "userNote=Test upload" -F "profileImage=@image.png" -F "attachment=@document.pdf" http://localhost:8084/upload
 ```
+
+## Raw PUT uploads
+
+Send a file as the request body to `/raw_upload` with its original filename in
+the `X-File-Name` header:
+
+```text
+curl.exe --upload-file document.pdf -H "X-File-Name: document.pdf" -H "Content-Type: application/pdf" http://localhost:8084/raw_upload
+```
+
+The server stores the body under `app_data/raw_uploads` beside the executable
+and returns JSON containing `originalFilename`, `newFilename`, and
+`downloadLink`. The link uses `/raw_uploads/<new-filename>` and supports byte
+ranges for resumable downloads.
+
+Open `http://localhost:8084/test_raw_upload.html` to use the raw upload form.
 
 ## Browse uploaded files
 
@@ -97,18 +117,29 @@ Uploads are stored under:
 <executable folder>/app_data/uploads/<timestamp>/
 ```
 
-The browser maps `/browse_uploads/` to that folder. It checks paths stay inside
-the upload folder and does not show symbolic links. Missing paths return `404`
-and paths outside the folder return `403`.
+The browser maps `/browse_uploads/` to that folder. It checks that paths stay
+inside the upload folder and does not show symbolic links. Missing paths return
+`404`; paths outside the folder return `403`.
+
+Raw uploads are stored separately under:
+
+```text
+<executable folder>/app_data/raw_uploads/
+```
+
+Their download links support `Accept-Ranges` and resumable byte-range requests.
+Full downloads can use gzip when the client requests it.
 
 ## WebSockets
 
 Open `http://localhost:8084/test_websocket` to load the browser test page. It
-connects to the `/websocket_ep` WebSocket endpoint over HTTPS by default. The
-page's endpoint field can be changed when needed.
+connects to `/websocket_ep` over HTTPS by default. The endpoint field can be
+changed to use plain HTTP instead. HTTPS supports HTTP/2 WebSocket connections
+when HTTP/2 is enabled in the build.
 
 When a client connects, the server sends a welcome message with the connection
-ID and a user ID. Send messages in this format:
+ID and a user ID. Other connected clients receive a notice when someone joins.
+The new client does not receive its own join notice. Send messages in this format:
 
 ```text
 MESSAGE|{destination}|{data}
@@ -126,6 +157,7 @@ The current web root contains these files:
 | --- | --- |
 | `/` or `/index.html` | `wwwroot/index.html`, the home page. |
 | `/test_multipart.html` | `wwwroot/test_multipart.html`, the upload form and response viewer. |
+| `/test_raw_upload.html` | `wwwroot/test_raw_upload.html`, the raw upload form. |
 | `/test_websocket.html` | `wwwroot/test_websocket.html`, the WebSocket test page. |
 | `/css/styles.css` | `wwwroot/css/styles.css`, the page styles. |
 | `/js/tbs.js` | `wwwroot/js/tbs.js`, the sample JavaScript file. |
@@ -148,14 +180,17 @@ response content type from the file extension.
 | Maximum header size | 1 MB | 1 MB |
 | Multipart parsing | Enabled | Enabled |
 | Multipart temporary folder | `./tmp` | `./tmp` |
+| Compression | Enabled | Enabled |
 | Maximum requests per connection | No limit | 100 |
 
 HTTPS uses `localhost.crt`, `localhost.key`, and `dh2048.pem`. HTTP/2 is
-disabled by this sample, even when HTTP/2 support is compiled into the library.
+enabled for HTTPS when the library is built with `TOBASA_HTTP_USE_HTTP2`.
 
 ## Source files
 
-- [`src/main.cpp`](src/main.cpp) sets up both servers and handles requests.
+- [`src/main.cpp`](src/main.cpp) starts both servers and routes requests.
+- [`src/handlers.cpp`](src/handlers.cpp) implements request, upload, and WebSocket handlers.
+- [`src/handlers.h`](src/handlers.h) declares the handlers.
 - [`src/server_lib.cpp`](src/server_lib.cpp) contains upload folder and file-name helpers.
 - [`src/server_lib.h`](src/server_lib.h) declares those helpers.
 - [`wwwroot/`](wwwroot/) contains the sample pages and assets.

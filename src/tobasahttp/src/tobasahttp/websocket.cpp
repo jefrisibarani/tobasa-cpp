@@ -865,6 +865,16 @@ void WebSocketContext::sendText(const std::string& data, ConnectionId connId, ws
    }
 }
 
+void WebSocketContext::sendTextExcept(const std::string& data, const WebSocketPtr& excludedClient,
+      ws::SendErrorHandler callback)
+{
+   for (auto conn : connectionsSnapshot())
+   {
+      if (conn != excludedClient)
+         conn->sendText(data, callback);
+   }
+}
+
 void WebSocketContext::sendBinary(const std::string& data, ConnectionId connId, ws::SendErrorHandler callback)
 {
    for (auto conn: connectionsSnapshot())

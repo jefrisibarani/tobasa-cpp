@@ -205,6 +205,37 @@ TEST(TobasaHttpParserTest, ReadsContentLengthBodyAcrossFragments)
    EXPECT_EQ(parser.content(), "abcd");
 }
 
+TEST(TobasaHttpParserTest, StreamsContentLengthBodyWithoutAccumulating)
+{
+   const std::string header =
+      "HTTP/1.1 200 OK\r\n"
+      "Content-Length: 4\r\n"
+      "\r\n";
+   std::vector<char> buffer(header.begin(), header.end());
+   tbs::http::parser::Parser parser(tbs::http::parser::Type::RESPONSE, buffer);
+   std::string streamedBody;
+   parser.onBodyData = [&streamedBody](const uint8_t *data, size_t size)
+   {
+      streamedBody.append(reinterpret_cast<const char *>(data), size);
+   };
+
+   auto headerInfo = parser.parse(buffer.size());
+   ASSERT_TRUE(headerInfo.success());
+
+   buffer.assign({'a', 'b'});
+   auto firstBodyInfo = parser.parse(buffer.size());
+   ASSERT_TRUE(firstBodyInfo.success());
+   EXPECT_FALSE(parser.contentDone());
+
+   buffer.assign({'c', 'd', 'x'});
+   auto secondBodyInfo = parser.parse(buffer.size());
+
+   ASSERT_TRUE(secondBodyInfo.success());
+   EXPECT_TRUE(parser.done());
+   EXPECT_EQ(streamedBody, "abcd");
+   EXPECT_TRUE(parser.content().empty());
+}
+
 TEST(TobasaHttpParserTest, ConsumesOnlyContentLengthBytes)
 {
    const std::string request =
@@ -316,6 +347,33 @@ TEST(TobasaHttpParserTest, ParsesMultipleChunksAndTrailer)
    ASSERT_TRUE(info.success());
    EXPECT_TRUE(parser.done());
    EXPECT_EQ(parser.content(), "Wikipedia");
+}
+
+TEST(TobasaHttpParserTest, StreamsDecodedChunkedBodyWithoutFraming)
+{
+   const std::string response =
+      "HTTP/1.1 200 OK\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "4;kind=text\r\nWiki\r\n"
+      "5\r\npedia\r\n"
+      "0\r\n"
+      "X-Checksum: yes\r\n"
+      "\r\n";
+   std::vector<char> buffer(response.begin(), response.end());
+   tbs::http::parser::Parser parser(tbs::http::parser::Type::RESPONSE, buffer);
+   std::string streamedBody;
+   parser.onBodyData = [&streamedBody](const uint8_t *data, size_t size)
+   {
+      streamedBody.append(reinterpret_cast<const char *>(data), size);
+   };
+
+   auto info = parser.parse(buffer.size());
+
+   ASSERT_TRUE(info.success()) << info.message();
+   EXPECT_TRUE(parser.done());
+   EXPECT_EQ(streamedBody, "Wikipedia");
+   EXPECT_TRUE(parser.content().empty());
 }
 
 TEST(TobasaHttpParserTest, AcceptsChunkExtensionsAndCaseInsensitiveCoding)

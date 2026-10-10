@@ -1179,6 +1179,11 @@ bool Http2Session::isWebSocketStream(int32_t streamId) const
    return _webSocketStreams.count(streamId) > 0;
 }
 
+bool Http2Session::hasWebSocketStreams() const
+{
+   return !_webSocketStreams.empty();
+}
+
 Http2Session::WebSocketStreamData* Http2Session::findWebSocketStream(int32_t streamId)
 {
    auto it = _webSocketStreams.find(streamId);

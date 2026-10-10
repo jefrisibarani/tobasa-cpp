@@ -44,6 +44,7 @@ public:
 };
 using ClientResponsePtr = std::shared_ptr<ClientResponse>;
 using ClientResponseHandler = std::function<void(const ClientResponsePtr&)>;
+using ClientResponseHeadersHandler = std::function<void(const ClientResponsePtr&)>;
 
 /// Result of one client request, containing its response or request error. 
 struct ClientResult

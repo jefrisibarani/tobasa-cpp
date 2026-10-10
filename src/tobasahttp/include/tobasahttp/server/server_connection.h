@@ -1618,7 +1618,7 @@ protected:
 
    void readHttp2()
    {
-      if (!this->_http2Session->hasSseStreams())
+      if (!this->_http2Session->hasSseStreams() && !this->_http2Session->hasWebSocketStreams())
          this->startTimer(this->timeoutRead());
 
       this->_socket.async_read_some(
@@ -1660,7 +1660,8 @@ protected:
                      self->writeHttp2();
 
                       if ( !self->_http2Session->writingData() &&  self->_http2Session->shouldStop()
-                         && !self->_http2Session->hasSseStreams())
+                         && !self->_http2Session->hasSseStreams()
+                         && !self->_http2Session->hasWebSocketStreams())
                      {
                         self->processCompleted(self->id(), "all HTTP/2 data processed [R]");
                         return;

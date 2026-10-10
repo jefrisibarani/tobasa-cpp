@@ -96,6 +96,78 @@ change the maximum number of connections; asynchronous requests wait when all
 connections are busy. See [settings](settings.md) for the shared timeout and
 connection settings.
 
+## Stream large request and response bodies
+
+Streaming is opt-in. A request without a body source or response-body handler
+continues to use the existing buffered behavior.
+
+Use a file or owned byte vector as an outbound body source:
+
+```cpp
+http::ClientRequest upload("PUT", "/archive");
+upload.bodySource(http::RequestDataSource::fromFile("archive.tar"));
+auto result = client.execute(std::move(upload));
+```
+
+For bytes, pass an owned `std::vector<uint8_t>` to
+`RequestDataSource::fromBytes()`. The source reports its size and the client
+sends it with `Content-Length`, reading and writing bounded blocks. It owns the
+byte vector for the full transfer. Unknown-size producers and chunked request
+uploads are not supported by this API. A caller-supplied `Transfer-Encoding`
+header conflicts with this framing and is rejected.
+
+To consume a response without keeping the entire body in memory, set a
+synchronous response-body handler on the request:
+
+```cpp
+http::ClientRequest download("GET", "/large-file");
+download.responseBodyHandler([&output](const uint8_t *data, size_t size)
+{
+   output.write(reinterpret_cast<const char *>(data),
+      static_cast<std::streamsize>(size));
+});
+auto result = client.execute(std::move(download));
+```
+
+The handler receives decoded entity bytes for both `Content-Length` and
+chunked responses; chunk framing and trailers are not delivered. Calls happen
+synchronously on the connection executor, so the handler must not retain the
+pointer and should not perform long blocking work. Copy or consume the bytes
+before returning. The final `ClientResult` still arrives after the full
+response; status and headers are available, while `response->content()` is
+empty for a streamed response. Bytes already delivered remain consumed if a
+later transport or framing error occurs, and that request completes with an
+error rather than a response. A connection with a streamed body is not reused
+until that response has been fully parsed.
+
+For a determinate progress indicator, inspect response headers before body
+delivery:
+
+```cpp
+std::size_t expectedBytes = 0;
+std::size_t receivedBytes = 0;
+
+http::ClientRequest download("GET", "/large-file");
+download.responseHeadersHandler([&](const http::ClientResponsePtr& response)
+{
+   const auto length = response->headers().value("Content-Length");
+   if (!length.empty())
+      expectedBytes = static_cast<std::size_t>(std::stoull(length));
+});
+download.responseBodyHandler([&](const uint8_t *, std::size_t size)
+{
+   receivedBytes += size;
+   // Publish receivedBytes / expectedBytes when expectedBytes is known.
+});
+```
+
+The headers handler runs once after the response headers and framing have been
+validated, before any body chunks, and receives the same response object later
+delivered with the completed result. Chunked responses generally have no
+`Content-Length`, so their total size may be unknown. Both handlers run
+synchronously on the connection executor; marshal UI updates to the UI thread
+and keep the callbacks brief.
+
 ## Use TLS
 
 `SecureClientDefault` creates a TLS connection. Peer verification is off by

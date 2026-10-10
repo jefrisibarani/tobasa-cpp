@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>Raw Upload Test</title>
+   <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="multipart-page">
+   <main class="app">
+      <header class="page-heading">
+         <h1>Raw File Upload</h1>
+         <a class="endpoint" href="/">Home</a>
+      </header>
+
+      <form id="rawUploadForm" action="/raw_upload">
+         <div class="upload-grid">
+            <div class="file-field">
+               <div class="field-heading">
+                  <label class="field-title" for="uploadFile">File</label>
+                  <span class="field-name">PUT request body</span>
+               </div>
+               <input id="uploadFile" type="file" required />
+               <div class="file-meta" id="fileMeta">No file selected</div>
+            </div>
+         </div>
+
+         <div class="form-footer">
+            <button id="uploadButton" type="submit">Upload file</button>
+            <span class="muted" id="uploadStatus" role="status" aria-live="polite">Select a file to upload.</span>
+         </div>
+      </form>
+
+      <section class="response-section" aria-labelledby="responseTitle">
+         <div class="response-header">
+            <h2 id="responseTitle">Server response</h2>
+            <span class="status" id="responseStatus">Waiting</span>
+         </div>
+         <div class="response-body" id="responseBody" role="status" aria-live="polite">No upload submitted.</div>
+      </section>
+   </main>
+
+   <script>
+      const form = document.getElementById("rawUploadForm");
+      const fileInput = document.getElementById("uploadFile");
+      const fileMeta = document.getElementById("fileMeta");
+      const uploadButton = document.getElementById("uploadButton");
+      const uploadStatus = document.getElementById("uploadStatus");
+      const responseStatus = document.getElementById("responseStatus");
+      const responseBody = document.getElementById("responseBody");
+
+      fileInput.addEventListener("change", () => {
+         const file = fileInput.files[0];
+         fileMeta.textContent = file
+            ? `${file.name} · ${(file.size / 1024).toFixed(1)} KB`
+            : "No file selected";
+      });
+
+      form.addEventListener("submit", async (event) => {
+         event.preventDefault();
+         const file = fileInput.files[0];
+         if (!file) return;
+
+         uploadButton.disabled = true;
+         uploadStatus.textContent = "Uploading file...";
+         responseStatus.textContent = "Uploading";
+         responseStatus.className = "status";
+         responseBody.textContent = "Waiting for /raw_upload...";
+
+         try {
+            const response = await fetch(form.action, {
+               method: "PUT",
+               headers: {
+                  "Content-Type": file.type || "application/octet-stream",
+                  "X-File-Name": file.name
+               },
+               body: file
+            });
+            const contentType = response.headers.get("content-type") || "";
+            responseStatus.textContent = `${response.status} ${response.statusText}`;
+            responseStatus.className = response.ok ? "status success" : "status error";
+
+            if (contentType.includes("application/json")) {
+               const data = await response.json();
+               const summary = document.createElement("p");
+               summary.textContent = `Saved ${data.originalFilename} as ${data.newFilename}.`;
+               const link = document.createElement("a");
+               const downloadUrl = new URL(data.downloadLink, window.location.href);
+               if (downloadUrl.origin !== window.location.origin)
+                  throw new Error("The server returned a download link on another origin.");
+               link.href = downloadUrl.href;
+               link.textContent = "Download uploaded file";
+               responseBody.replaceChildren(summary, link);
+            } else {
+               responseBody.textContent = await response.text() || "The server returned an empty response.";
+            }
+
+            uploadStatus.textContent = response.ok
+               ? "Upload request completed."
+               : "The server rejected the upload request.";
+         } catch (error) {
+            responseStatus.textContent = "Request failed";
+            responseStatus.className = "status error";
+            responseBody.textContent = error.message;
+            uploadStatus.textContent = "Could not reach the upload endpoint.";
+         } finally {
+            uploadButton.disabled = false;
+         }
+      });
+   </script>
+</body>
+</html>

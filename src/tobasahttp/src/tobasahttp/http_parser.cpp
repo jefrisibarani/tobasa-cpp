@@ -14,6 +14,7 @@
 
 namespace tbs {
 namespace http {
+
 namespace parser {
 
 const int MAX_REQUEST_TARGET_LENGTH = 1024*4; 
@@ -313,6 +314,7 @@ void Parser::prepareForNextMessage()
    _hasChunkedEncoding     = false;
    _hasContentLength       = false;
    _totalParsedBytes       = 0;
+   _contentBytesReceived   = 0;
 
    _headersCtx             = {};
    _headersCtx.maxHeaderSize = _maxHeaderSize;
@@ -644,6 +646,9 @@ Info Parser::processHeader(size_t bytesTransferred, size_t lastIndex)
       }
    }
 
+   if (onHeadersReady)
+      onHeadersReady();
+
    bool hasExpect100 = _headersCtx.lineExists("Expect", "100-continue");
    if ( hasExpect100 ) {
       return { true, "expect 100-continue", 0, HttpStatus(StatusCode::CONTINUE), lastIndex };
@@ -813,12 +818,16 @@ Info Parser::retrieveBody(size_t dataStart, size_t totalData)
    char* buffer = nullptr;
    buffer = _readBuffer.data() + dataStart ;
 
-   const size_t remainingData = _contentLength - _content.size();
+   const size_t remainingData = _contentLength - _contentBytesReceived;
    const size_t contentSize   = totalData < remainingData ? totalData : remainingData;
-   _content.append(buffer, contentSize);
+   if (onBodyData)
+      onBodyData(reinterpret_cast<const uint8_t *>(buffer), contentSize);
+   else
+      _content.append(buffer, contentSize);
+   _contentBytesReceived += contentSize;
 
    const size_t lastIndex = contentSize > 0 ? dataStart + contentSize - 1 : dataStart;
-   if ( _content.size() == _contentLength )
+   if ( _contentBytesReceived == _contentLength )
    {
       _contentDone = true;
 
@@ -938,7 +947,11 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
             size_t chunkLen = chunkEnd - chunkStart;
             char* bfr = _readBuffer.data() + chunkStart;
 
-            if (_hasMultipart && _enableMultipart)
+            if (onBodyData)
+            {
+               onBodyData(reinterpret_cast<const uint8_t *>(bfr), chunkLen);
+            }
+            else if (_hasMultipart && _enableMultipart)
             {
                // Multipart & Transfer-Encoding: chunked, has no content-length
                _multipartParser->chunkedMultipart(true);
@@ -973,6 +986,7 @@ Info Parser::retrieveChunkedBody(size_t dataStart, size_t totalData)
                _content.append(bfr, chunkLen);
             }
 
+            _contentBytesReceived += chunkLen;
             _chunkedCtx.dataCount += chunkLen;
 
             it = _readBuffer.begin() + chunkEnd-1;

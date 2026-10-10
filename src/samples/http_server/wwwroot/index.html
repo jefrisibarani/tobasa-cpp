@@ -33,10 +33,10 @@
                     <p>Upload demo endpoint for testing multipart form handling.</p>
                 </a>
 
-                <a class="card" href="/">
-                    <span class="tag">Home</span>
-                    <h3>/ - GET</h3>
-                    <p>Default landing page for the sample site and static file browsing.</p>
+                <a class="card" href="/test_raw_upload.html">
+                    <span class="tag">Raw upload</span>
+                    <h3>/test_raw_upload.html - GET</h3>
+                    <p>Send a file as a raw PUT request body and receive a download link.</p>
                 </a>
 
                 <a class="card" href="/test_multipart.html">
@@ -55,9 +55,16 @@
 
             <div class="meta">
                 <span>Sample endpoints</span>
+                <span class="protocol-version">Protocol: <span id="httpVersion">Checking</span></span>
                 <span class="status"><span class="dot"></span> Server ready</span>
             </div>
         </div>
     </div>
+    <script>
+        const navigation = performance.getEntriesByType("navigation")[0];
+        const protocol = navigation?.nextHopProtocol;
+        const protocolLabels = { "http/1.1": "HTTP/1.1", h2: "HTTP/2" };
+        document.getElementById("httpVersion").textContent = protocolLabels[protocol] || protocol || "Unknown";
+    </script>
 </body>
 </html>

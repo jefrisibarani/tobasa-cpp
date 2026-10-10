@@ -37,7 +37,9 @@ public:
 
 private:
    ClientResponseHandler          _responseHandler;
+   ClientResponseHeadersHandler   _responseHeadersHandler;
    ClientRequestErrorHandler      _requestErrorHandler;
+   ClientResponsePtr              _response;
    /// request to send
    std::unique_ptr<ClientRequest> _pRequest;
 
@@ -45,7 +47,106 @@ private:
    bool                     _busy {false};
    size_t                   _requestsHandled {0};
    size_t                   _maxRequests {200};
+   size_t                   _requestBodyOffset {0};
+   bool                     _responseHeadersNotified {false};
    std::atomic<uint32_t>    _currentRequestId { 0 };
+
+   void notifyResponseHeaders()
+   {
+      if (_responseHeadersNotified || !_responseHeadersHandler)
+         return;
+
+      _responseHeadersNotified = true;
+      _response = std::make_shared<ClientResponse>(HttpVersion::one);
+      _response->majorVersion(this->_parser.majorVersion());
+      _response->minorVersion(this->_parser.minorVersion());
+      _response->headers(this->_parser.headers());
+
+      HttpStatus status(static_cast<StatusCode>(this->_parser.statusCode()), this->_parser.statusMessage());
+      _response->httpStatus(std::move(status));
+      _responseHeadersHandler(_response);
+   }
+
+   void configureRequestCallbacks()
+   {
+      _response = nullptr;
+      _responseHeadersNotified = false;
+      this->_parser.onBodyData = _pRequest->responseBodyHandler();
+      this->_parser.onHeadersReady = [this]
+      {
+         notifyResponseHeaders();
+      };
+   }
+
+   void startReadingResponse()
+   {
+      this->_processingStopWatch.stop();
+      this->read();
+      this->startTimer(this->timeoutRead());
+   }
+
+   void writeRequestBody()
+   {
+      auto source = _pRequest->bodySource();
+      if (!source || _requestBodyOffset >= source->size())
+      {
+         startReadingResponse();
+         return;
+      }
+
+      constexpr size_t chunkSize = 64 * 1024;
+      const size_t bytesToRead = std::min(chunkSize, source->size() - _requestBodyOffset);
+      source->asyncReadAt(_requestBodyOffset, bytesToRead, this->executor(),
+         [self = this->selfPtr(), source, bytesToRead]
+         (std::vector<uint8_t> data, std::exception_ptr error)
+         {
+            if (self->closed())
+               return;
+
+            if (error)
+            {
+               try
+               {
+                  std::rethrow_exception(error);
+               }
+               catch (const std::exception& ex)
+               {
+                  self->processError(self->id(), ex.what(), ErrorType::exception,
+                     ERROR_CODE_EXCEPTION, "ClientConnection");
+               }
+               catch (...)
+               {
+                  self->processError(self->id(), "Request body source read failed",
+                     ErrorType::exception, ERROR_CODE_EXCEPTION, "ClientConnection");
+               }
+               return;
+            }
+
+            if (data.size() != bytesToRead)
+            {
+               self->processError(self->id(), "Request body source ended before Content-Length",
+                  ErrorType::internal, ERROR_CODE_DATA_FAIL, "ClientConnection");
+               return;
+            }
+
+            auto buffer = std::make_shared<std::vector<uint8_t>>(std::move(data));
+            asio::async_write(self->_socket, asio::buffer(*buffer),
+               asio::bind_executor(self->executor(),
+                  [self, buffer](std::error_code error, size_t bytesTransferred)
+                  {
+                     if (error)
+                     {
+                        self->processError(self->id(), error, ErrorType::system, "ClientConnection");
+                        return;
+                     }
+
+                     self->_requestBodyOffset += bytesTransferred;
+                     self->writeRequestBody();
+                  }));
+            self->startTimer(self->timeoutWrite());
+         });
+      this->startTimer(this->timeoutWrite());
+   }
 
    void reportRequestError(const ErrorData& error)
    {
@@ -109,14 +210,30 @@ public:
 
    virtual void write()
    {
+      const auto requestBodySize = _pRequest->bodySource()
+         ? _pRequest->bodySource()->size()
+         : _pRequest->contentLength();
       this->_logger.info("[{}] [conn:{}] Processing request to: {} {} {} {}", this->logHttpType(),
          this->id(), toString(this->_remoteEndpoint), this->_pRequest->target(),
-         this->_pRequest->contentType(), this->_pRequest->contentLength() );
+         this->_pRequest->contentType(), requestBodySize);
 
       std::ostream sendStream(&this->_sendBuffer);
       RequestSerializer serializer(*this->_pRequest);
 
-      auto rawRequest = serializer.getString();
+      std::string rawRequest;
+      try
+      {
+         rawRequest = _pRequest->bodySource()
+            ? serializer.getHeaderString()
+            : serializer.getString();
+      }
+      catch (const std::exception& ex)
+      {
+         this->processError(this->id(), ex.what(), ErrorType::exception,
+            ERROR_CODE_EXCEPTION, "ClientConnection");
+         return;
+      }
+
       sendStream << std::move(rawRequest);
 
       asio::async_write(
@@ -128,12 +245,10 @@ public:
             {
                if (!error)
                {
-                  self->_processingStopWatch.stop();
-
-                  // start async read, this will return immediately
-                  self->read();
-                  // fire up read timer
-                  self->startTimer(self->timeoutRead());
+                  if (self->_pRequest->bodySource())
+                     self->writeRequestBody();
+                  else
+                     self->startReadingResponse();
                }
                else
                {
@@ -154,6 +269,9 @@ public:
       _pRequest            = std::move(request);
       _responseHandler     = std::move(handler);
       _requestErrorHandler = std::move(errorHandler);
+      _requestBodyOffset   = 0;
+      _responseHeadersHandler = _pRequest->responseHeadersHandler();
+      configureRequestCallbacks();
    }
 
    void sendRequest(
@@ -172,6 +290,9 @@ public:
             self->_pRequest            = std::move(request);
             self->_responseHandler     = std::move(handler);
             self->_requestErrorHandler = std::move(errorHandler);
+            self->_requestBodyOffset   = 0;
+            self->_responseHeadersHandler = self->_pRequest->responseHeadersHandler();
+            self->configureRequestCallbacks();
             self->_parser.parsingId(++self->_currentRequestId);
             self->_processingStopWatch.start();
             self->_processingStopWatch.lap(self->_parser.parsingId(), "start");
@@ -313,7 +434,7 @@ protected:
 
       _requestsHandled++;
 
-      auto resp = std::make_shared<ClientResponse>(HttpVersion::one);
+      auto resp = _response ? _response : std::make_shared<ClientResponse>(HttpVersion::one);
 
       if (this->_parser.headersDone() && this->_parser.contentDone())
       {
@@ -335,7 +456,12 @@ protected:
 
          auto responseHandler = std::move(_responseHandler);
          _responseHandler     = nullptr;
+         _responseHeadersHandler = nullptr;
          _requestErrorHandler = nullptr;
+         _response = nullptr;
+         _responseHeadersNotified = false;
+         this->_parser.onHeadersReady = nullptr;
+         this->_parser.onBodyData = nullptr;
 
          if (responseHandler)
             responseHandler(resp);

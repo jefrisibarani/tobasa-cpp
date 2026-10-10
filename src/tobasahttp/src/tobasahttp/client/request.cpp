@@ -46,5 +46,42 @@ HttpVersion ClientRequest::httpVersion() const noexcept
    return _httpVersion;
 }
 
+void ClientRequest::responseHeadersHandler(ClientResponseHeadersHandler handler)
+{
+   _responseHeadersHandler = std::move(handler);
+}
+
+const ClientResponseHeadersHandler& ClientRequest::responseHeadersHandler() const noexcept
+{
+   return _responseHeadersHandler;
+}
+
+void ClientRequest::responseBodyHandler(ClientResponseBodyHandler handler)
+{
+   _responseBodyHandler = std::move(handler);
+}
+
+const ClientResponseBodyHandler& ClientRequest::responseBodyHandler() const noexcept
+{
+   return _responseBodyHandler;
+}
+
+void ClientRequest::bodySource(std::shared_ptr<RequestDataSource> source)
+{
+   _bodySource = std::move(source);
+   Message::content({});
+}
+
+const std::shared_ptr<RequestDataSource>& ClientRequest::bodySource() const noexcept
+{
+   return _bodySource;
+}
+
+void ClientRequest::content(const std::string& content)
+{
+   _bodySource.reset();
+   Message::content(content);
+}
+
 } // namespace http
 } // namespace tbs

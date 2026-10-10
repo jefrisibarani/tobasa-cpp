@@ -15,6 +15,7 @@ private:
 
 public:
    explicit RequestSerializer(ClientRequest& request);
+   std::string getHeaderString();
    std::string getString();
 };
 

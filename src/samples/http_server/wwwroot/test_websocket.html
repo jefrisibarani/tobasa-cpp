@@ -29,7 +29,7 @@
                     <span id="statusDot" class="dot disconnected"></span>
                     <span id="statusText">Disconnected</span>
                 </div>
-                <span class="muted"></span>
+                <span class="muted">HTTP version: <span id="httpVersion">Checking</span></span>
             </div>
         </div>
 
@@ -73,17 +73,44 @@
         const sendButton = document.getElementById('sendButton');
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
+        const httpVersion = document.getElementById('httpVersion');
+
+        const navigation = performance.getEntriesByType('navigation')[0];
+        const negotiatedProtocol = navigation?.nextHopProtocol;
+        const protocolLabels = { 'http/1.1': 'HTTP/1.1', h2: 'HTTP/2' };
+        httpVersion.textContent = protocolLabels[negotiatedProtocol] || negotiatedProtocol || 'Unavailable';
 
         let socket = null;
+        let localConnectionId = '';
+
+        function senderLabel(message) {
+            const directMessage = message.match(/^MESSAGE from ID (\d+)\s*:/);
+            if (directMessage) return `ID ${directMessage[1]}`;
+
+            const joinedMessage = message.match(/^Client (\d+) joined$/);
+            if (joinedMessage) return `ID ${joinedMessage[1]}`;
+
+            if (message.startsWith('[echo]') && localConnectionId)
+                return `ID ${localConnectionId}`;
+
+            return 'Server';
+        }
 
         function appendMessage(message, type = 'event') {
             const item = document.createElement('div');
-            item.textContent = message;
-
             if (type === 'sent') item.className = 'message-sent';
-            else if (type === 'recv') item.className = 'message-recv';
-            else if (type === 'error') item.className = 'message-error';
+            else if (type === 'recv') {
+                item.className = 'message-recv';
+                const sender = document.createElement('span');
+                sender.className = 'message-sender';
+                sender.textContent = senderLabel(message);
+                const body = document.createElement('span');
+                body.textContent = message;
+                item.append(sender, body);
+            } else if (type === 'error') item.className = 'message-error';
             else item.className = 'message-event';
+
+            if (type !== 'recv') item.textContent = message;
 
             messagesDiv.appendChild(item);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -117,6 +144,7 @@
                 socket.close();
             }
 
+            localConnectionId = '';
             socket = new WebSocket(endpoint);
 
             socket.addEventListener('open', () => {
@@ -128,7 +156,9 @@
                 const lines = event.data.split('\n');
                 lines.forEach((line) => {
                     if (line) {
-                        appendMessage('[RECV] ' + line, 'recv');
+                        const connectionId = line.match(/^Your connection ID:\s*(\d+)/);
+                        if (connectionId) localConnectionId = connectionId[1];
+                        appendMessage(line, 'recv');
                     }
                 });
             });
@@ -158,7 +188,7 @@
             }
 
             socket.send(message);
-            appendMessage('[SENT] ' + message, 'sent');
+            appendMessage(message, 'sent');
             messageInput.value = '';
         });
 

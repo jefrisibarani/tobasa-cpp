@@ -209,6 +209,7 @@ public:
    void registerWebSocketStream(int32_t streamId, WebSocketDataHandler onData,
       WebSocketCloseHandler onClose);
    bool isWebSocketStream(int32_t streamId) const;
+   bool hasWebSocketStreams() const;
    void enqueueWebSocketData(int32_t streamId, std::string data);
    void closeWebSocketStream(int32_t streamId);
    WebSocketStreamData* findWebSocketStream(int32_t streamId);
