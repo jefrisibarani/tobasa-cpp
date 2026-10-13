@@ -110,7 +110,7 @@ public:
    bool isBof() const
    {
       if (_pAdodbResult->_dataCached)
-         return (!_pAdodbResult->_nRows || _pAdodbResult->_currentRow < 1);
+         return (!_pAdodbResult->_nRows || _position < 1);
       else
          return _pAdodbResult->_pResult->BOF;
    }

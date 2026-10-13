@@ -255,6 +255,14 @@ bool PgsqlConnection::rollbackTransaction()
    return execute("ROLLBACK") >= 0;
 }
 
+bool PgsqlConnection::isTranscationActive()
+{
+   if (status() != ConnectionStatus::ok || _pPGconn == nullptr)
+      return false;
+
+   return PQtransactionStatus(_pPGconn) != PQTRANS_IDLE;
+}
+
 int64_t PgsqlConnection::lastInsertRowid()
 {
    throw SqlException("PgsqlConnection does not support lastInsertRowid()", "PgsqlConnection");

@@ -342,6 +342,14 @@ bool MysqlConnection::rollbackTransaction()
    return execute("ROLLBACK") >= 0;
 }
 
+bool MysqlConnection::isTranscationActive()
+{
+   if (status() != ConnectionStatus::ok || _pMYcon == nullptr)
+      return false;
+
+   return ( _pMYcon->server_status & SERVER_STATUS_IN_TRANS ) != 0;
+}
+
 int64_t MysqlConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

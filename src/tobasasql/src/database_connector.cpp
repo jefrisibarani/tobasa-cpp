@@ -1,4 +1,15 @@
 #include <tobasa/crypt.h>
+
+#if defined(TOBASA_SQL_USE_SQLITE)
+   #include <sqlite3.h>
+#endif
+#if defined(TOBASA_SQL_USE_MYSQL)
+   #include <mysql/mysql.h>
+#endif
+#if defined(TOBASA_SQL_USE_PGSQL)
+   #include <libpq-fe.h>
+#endif
+
 #include "tobasasql/sql_util.h"
 #include "tobasasql/database_connector.h"
 
@@ -64,7 +75,9 @@ DatabaseConnector::~DatabaseConnector()
 
 bool DatabaseConnector::connect()
 {
-   auto connString = getConnectionString(_dbOption, _dbConnOption.securitySalt);
+   auto connString = _dbConnOption.connectionStringIsComplete
+      ? _dbOption.connectionString
+      : getConnectionString(_dbOption, _dbConnOption.securitySalt);
 
    return std::visit(
       [&](auto& conn)
@@ -197,6 +210,19 @@ bool DatabaseConnector::testConnection()
       }, _sqlConnPtrVariant);
 }
 
+
+bool DatabaseConnector::isTranscationActive()
+{
+   return std::visit(
+      [&](auto& conn)
+      {
+         if (conn->backendType() == _dbOption.dbDriver)
+            return conn->isTranscationActive();
+         return false;
+      }, _sqlConnPtrVariant);
+}
+
+
 bool DatabaseConnector::beginTransaction()
 {
    return std::visit(
@@ -249,6 +275,23 @@ bool DatabaseConnector::rollbackTransaction()
          return false;
       }, _sqlConnPtrVariant
    );
+}
+
+bool DatabaseConnector::resetTransactionForPool() noexcept
+{
+   try
+   {
+      if (!connected())
+         return disconnect();
+
+      if (!isTranscationActive() || rollbackTransaction())
+         return true;
+   }
+   catch (...)
+   {
+   }
+
+   return disconnect();
 }
 
 SqlConnectionPtrVariant& DatabaseConnector::sqlConnPtrVariant()

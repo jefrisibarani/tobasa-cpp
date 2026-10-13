@@ -8,6 +8,7 @@
 #include <string>
 #include <tobasa/exception.h>
 #include <tobasasql/database_connector.h>
+#include <tobasasql/pool_acquire_options.h>
 #include <tobasasql/settings.h>
 
 namespace tbs {
@@ -15,13 +16,17 @@ namespace sql {
 
 class ConnectionPool;
 
+namespace detail {
+class ConnectionPoolTestAccess;
+}
+
 /**
  * @brief RAII connection handle that automatically returns the connection to the pool.
  */
 class PooledConnection 
 {
-   std::shared_ptr<ConnectionPool> _pool;
-   std::shared_ptr<DatabaseConnector> _conn;
+   std::shared_ptr<ConnectionPool> _connPool;
+   std::shared_ptr<DatabaseConnector> _connector;
 
 public:
 
@@ -29,28 +34,28 @@ public:
 
    PooledConnection(std::shared_ptr<ConnectionPool> pool,
                   std::shared_ptr<DatabaseConnector> conn)
-      : _pool(std::move(pool)), _conn(std::move(conn)) {}
+      : _connPool(std::move(pool)), _connector(std::move(conn)) {}
 
    // Move only
    PooledConnection(PooledConnection&& other) noexcept
-      : _pool(std::move(other._pool)), _conn(std::move(other._conn)) {}
+      : _connPool(std::move(other._connPool)), _connector(std::move(other._connector)) {}
 
    PooledConnection& operator=(PooledConnection&& other) noexcept 
    {
       if (this != &other) 
       {
          release();
-         _pool = std::move(other._pool);
-         _conn = std::move(other._conn);
+         _connPool = std::move(other._connPool);
+         _connector = std::move(other._connector);
       }
       return *this;
    }
 
    ~PooledConnection();
 
-   std::shared_ptr<DatabaseConnector> conn() const
+   std::shared_ptr<DatabaseConnector> connector() const
    { 
-      return _conn; 
+      return _connector; 
    }
 
    void release();
@@ -70,33 +75,46 @@ private:
 class ConnectionPool : public std::enable_shared_from_this<ConnectionPool> 
 {
    friend class PooledConnection;
+   // TODO_JEFRI: remove this friend
+   friend class detail::ConnectionPoolTestAccess;
 
-   std::string             _name;
-   conf::ConnectorOption   _option;
-   std::mutex              _mutex;
-   std::condition_variable _cv;
+   std::string _name;
+   size_t      _maxConnections;
+   size_t      _currentConnections = 0;
+   conf::ConnectorOption _option;
+   std::deque<std::shared_ptr<DatabaseConnector>> _connectors;
 
-   size_t                  _maxConnections;
-   size_t                  _currentConnections = 0;
+   struct Waiter
+   {
+      std::condition_variable condition;
+   };
    
-   std::deque<std::shared_ptr<DatabaseConnector>> _pool;
+   struct WaitState
+   {
+      std::deque<std::shared_ptr<Waiter>> waiters;
+   };
+
+   std::mutex  _mutex;
+   // Keep this member in place to preserve the public class layout.
+   std::condition_variable _cv;
 
 public:
 
    ConnectionPool(std::string name,
                   conf::ConnectorOption option,
-                  size_t maxConnections = 4)
-      : _name(std::move(name))
-      , _option(std::move(option))
-      , _maxConnections(maxConnections) {}
+                  size_t maxConnections = 4);
 
-   /**
-    * @brief Acquire a connection from the pool.
-    *        If none are available and maxConnections is reached, waits.
-    */
+   /// Acquire a connection from the pool.
+   /// If none are available and maxConnections is reached, waits.
    PooledConnection acquire();
+   /// Acquire a connection with an optional wait timeout or cancellation token.
+   PooledConnection acquire(const PoolAcquireOptions& options);
+
+   bool matches(const conf::ConnectorOption& option, size_t maxConnections) const noexcept;
 
 private:
+   std::shared_ptr<WaitState> waitState();
+   void notifyFrontWaiter();
    void release(std::shared_ptr<DatabaseConnector> conn);
 };
 

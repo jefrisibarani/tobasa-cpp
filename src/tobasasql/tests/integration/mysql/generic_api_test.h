@@ -78,7 +78,7 @@ struct SampleData
 };
 
 
-std::vector<SampleData> getSampleDataVector()
+inline std::vector<SampleData> getSampleDataVector()
 {
    std::vector<SampleData> vector;
    vector = {

@@ -251,6 +251,11 @@ bool SqliteConnection::rollbackTransaction()
    return execute("ROLLBACK") >= 0;
 }
 
+bool SqliteConnection::isTranscationActive()
+{
+   return status() == ConnectionStatus::ok && sqlite3_get_autocommit(_pDatabase) == 0;
+}
+
 int64_t SqliteConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

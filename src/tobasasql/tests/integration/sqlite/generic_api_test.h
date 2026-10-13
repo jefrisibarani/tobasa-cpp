@@ -89,7 +89,7 @@ struct SampleData
 //  | val_time     | SQLITE_TEXT            | 04:40                  | 04:40                  |                         |
 //  | val_datetime | SQLITE_TEXT            | 2004-04-14 15:21       | 2004-04-14 15:21       |                         |
 //  +--------------+------------------------+------------------------+------------------------+-------------------------+
-std::vector<SampleData> getSampleDataVector()
+inline std::vector<SampleData> getSampleDataVector()
 {
    std::vector<SampleData> vector;
    vector = {

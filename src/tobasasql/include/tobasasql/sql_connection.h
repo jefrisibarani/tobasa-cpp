@@ -249,6 +249,11 @@ public:
       return _connImpl.rollbackTransaction();
    }
 
+   bool isTranscationActive()
+   {
+      return _connImpl.isTranscationActive();
+   }
+
    void setLogSqlQuery(bool enable=true)
    {
       _connImpl.setLogSqlQuery(enable);

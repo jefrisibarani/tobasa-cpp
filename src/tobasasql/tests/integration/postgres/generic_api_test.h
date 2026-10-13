@@ -100,7 +100,7 @@ struct SampleData
 };
 
 
-std::vector<SampleData> getSampleDataVector()
+inline std::vector<SampleData> getSampleDataVector()
 {
    // NOTE: PostgreSQL rounds REAL and DOUBLE PRECISION values during storage,
    // so values such as 14.1234567890123456l may appear as 14.123457 after retrieval.

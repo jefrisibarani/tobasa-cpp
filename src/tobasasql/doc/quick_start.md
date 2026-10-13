@@ -1,7 +1,5 @@
 # TobasaSQL quick start
 
-## Introduction
-
 TobasaSQL is a small C++ SQL library. It gives your app one set of APIs for
 SQLite, PostgreSQL, MySQL/MariaDB, and Microsoft SQL Server.
 
@@ -13,7 +11,8 @@ TobasaSQL is not an ORM. You write the SQL yourself. The library handles the
 backend-specific work for connections, parameters, results, metadata, and
 optional logging.
 
-The main types are templates that use a selected driver:
+TobasaSQL provides typed APIs for code that selects a driver at compile time,
+and backend-neutral `Db*` APIs for code that selects a backend at runtime:
 
 | Type | Purpose |
 | --- | --- |
@@ -21,6 +20,7 @@ The main types are templates that use a selected driver:
 | `sql::SqlQuery<Driver>` | Store SQL and typed parameters, then execute it. |
 | `sql::SqlResult<Driver>` | Move through rows and read values or metadata. |
 | `sql::SqlTable<Driver>` | Open and edit a table with the table helper API. |
+| `sql::DbConnection`, `DbCommand`, `DbResult`, `DbTable` | Use connections, commands, results, and tables without driver types in application interfaces. |
 | `sql::DataType` | Portable type used for a parameter or reported for a column. |
 
 See [`data_types.md`](data_types.md) for the complete type and conversion
@@ -42,11 +42,12 @@ Choose the TobasaSQL backend options you need:
 The CMake option controls which driver types are available. For example,
 `SqliteDriver` exists only when `TOBASA_SQL_USE_SQLITE` is defined.
 
-## Two ways to use TobasaSQL
+## Ways to use TobasaSQL
 
-There are two common ways to use the library. Use a typed connection when the
-backend is fixed. Use the connector layer when the app should choose the backend
-at runtime.
+Choose the API that fits how your application selects and manages its backend.
+Use typed connections when the backend is fixed, `Db*` when you want a
+backend-neutral API, or the connector and service layer when database
+configuration and service lifetime should be managed centrally.
 
 ### Direct typed connection
 
@@ -71,6 +72,20 @@ is enabled by CMake.
 
 The connection, `SqlQuery`, and `SqlResult` types then give you the same SQL,
 parameter, and result operations for that backend.
+
+### Backend-neutral `Db*` API
+
+Use `DbConnection`, `DbCommand`, `DbResult`, and `DbTable` when application
+interfaces should not expose a driver type, or when the backend is selected at
+runtime from `DbConnectionOptions`. This API is non-templated and can also
+create a `DbConnectionPool` for pooled connections. The enabled driver still
+needs to be present in the build, and connection-string syntax and some
+behavior remain backend-specific.
+
+The `Db*` handles are move-only. Commands, results, and tables created from a
+connection share its connection state, which affects how long a direct or
+pooled connection remains in use. See the [`Db*` API guide](db_api.md) for
+parameters, result access, table editing, errors, and lifetime details.
 
 ### Configuration-driven connector
 
@@ -103,11 +118,13 @@ enabled.
 | Approach | Best suited for | Backend selection |
 | --- | --- | --- |
 | Direct `SqlConnection<Driver>` | Small programs, tests, samples, and fixed-backend applications | Compile time |
+| `DbConnection` and other `Db*` types | Backend-neutral APIs and direct runtime backend selection | `DbConnectionOptions` at runtime |
 | `DatabaseConnector` / `DbServiceFactory` | Configured applications, services, repositories, and connection pools | Runtime configuration |
 
-Both approaches eventually use a typed `SqlConnection<Driver>`. The connector
-layer adds configuration and connection lifetime handling; it does not turn
-SQL into an ORM.
+All three approaches use a typed `SqlConnection<Driver>` internally. The
+connector layer adds application configuration and service lifetime handling;
+the `Db*` types provide a non-templated SQL API. Neither approach turns SQL into
+an ORM.
 
 ## Sample programs
 

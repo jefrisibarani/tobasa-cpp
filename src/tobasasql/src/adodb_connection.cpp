@@ -384,6 +384,22 @@ bool AdodbConnection::rollbackTransaction()
    return execute("ROLLBACK TRANSACTION") >= 0;
 }
 
+bool AdodbConnection::isTranscationActive()
+{
+   if (status() != ConnectionStatus::ok)
+      return false;
+
+   try
+   {
+      const auto count = std::stoll(executeScalar("SELECT @@TRANCOUNT"));
+      return count > 0;
+   }
+   catch (...)
+   {
+      return false;
+   }
+}
+
 int64_t AdodbConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

@@ -72,6 +72,7 @@ public:
    bool startTransaction();
    bool commitTransaction();
    bool rollbackTransaction();
+   bool isTranscationActive();
 
    // PostgreSQL does not support a portable lastInsertRowid() equivalent.
    // Prefer INSERT ... RETURNING id or SELECT lastval() for the current session.

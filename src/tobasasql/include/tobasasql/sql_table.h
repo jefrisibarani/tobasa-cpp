@@ -798,7 +798,7 @@ public:
          _initialRows   = _pResult->totalRows();
          _numColumns    = _pResult->totalColumns();
          _pColumnsInfo  = new ColumnInfo[_numColumns];
-         _pColumnMaps   = new ColumnMap<SqlResult>[_numColumns];
+         _pColumnMaps   = new ColumnMap<SqlDriverType>[_numColumns];
          _pSavedRow     = new Row(_numColumns);
 
          if (_initialRows > 0)
@@ -1667,20 +1667,20 @@ public:
    }
 
    /// Setup column lookup.
-   ColumnMap<SqlResult>* getColumnLookups(const std::string &colname)
+   ColumnMap<SqlDriverType>* getColumnLookups(const std::string &colname)
    {
       int idx = getColumnPosition(colname);
       return getColumnLookups(idx);
    }
 
    /// Setup column lookup.
-   ColumnMap<SqlResult>* getColumnLookups(int col)
+   ColumnMap<SqlDriverType>* getColumnLookups(int col)
    {
       if (col > _numColumns || col < 0)
          return nullptr;
 
       if (_pColumnsInfo[col].hasDataLookup())
-         return _pColumnMaps[col];
+         return &_pColumnMaps[col];
 
       return nullptr;
    }
@@ -1754,7 +1754,7 @@ protected:
    SqlConnection&        _conn;         ///< SqlConnection object we are running on
    SqlResult*            _pResult;      ///< SqlResult for this table
    ColumnInfo*           _pColumnsInfo; ///< Column metadata info array
-   ColumnMap<SqlResult>* _pColumnMaps;  ///< Column maps array
+   ColumnMap<SqlDriverType>* _pColumnMaps;  ///< Column maps array
    Row*                  _pSavedRow;    ///< Original row of a changed row
    std::vector<Row*>     _rows;         ///< Cached data backend
    std::string           _tableName;    ///< sql table name

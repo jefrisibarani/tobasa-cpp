@@ -1,6 +1,7 @@
 file(GLOB TOBASASQL_CORE_SOURCES_LIST CONFIGURE_DEPENDS
    ${CMAKE_CURRENT_SOURCE_DIR}/src/database_*.cpp
    ${CMAKE_CURRENT_SOURCE_DIR}/src/sql_*.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/src/db_api.cpp
 )
 
 if(TOBASA_SQL_USE_PGSQL)
@@ -45,6 +46,7 @@ file(GLOB TOBASASQL_CORE_HEADERS_LIST CONFIGURE_DEPENDS
    ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/database_connector.h
    ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/database_service_factory_base.h
    ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/database_service_factory.h
+   ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/db_api.h
    ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/exception.h
    ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/settings.h
    ${CMAKE_CURRENT_SOURCE_DIR}/include/tobasasql/sql_conn_variant.h

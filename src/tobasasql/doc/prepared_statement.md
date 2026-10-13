@@ -130,12 +130,3 @@ cmd.close();
 
 This is the actual prepared-statement flow at the driver level. The driver may create a native statement object internally, but the library gives you a consistent cross-driver API instead of forcing you to work with each backend's raw statement system directly.
 
-## Simple summary
-
-- `SqlQuery` is the easy app-level API.
-- Driver command classes are the real backend implementation.
-- Parameters are supported and safe to use.
-- Named placeholders are rewritten automatically.
-- The library supports prepared execution without building SQL strings by hand.
-
-In plain English: TobasaSQL lets you write SQL with parameters, and the library handles the backend details for you.

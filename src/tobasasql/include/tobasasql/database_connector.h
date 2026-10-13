@@ -7,12 +7,16 @@
 namespace tbs {
 namespace sql {
 
+class ConnectionPool;
+
 /** 
  * \ingroup SQL
  * Database connector
  */
 class DatabaseConnector : public DatabaseConnectorBase
 {
+   friend class ConnectionPool;
+
 protected:
    SqlDriverVariant                _sqlDriverVariant;
    SqlConnectionPtrVariant         _sqlConnPtrVariant;
@@ -47,6 +51,9 @@ protected:
 
    /// List of SqlService created with this connector;
    std::vector<SqlServiceInfo>     _services;
+
+   /// Clear any transaction state before this connector returns to its pool.
+   bool resetTransactionForPool() noexcept;
 
    void setSqlServiceCallbacks(SqlServicePtr svc)
    {
@@ -83,6 +90,8 @@ public:
    virtual SqlDriverVariant& getSqlDriverVariant();
 
    conf::ConnectorOption option();
+
+   virtual bool isTranscationActive();
 
    virtual bool beginTransaction();
    virtual bool commitTransaction();

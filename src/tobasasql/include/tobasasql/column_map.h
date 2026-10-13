@@ -263,33 +263,33 @@ public:
     * \param dataset
     * \param needMapping
     */
-   void init(const SqlResult& dataset, bool needMapping = true)
+   void init(SqlResult& dataset, bool needMapping = true)
    {
       _keys.clear();
       _values.clear();
 
       _rows = dataset.totalRows();
       _cols = dataset.totalColumns();
-      dataset.moveFirst();
 
       _needMapping = needMapping;
 
-      int totalRows = 0;
       std::string key;
       std::string value;
 
-      while (!dataset.isEof())
+      for (int row = 0; row < _rows; ++row)
       {
+         if (row == 0)
+            dataset.moveFirst();
+
          key = dataset.getStringValue(0);
          value = dataset.getStringValue(1);
          _keys.push_back(key);
          _values.push_back(value);
 
-         totalRows++;
-         dataset.moveNext();
+         if (row + 1 < _rows)
+            dataset.moveNext();
       }
 
-      _rows  = totalRows;
       _valid = true;
    }
 

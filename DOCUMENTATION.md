@@ -77,6 +77,8 @@ These guides are for applications using the Tobasa SQL library directly.
 | Document | What it covers |
 | --- | --- |
 | [`quick_start.md`](src/tobasasql/doc/quick_start.md) | Backend selection, direct connections, configured services, parameters, queries, results, and logging. |
+| [`db_api.md`](src/tobasasql/doc/db_api.md) | The backend-neutral `DbConnection`, `DbCommand`, `DbResult`, `DbTable`, and connection-pool APIs, including parameters, lifetimes, and errors. |
+| [`connection_pool.md`](src/tobasasql/doc/connection_pool.md) | Connection-pool acquisition, blocking, lease lifetime, reuse, and current failure-path limitations. |
 | [`data_types.md`](src/tobasasql/doc/data_types.md) | Portable `tbs::sql::DataType` values and backend-specific type mappings. |
 | [`sql_parameter.md`](src/tobasasql/doc/sql_parameter.md) | Parameter order, names, binding rules, and backend-specific behavior. |
 | [`prepared_statement.md`](src/tobasasql/doc/prepared_statement.md) | The prepared-statement flow in `SqlQuery`, the driver `*Command` classes, and the one-shot execution pattern. |
@@ -105,7 +107,8 @@ These README files explain the sample applications under `src/samples`.
 - To trace a request through the implementation, use the notes in
   [`dev_notes`](dev_notes/).
 - To use the SQL library in another application, start with
-  [`quick_start.md`](src/tobasasql/doc/quick_start.md), then read
+  [`quick_start.md`](src/tobasasql/doc/quick_start.md) and
+  [`db_api.md`](src/tobasasql/doc/db_api.md), then read
   [`data_types.md`](src/tobasasql/doc/data_types.md),
   [`sql_parameter.md`](src/tobasasql/doc/sql_parameter.md), and
   [`prepared_statement.md`](src/tobasasql/doc/prepared_statement.md).

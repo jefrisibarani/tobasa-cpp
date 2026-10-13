@@ -216,9 +216,9 @@ public:
    void moveFirst()                 { _resultImpl.navigator().moveFirst(); }
    void moveLast()                  { _resultImpl.navigator().moveLast(); }
    void locate(int newRow)          { _resultImpl.navigator().locate(newRow); }
-   long currentRowPosition() const  { return _resultImpl.navigator().position(); }
-   bool isBof() const               { return _resultImpl.navigator().isBof(); }
-   bool isEof() const               { return _resultImpl.navigator().isEof(); }
+   long currentRowPosition() const  { return const_cast<ResultImpl&>(_resultImpl).navigator().position(); }
+   bool isBof() const               { return const_cast<ResultImpl&>(_resultImpl).navigator().isBof(); }
+   bool isEof() const               { return const_cast<ResultImpl&>(_resultImpl).navigator().isEof(); }
 
    // -------------------------------------------------------
    // Result summary
@@ -378,7 +378,6 @@ public:
    {
       return getFloatValue(columnNumber(columnName));
    }
-
 
    double getDoubleValue(const int columnIndex) const
    {

@@ -33,7 +33,6 @@ bool DbServiceFactory::disconnect()
             if (connector)
             {
                connector->disconnect();
-               //delete connector;
                connector = nullptr;
             }
          }
@@ -74,18 +73,27 @@ bool DbServiceFactory::connected()
    return false;
 }
 
-void DbServiceFactory::addConnectorOption(const std::string& name, const conf::ConnectorOption& option)
+void DbServiceFactory::addConnectorOption(const std::string& name, const conf::ConnectorOption& option, int poolSize)
 {
-   _connectorOptions[name] = option;
+   _connectorOptions[name] = ConnectorData{poolSize, option};
 }
 
 conf::ConnectorOption DbServiceFactory::getConnectorOption(const std::string& name, bool &isValid)
+{
+   auto data = getConnectorData(name,isValid);
+   if (isValid)
+      return data.option;
+   else
+      return conf::ConnectorOption();
+}
+
+DbServiceFactory::ConnectorData DbServiceFactory::getConnectorData(const std::string& name, bool& isValid)
 {
    auto it = _connectorOptions.find(name);
    if ( it == _connectorOptions.end() ) 
    {
       isValid = false;
-      return conf::ConnectorOption();
+      return ConnectorData();
    }
    else 
    {
@@ -125,17 +133,22 @@ bool DbServiceFactory::testConnection()
 
 std::shared_ptr<DatabaseConnector> DbServiceFactory::getConnector(const std::string& optionName, bool pooled)
 {
+   return getConnector(optionName, pooled, PoolAcquireOptions{});
+}
+
+std::shared_ptr<DatabaseConnector> DbServiceFactory::getConnector(const std::string& optionName, bool pooled, const PoolAcquireOptions& acquireOptions)
+{
    if (pooled)
    {
       bool valid = false;
-      auto option = getConnectorOption(optionName, valid);
+      auto data  = getConnectorData(optionName, valid);
          if (!valid)
             throw std::runtime_error("Invalid connector option: " + optionName);
 
-      const size_t poolSize = _connPoolSize;
-      auto pool = _connPoolManager.getOrCreatePool(optionName, option, poolSize);
-      auto pooledConn = pool->acquire();
-      auto connector = pooledConn.conn();
+      const size_t poolSize = data.poolSize > 0 ? data.poolSize : _connPoolSize;
+      auto pool       = _connPoolManager.getOrCreatePool(optionName, data.option, poolSize);
+      auto pooledConn = pool->acquire(acquireOptions);
+      auto connector  = pooledConn.connector();
       if (!connector || !connector->connected())
          throw std::runtime_error("Database connection unavailable for " + optionName);
 
@@ -167,12 +180,12 @@ std::shared_ptr<DatabaseConnector> DbServiceFactory::getConnector(const std::str
       if (!connector)
       {
          bool valid = false;
-         auto option = getConnectorOption(optionName, valid);
+         auto data  = getConnectorData(optionName, valid);
          if (!valid)
             throw AppException("Connector option " + optionName + " not found");
 
          // Create new non-pooled connector
-         connector = std::make_shared<DatabaseConnector>(option, optionName);
+         connector = std::make_shared<DatabaseConnector>(data.option, optionName);
          connector->initSqlDriver();
          if (!connector->connect())
             throw AppException("Failed to connect to database with option " + optionName);

@@ -46,6 +46,18 @@ struct Database
     * for decryption. Otherwise, the password is treated as plaintext.
     */
    std::string      password;
+
+   bool operator==(const Database& other) const noexcept
+   {
+      return dbDriver == other.dbDriver
+         && connectionString == other.connectionString
+         && password == other.password;
+   }
+
+   bool operator!=(const Database& other) const noexcept
+   {
+      return !(*this == other);
+   }
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Database, dbDriver, connectionString, password)
 
@@ -61,15 +73,33 @@ struct ConnectorOption
    std::string environment;      // development, production
    bool        logInternalSqlQuery;
    bool        logSqlQuery;
+   bool        connectionStringIsComplete = false;
    /**
     * Optional salt used to decrypt an encrypted password.
     * When securitySalt is non-empty, the password in the corresponding Database
     * entry must be stored in encrypted form and decrypted with this salt.
     */
    std::string securitySalt;
+
+   bool operator==(const ConnectorOption& other) const noexcept
+   {
+      return production == other.production
+         && development == other.development
+         && environment == other.environment
+         && logInternalSqlQuery == other.logInternalSqlQuery
+         && logSqlQuery == other.logSqlQuery
+         && connectionStringIsComplete == other.connectionStringIsComplete
+         && securitySalt == other.securitySalt;
+   }
+
+   bool operator!=(const ConnectorOption& other) const noexcept
+   {
+      return !(*this == other);
+   }
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ConnectorOption, production, development, 
-   environment, logInternalSqlQuery, logSqlQuery, securitySalt)
+   environment, logInternalSqlQuery, logSqlQuery, securitySalt,
+   connectionStringIsComplete)
 
 /** @}*/
 

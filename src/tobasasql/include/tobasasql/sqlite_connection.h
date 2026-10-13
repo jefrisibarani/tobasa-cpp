@@ -77,6 +77,7 @@ public:
    bool startTransaction();
    bool commitTransaction();
    bool rollbackTransaction();
+   bool isTranscationActive();
 
    int64_t lastInsertRowid();
 

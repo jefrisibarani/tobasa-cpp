@@ -242,6 +242,22 @@ bool OdbcConnection::rollbackTransaction()
    return execute("ROLLBACK TRANSACTION") >= 0;
 }
 
+bool OdbcConnection::isTranscationActive()
+{
+   if (status() != ConnectionStatus::ok)
+      return false;
+
+   try
+   {
+      const auto count = std::stoll(executeScalar("SELECT @@TRANCOUNT"));
+      return count > 0;
+   }
+   catch (...)
+   {
+      return false;
+   }
+}
+
 int64_t OdbcConnection::lastInsertRowid()
 {
    if (status() != ConnectionStatus::ok)

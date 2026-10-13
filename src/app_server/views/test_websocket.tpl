@@ -20,7 +20,7 @@
                   </div>
                   <div id="eventOutput" class="mb-2" style="padding:5px;height:180px;overflow: auto; border-style: solid;border-width:1px;border-color: #cfcfcf ;border-radius:10px;"></div>
                   <div class="mb-1">Chat messages</div>
-                  <div id="msgOutput"   class="mb-2" style="padding:5px;height:200px;overflow: auto; border-style: solid;border-width:1px;border-color: #cfcfcf ;border-radius:10px;"></div>
+                  <div id="msgOutput"   class="mb-2 chat-message-list" style="padding:5px;height:200px;overflow: auto; border-style: solid;border-width:1px;border-color: #cfcfcf ;border-radius:10px;"></div>
                   <textarea id="msgInput" class="mt-2 mb-2 form-control" rows="3"></textarea>
                   <div class="d-flex">
                      <span class="me-1">Send To:</span>
@@ -99,7 +99,7 @@
           const lines = msg.content.split('\n');
           // Process each line
           lines.forEach((line, index) => {
-            appendMessage(`[${msg.senderName}] ${line}`);
+            appendMessage(line, 'INCOMING', msg.senderName);
           });
 
         }
@@ -186,34 +186,30 @@
         if (messageType === 'SYS')
           appendEventMsg(`[SENT] ${content}`, 'OUTGOING');
         else
-          appendMessage(`[${myNickName}] ${content}`, 'OUTGOING');
+          appendMessage(content, 'OUTGOING', myNickName);
       }
       else
         appendEventMsg(`[ERR ] WebSocket is not connected or content is empty.`);
     }
 
     // Append messages to the message display area
-    function appendMessage(val, type="INCOMING") {
-       //msgOutput.insertAdjacentHTML("afterbegin", `<p style="margin-bottom:0px">${val}</p>`);
+    function appendMessage(val, type, senderName) {
        const el = document.createElement('div');
+       el.classList.add('chat-message-bubble');
+       el.classList.add(type === 'OUTGOING' ? 'chat-message-sent' : 'chat-message-received');
 
-       if (val.includes("[RECV]"))
-          el.style.color = "blue";
-       else if (val.includes("[ERR ]"))
-          el.style.color = "red"; 
-       else if (val.includes("[EVT ]"))
-          el.style.color = "brown"; 
-       else {
-          if (type=='OUTGOING') {
-            el.style.color = "black";
-          }
-          else if (type=='INCOMING') {
-            el.style.color = "green";
+       const identity = document.createElement('div');
+       identity.classList.add('chat-message-identity');
+       identity.textContent = senderName;
 
-          }
+       const body = document.createElement('div');
+       body.classList.add('chat-message-text');
+       body.textContent = val;
+
+       if (senderName) {
+         el.appendChild(identity);
        }
-
-       el.textContent = val;
+       el.appendChild(body);
        msgOutput.appendChild(el);
        msgOutput.scrollTop = msgOutput.scrollHeight; // Auto-scroll to the bottom
     }
@@ -383,5 +379,57 @@
       return now.getTime().toString(); //  get unix timestamp in ms
     }
   </script>
+{% endblock %}
 
+{% block pageCss %}
+  <style>
+    .chat-message-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .chat-message-bubble {
+      box-sizing: border-box;
+      width: fit-content;
+      max-width: 82%;
+      margin: 0;
+      padding: 3px 7px;
+      border-radius: 8px;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .chat-message-identity {
+      width: fit-content;
+      /*margin-bottom: 1px;*/
+      padding: 0px 0px;
+      border-radius: 4px;
+      background-color: #cbd2d7;
+      color: #35404a;
+      font-size: 0.65em;
+      font-weight: 600;
+      line-height: 1.0;
+    }
+
+    .chat-message-text {
+      white-space: pre-wrap;
+    }
+
+    .chat-message-received {
+      align-self: flex-start;
+      background-color: #eef1f3;
+      color: green;
+    }
+
+    .chat-message-sent {
+      align-self: flex-end;
+      background-color: #e3f2e7;
+      color: black;
+    }
+
+    .chat-message-sent .chat-message-identity {
+      background-color: #b9d5c0;
+    }
+  </style>
 {% endblock %}

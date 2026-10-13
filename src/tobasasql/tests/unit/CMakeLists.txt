@@ -6,12 +6,35 @@ add_executable(tobasasql_unit_tests
    mysql_parameter_test.cpp
    sqlite_connection_test.cpp
 )
-
 set_target_properties(tobasasql_unit_tests PROPERTIES
    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
-
 target_link_libraries(tobasasql_unit_tests PRIVATE tobasasql GTest::gtest_main)
 gtest_discover_tests(tobasasql_unit_tests)
+
+
+
+# # ----------------------------------------------------------------------
+add_executable(tobasasql_dbapi_unit_tests
+   db_api_test.cpp
+)
+set_target_properties(tobasasql_dbapi_unit_tests PROPERTIES
+   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
+)
+target_link_libraries(tobasasql_dbapi_unit_tests PRIVATE tobasasql GTest::gtest_main)
+gtest_discover_tests(tobasasql_dbapi_unit_tests)
+
+add_executable(tobasasql_connection_pool_unit_tests
+   connection_pool_test.cpp
+)
+set_target_properties(tobasasql_connection_pool_unit_tests PROPERTIES
+   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
+)
+target_link_libraries(tobasasql_connection_pool_unit_tests PRIVATE tobasasql GTest::gtest_main)
+gtest_discover_tests(tobasasql_connection_pool_unit_tests)

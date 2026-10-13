@@ -75,11 +75,10 @@ Application-specific logic (field mapping, domain models, UI, business rules) sh
 
 All product names and trademarks are the property of their respective owners. This project implements communication protocols based on publicly available specifications and observed device behavior.
 
-## References
+## Thankyou
 
-- CLSI LIS01-A2 & LIS2-A2 implementation
-- HL7 Message format standards
-- Device manufacturer communication protocols
+- [CLSI LIS01-A2 & LIS2-A2 implementation](https://www.nuget.org/packages/ESSY.LIS.LIS01-A2/)
+- [HL7-dotnetcore](https://github.com/Efferent-Health/HL7-dotnetcore)
 
 ## License
 
