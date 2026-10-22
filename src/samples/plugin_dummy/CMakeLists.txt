@@ -25,9 +25,6 @@ target_link_libraries(${PROJECT_NAME}
    PRIVATE tobasa )
 
 if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
    target_compile_definitions( ${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS )
 endif()
 

@@ -3,6 +3,7 @@
 #ifdef _WIN32
    #pragma comment(lib, "rpcrt4.lib") 
    #include <windows.h>
+   #include <rpc.h>
    #include <rpcdce.h>
 #else
    #include <sstream>

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 
 namespace tbs {
@@ -10,7 +12,7 @@ namespace sql {
  * \brief Mysql Helper
  * \note Experimental
  */
-struct MysqlHelper
+struct TBS_SQL_API MysqlHelper
 {
    static std::string limitAndOffset(long limit, long offset, const std::string& dbmsName = {});
 };

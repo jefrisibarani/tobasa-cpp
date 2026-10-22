@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <mutex>
 #include <set>
 #include <asio/ip/tcp.hpp>
@@ -16,7 +18,7 @@ namespace lis {
 /** \ingroup LIS
  * TCPConnection
  */
-class TCPConnection
+class TBS_LIS_API TCPConnection
    : public Connection
 {
 public:

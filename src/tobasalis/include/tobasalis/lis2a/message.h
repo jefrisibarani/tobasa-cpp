@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/message.h"
 #include "tobasalis/lis2a/record.h"
 #include "tobasalis/lis2a/header.h"
@@ -81,7 +83,7 @@ class PatientRecord;
 /** \ingroup LIS
  * Message
  */
-class Message
+class TBS_LIS_API Message
    : public lis::Message
 {
 public:

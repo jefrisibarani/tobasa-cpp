@@ -1,12 +1,14 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <memory>
 #include <string>
 
 namespace tbs {
 namespace hl7 {
 
-class HL7Encoding
+class TBS_LIS_API HL7Encoding
 {
 private:
    char _fieldDelimiter          = '|';

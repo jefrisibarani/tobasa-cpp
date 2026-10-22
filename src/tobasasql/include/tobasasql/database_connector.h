@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include "tobasasql/sql_service_base.h"
 #include "tobasasql/settings.h"
 #include "tobasasql/database_connector_base.h"
@@ -13,7 +15,7 @@ class ConnectionPool;
  * \ingroup SQL
  * Database connector
  */
-class DatabaseConnector : public DatabaseConnectorBase
+class TBS_SQL_API DatabaseConnector : public DatabaseConnectorBase
 {
    friend class ConnectionPool;
 

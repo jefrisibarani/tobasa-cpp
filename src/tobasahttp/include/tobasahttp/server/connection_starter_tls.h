@@ -12,6 +12,9 @@
 #endif
 
 #include <asio/ssl.hpp>
+#include <openssl/objects.h>
+#include <openssl/tls1.h>
+#include <sstream>
 #include "tobasahttp/server/tls_helper.h"
 
 
@@ -40,6 +43,7 @@ private:
    Settings&           _settings;
    Logger&             _logger;
    asio::ssl::context  _tlsContex;
+   SniTlsContexts      _sniTlsContexts;
    HandshakeType       _handshakeType;
    InstanceType        _instanceType;
 
@@ -103,21 +107,44 @@ public:
       // after connected TLS socked must initiating handshake
       conn->onStart =
          [handshakeType=this->_handshakeType, 
-            wConn = std::weak_ptr<ConnectionType>(conn), &settings=this->_settings]
+            wConn = std::weak_ptr<ConnectionType>(conn), &settings=this->_settings,
+            logger=&this->_logger, logType=logHttpType(), sniContexts=&this->_sniTlsContexts]
          (Socket& tlsSock, std::function<void(const std::error_code&)> onStartCallback)
          {
+            auto initialContext = SSL_get_SSL_CTX(tlsSock.native_handle());
             tlsSock.async_handshake(handshakeType,
                [&tlsSock, onStartCallback=std::move(onStartCallback), 
-                  connWeak = std::move(wConn), &settings](const std::error_code& error)
+                  connWeak = std::move(wConn), &settings, logger, logType, initialContext, sniContexts](const std::error_code& error)
                {
                   if (!error)
                   {
+                     auto ssl = tlsSock.native_handle();
+                     auto activeContext = SSL_get_SSL_CTX(ssl);
+                     auto serverName = sniContexts->hostname(ssl);
+                     if (!serverName)
+                        serverName = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+                     const unsigned char* alpn = nullptr;
+                     unsigned int alpnLength = 0;
+                     SSL_get0_alpn_selected(ssl, &alpn, &alpnLength);
+                     auto alpnProtocol = alpnLength > 0
+                        ? std::string(reinterpret_cast<const char*>(alpn), alpnLength)
+                        : std::string{};
+                     logger->debug(
+                        "[{}] TLS handshake succeeded: SNI={}, version={}, cipher={}, initial_SSL_CTX={}, active_SSL_CTX={}, ALPN={}",
+                        logType,
+                        serverName ? serverName : "",
+                        SSL_get_version(ssl),
+                        SSL_get_cipher(ssl) ? SSL_get_cipher(ssl) : "(none)",
+                        static_cast<const void*>(initialContext),
+                        static_cast<const void*>(activeContext),
+                        alpnProtocol);
+
                      if (auto c = connWeak.lock()) 
                      {
 #ifdef TOBASA_HTTP_USE_HTTP2
                         // Check the selected protocol from ALPN during the TLS handshake
                         // The protocol will be "h2" for HTTP/2, or "http/1.1" for HTTP/1.1
-                        if (settings.http2Enabled() && http2::tlsH2Negotiated(tlsSock ))
+                        if (settings.http2Enabled() && http2::tlsH2NegotiatedInModule(tlsSock))
                            c->httpVersion(HttpVersion::two);
                         else
                            c->httpVersion(HttpVersion::one);
@@ -128,7 +155,99 @@ public:
                   }
                   else
                   {
-                     auto msg = error.message();
+                     auto ssl = tlsSock.native_handle();
+                     auto context = SSL_get_SSL_CTX(ssl);
+                     auto clientCiphers = SSL_get_client_ciphers(ssl);
+                     auto contextCiphers = SSL_CTX_get_ciphers(context);
+                     std::ostringstream offered;
+                     std::ostringstream configured;
+
+                     for (int i = 0; clientCiphers && i < sk_SSL_CIPHER_num(clientCiphers); ++i)
+                     {
+                        if (i > 0)
+                           offered << ',';
+                        offered << SSL_CIPHER_get_name(sk_SSL_CIPHER_value(clientCiphers, i));
+                     }
+
+                     for (int i = 0; contextCiphers && i < sk_SSL_CIPHER_num(contextCiphers); ++i)
+                     {
+                        if (i > 0)
+                           configured << ',';
+                        configured << SSL_CIPHER_get_name(sk_SSL_CIPHER_value(contextCiphers, i));
+                     }
+
+                     auto serverName = sniContexts->hostname(ssl);
+                     if (!serverName)
+                        serverName = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+                     auto certificate = SSL_CTX_get0_certificate(context);
+                     auto privateKey = SSL_CTX_get0_privatekey(context);
+                     auto publicKey = certificate ? X509_get0_pubkey(certificate) : nullptr;
+                     auto keyType = publicKey ? OBJ_nid2sn(EVP_PKEY_get_base_id(publicKey)) : nullptr;
+                     auto keyMatchesCertificate = SSL_CTX_check_private_key(context);
+                     auto certificateSuitability = SSL_check_chain(ssl, certificate, privateKey, nullptr);
+                     std::ostringstream peerSigalgs;
+                     std::ostringstream sharedSigalgs;
+                     std::ostringstream sharedGroups;
+
+                     for (int i = 0; ; ++i)
+                     {
+                        int signNid = 0;
+                        int hashNid = 0;
+                        int signHashNid = 0;
+                        unsigned char rawSign = 0;
+                        unsigned char rawHash = 0;
+                        if (SSL_get_sigalgs(ssl, i, &signNid, &hashNid, &signHashNid, &rawSign, &rawHash) <= 0)
+                           break;
+                        if (i > 0)
+                           peerSigalgs << ',';
+                        peerSigalgs << static_cast<unsigned int>(rawSign) << ':'
+                                    << static_cast<unsigned int>(rawHash);
+                     }
+
+                     for (int i = 0; ; ++i)
+                     {
+                        int signNid = 0;
+                        int hashNid = 0;
+                        int signHashNid = 0;
+                        unsigned char rawSign = 0;
+                        unsigned char rawHash = 0;
+                        if (SSL_get_shared_sigalgs(ssl, i, &signNid, &hashNid, &signHashNid, &rawSign, &rawHash) <= 0)
+                           break;
+                        if (i > 0)
+                           sharedSigalgs << ',';
+                        sharedSigalgs << static_cast<unsigned int>(rawSign) << ':'
+                                      << static_cast<unsigned int>(rawHash);
+                     }
+
+                     for (int i = 0; i < 16; ++i)
+                     {
+                        int groupNid = SSL_get_shared_group(ssl, i);
+                        if (groupNid == 0)
+                           break;
+                        if (i > 0)
+                           sharedGroups << ',';
+                        auto groupName = OBJ_nid2sn(groupNid);
+                        sharedGroups << (groupName ? groupName : "unknown");
+                     }
+
+                     logger->debug(
+                        "[{}] TLS handshake failed: {}; SNI={}, version={}, cipher={}, initial_SSL_CTX={}, active_SSL_CTX={}, security_level={}, cert_key={}, key_matches_certificate={}, certificate_suitability=0x{:X}, peer_ciphers=[{}], context_ciphers=[{}], peer_sigalgs=[{}], shared_sigalgs=[{}], shared_groups=[{}]",
+                        logType,
+                        error.message(),
+                        serverName ? serverName : "",
+                        SSL_get_version(ssl),
+                        SSL_get_cipher(ssl) ? SSL_get_cipher(ssl) : "(none)",
+                        static_cast<const void*>(initialContext),
+                        static_cast<const void*>(context),
+                        SSL_CTX_get_security_level(context),
+                        keyType ? keyType : "(none)",
+                        keyMatchesCertificate,
+                        certificateSuitability,
+                        offered.str(),
+                        configured.str(),
+                        peerSigalgs.str(),
+                        sharedSigalgs.str(),
+                        sharedGroups.str());
                   }
                
                   onStartCallback(error);
@@ -186,35 +305,28 @@ private:
                _tlsContex.use_tmp_dh(asio::buffer(tmpDh.data(), tmpDh.size()));
          }
 
-         // Register SNI callback with raw OpenSSL
-         SSL_CTX_set_tlsext_servername_callback(_tlsContex.native_handle(), sniCallback);
-            
-         // Prepare extra SSL_CTX objects for other SNI hosts
-         // and run http2::configureTlsContext for each context
-         if (_settings.hostCertificates().size() > 0) 
-         {
-            auto certChain  = _settings.getDefaultTlsAsset(TlsAsset::cerificate_chain);
-            auto privateKey = _settings.getDefaultTlsAsset(TlsAsset::private_key);
-            auto tmpDh      = _settings.getDefaultTlsAsset(TlsAsset::tmp_dh);
-            setupCertificateforSNI( 
-                 _settings.hostCertificates()
-               , _settings.tmpDhFile()
-               , certChain
-               , privateKey
-               , tmpDh 
+         auto certChain = _settings.getDefaultTlsAsset(TlsAsset::cerificate_chain);
+         auto privateKey = _settings.getDefaultTlsAsset(TlsAsset::private_key);
+         auto tmpDh = _settings.getDefaultTlsAsset(TlsAsset::tmp_dh);
+         _sniTlsContexts.configure(
+            _tlsContex,
+            _settings.hostCertificates(),
+            _settings.tmpDhFile(),
+            certChain,
+            privateKey,
+            tmpDh,
 #ifdef TOBASA_HTTP_USE_HTTP2
-               , _settings.http2Enabled()
+            _settings.http2Enabled()
+#else
+            false
 #endif
-            );
-         }
+         );
 
 #ifdef TOBASA_HTTP_USE_HTTP2
          if (_settings.http2Enabled())
-         {
-            // Configure TLS context for default context
-            http2::configureTlsContext(_tlsContex);
-         }
+            http2::configureTlsContextInModule(_tlsContex);
 #endif
+
       }
       catch(const std::exception& ex)
       {

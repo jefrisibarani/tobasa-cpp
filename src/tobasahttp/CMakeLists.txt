@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12-3.18)
 cmake_policy(SET CMP0091 NEW)
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   cmake_policy(SET CMP0079 NEW)
+endif()
 
 # The project
 project(tobasahttp VERSION 1.0 LANGUAGES CXX)
@@ -33,7 +36,7 @@ endif(OPENSSL_FOUND)
 
 
 if(TOBASA_USE_PREBUILT_ZLIB) # only for windows build
-   set(ZLIB_LIBS_HTTP optimized ${TOBASA_ZLIB_DIR}/lib/zlib_o.lib debug ${TOBASA_ZLIB_DIR}/lib/zlib_d.lib )
+   set(ZLIB_LIBS_HTTP optimized ${TOBASA_ZLIB_DIR}/lib/zlib.lib debug ${TOBASA_ZLIB_DIR}/lib/zlibd.lib )
    set(ZLIB_INC_DIR_HTTP ${TOBASA_ZLIB_DIR}/include)
 elseif(TOBASA_USE_BUNDLED_ZLIB)
    set(ZLIB_LIBS_HTTP ZLIB::ZLIBSTATIC )
@@ -47,48 +50,81 @@ else()
 endif()
 
 if(TOBASA_HTTP_USE_HTTP2)
-   if(NOT DEFINED TOBASA_HTTP2_DIR)
-      if(MSVC)
-         set(TOBASA_HTTP2_DIR ${TOBASA_HTTP2_DIR_DEF} )
-      else()
-         set(TOBASA_HTTP2_DIR ${TOBASA_HTTP2_DIR_DEF} )
+   if(TOBASA_BUILD_WITH_VCPKG)
+      set(TOBASA_VCPKG_NGHTTP2_ROOT
+         "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+      set(TOBASA_HTTP2_INCLUDE_DIR "${TOBASA_VCPKG_NGHTTP2_ROOT}/include")
+      set(TOBASA_HTTP2_RELEASE_LIBRARY "${TOBASA_VCPKG_NGHTTP2_ROOT}/lib/nghttp2.lib")
+      set(TOBASA_HTTP2_DEBUG_LIBRARY "${TOBASA_VCPKG_NGHTTP2_ROOT}/debug/lib/nghttp2.lib")
+
+      if(NOT EXISTS "${TOBASA_HTTP2_INCLUDE_DIR}/nghttp2/nghttp2.h"
+         OR NOT EXISTS "${TOBASA_HTTP2_RELEASE_LIBRARY}"
+         OR NOT EXISTS "${TOBASA_HTTP2_DEBUG_LIBRARY}")
+         message(FATAL_ERROR
+            "nghttp2 was not found in Vcpkg triplet '${VCPKG_TARGET_TRIPLET}' "
+            "under '${TOBASA_VCPKG_NGHTTP2_ROOT}'. Install the nghttp2 port for this triplet.")
       endif()
+
+      set(TOBASA_HTTP2_TARGET
+         optimized ${TOBASA_HTTP2_RELEASE_LIBRARY}
+         debug ${TOBASA_HTTP2_DEBUG_LIBRARY})
+   elseif(UNIX OR TOBASA_FIND_DEPS)
+      find_package(PkgConfig REQUIRED)
+      pkg_check_modules(NGHTTP2 REQUIRED IMPORTED_TARGET libnghttp2)
+      set(TOBASA_HTTP2_TARGET PkgConfig::NGHTTP2)
+   else()
+      if(NOT DEFINED TOBASA_HTTP2_DIR)
+         set(TOBASA_HTTP2_DIR ${TOBASA_HTTP2_DIR_DEF})
+      endif()
+      set(TOBASA_HTTP2_TARGET
+         optimized ${TOBASA_HTTP2_DIR}/lib/nghttp2.lib
+         debug ${TOBASA_HTTP2_DIR}/debug/lib/nghttp2.lib)
    endif()
 endif()
 
 ## no more dependecies dir settings here
 # The library
-add_library(${PROJECT_NAME})
-include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
-
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasa_monolithic)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_HTTP_SHARED)
+elseif(TOBASA_BUILD_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET ${PROJECT_NAME})
+   add_library(${PROJECT_NAME} SHARED)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_HTTP_SHARED)
+else()
+   set(TOBASA_MODULE_TARGET ${PROJECT_NAME})
+   add_library(${PROJECT_NAME} STATIC)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TBS_HTTP_STATIC)
 endif()
 
-target_sources( ${PROJECT_NAME}
+include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
+
+target_sources(${TOBASA_MODULE_TARGET}
    PRIVATE ${MY_SOURCES_LIST}
    PRIVATE ${MY_HEADERS_LIST} )
 
-target_link_libraries( ${PROJECT_NAME}
-   PRIVATE tobasa
-   PRIVATE ${OPENSSL_LIBRARIES} 
+if(NOT TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   target_link_libraries(${TOBASA_MODULE_TARGET} PRIVATE tobasa)
+endif()
+
+target_link_libraries(${TOBASA_MODULE_TARGET}
+   PUBLIC ${OPENSSL_LIBRARIES}
    PRIVATE ${ZLIB_LIBS_HTTP} )
 
 if(MSVC)
-   target_link_libraries( ${PROJECT_NAME} PUBLIC crypt32.lib )
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC crypt32.lib)
 endif()
 
 if(TOBASA_HTTP_USE_HTTP2)
-   target_include_directories( ${PROJECT_NAME} PUBLIC ${TOBASA_HTTP2_DIR}/include )
-   if (MSVC)
-      target_link_libraries( ${PROJECT_NAME} PUBLIC ${TOBASA_HTTP2_DIR}/lib/nghttp2.lib )
-   else()
-      target_link_libraries( ${PROJECT_NAME} PUBLIC ${TOBASA_HTTP2_DIR}/lib/libnghttp2.a )
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_HTTP2_TARGET})
+   if(DEFINED TOBASA_HTTP2_INCLUDE_DIR)
+      target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_HTTP2_INCLUDE_DIR})
+   elseif(NOT UNIX)
+      target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_HTTP2_DIR}/include)
    endif()
 endif()
 
-target_include_directories( ${PROJECT_NAME}
+target_include_directories(${TOBASA_MODULE_TARGET}
    PUBLIC ${ZLIB_INC_DIR_HTTP}
    PUBLIC ${OPENSSL_INCLUDE_DIR}
    PUBLIC ${ASIO_INCLUDE_DIR}
@@ -96,29 +132,31 @@ target_include_directories( ${PROJECT_NAME}
    PUBLIC ${PROJECT_SOURCE_DIR}/src 
    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../tobasa/include" )
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC ASIO_STANDALONE )
+target_compile_definitions(${TOBASA_MODULE_TARGET}
+   PUBLIC ASIO_STANDALONE
+   PUBLIC ASIO_USE_TS_EXECUTOR_AS_DEFAULT )
 
 if (TOBASA_HTTP_USE_HTTP2)
-   target_compile_definitions( ${PROJECT_NAME} 
+   target_compile_definitions(${TOBASA_MODULE_TARGET}
       PUBLIC TOBASA_HTTP_USE_HTTP2
       PUBLIC TOBASA_HTTP2_WRITE_RESPONSE_NO_COPY_DATA
       PUBLIC NGHTTP2_NO_SSIZE_T)
 endif()
 
 if (MSVC)
-   target_compile_definitions(${PROJECT_NAME} PUBLIC _WIN32_WINNT=0x0601 _SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING NOMINMAX)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC _WIN32_WINNT=0x0601 _SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING NOMINMAX)
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    message(STATUS "${PROJECT_NAME} use cxx_std_20")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_20)
 else()
    message(STATUS "${PROJECT_NAME} use cxx_std_17")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_17)
 endif()
 
 if(MSVC)
-   target_compile_options(${PROJECT_NAME} PRIVATE /bigobj /FS )
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE /bigobj /FS )
 endif()
 
 # Show filtered headers in IDE

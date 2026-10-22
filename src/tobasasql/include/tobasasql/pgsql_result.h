@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <cassert>
 #include <string>
 #include <memory>
@@ -24,7 +26,7 @@ namespace sql {
  *
  * Provides full navigation and value retrieval via SqlResult interface.
  */
-class PgsqlResult : public ResultCommon
+class TBS_SQL_API PgsqlResult : public ResultCommon
 {
 public:
    using VariantType   = DefaultVariantType;

@@ -78,6 +78,7 @@ endif()
 # Target link libraries, compile definitions, include dirs
 # -------------------------------------------------------
 target_link_libraries( ${PROJECT_NAME} PRIVATE tobasa tobasasql tobasahttp tobasaweb)
+tobasa_stage_shared_runtime(${PROJECT_NAME} tobasa tobasasql tobasahttp tobasaweb tobasalis sqlite3_mc)
 
 if (TOBASA_BUILD_LIS_ENGINE)   
    target_link_libraries( ${PROJECT_NAME} PRIVATE tobasalis )
@@ -120,11 +121,14 @@ if(TOBASA_BUILD_IN_MEMORY_RESOURCES)
    target_compile_definitions( ${PROJECT_NAME} PRIVATE TOBASA_BUILD_IN_MEMORY_RESOURCES )
 endif()
 
+if(TOBASA_BUILD_IN_MEMORY_TZDB)
+   target_compile_definitions( ${PROJECT_NAME} PRIVATE TOBASA_DATE_USE_IN_MEMORY_TZDB )
+endif()
 
 # -------------------------------------------------------
 if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   #set_property(TARGET ${PROJECT_NAME} PROPERTY
+   #   MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
    target_link_libraries( ${PROJECT_NAME}
       PRIVATE ws2_32
@@ -279,6 +283,15 @@ if(NOT TOBASA_USE_STD_CALENDAR_TZONE)
    endif()
 endif()
 
+
+# Copy Plugins
+# -------------------------------------------------------
+if (TOBASA_BUILD_SHARED_LIB)
+   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:session_store_sqlite_plugin> $<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins/
+   )
+endif()
 
 # Copy binary dir to _output dir
 # -------------------------------------------------------

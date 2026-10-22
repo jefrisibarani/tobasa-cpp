@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(_MSC_VER) && defined(_WIN32)
 #include <windows.h>
 #endif
@@ -19,7 +21,7 @@ class DataSet;
 class OdbcConnection;
 class OdbcResult;
 
-class OdbcCommand : public Notifier
+class TBS_SQL_API OdbcCommand : public Notifier
 {
    using VariantType   = DefaultVariantType;
    using VariantHelper = VariantHelper<VariantType>;

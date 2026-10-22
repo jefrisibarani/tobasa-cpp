@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
 #import "c:\Program Files\Common Files\System\ado\msado15.dll" rename("EOF", "EndOfFile")
@@ -19,7 +21,7 @@ namespace sql {
  * - Windows-only backend.
  * \note use DataTypeCompatibilyt=80 in connection string
  */ 
-class AdodbConnection : public ConnectionCommon
+class TBS_SQL_API AdodbConnection : public ConnectionCommon
 {
 public:
    AdodbConnection();

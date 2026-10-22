@@ -8,11 +8,12 @@
 #include <string>
 #include <vector>
 #include "tobasa/data_reader.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
 
-class RequestDataSource : public std::enable_shared_from_this<RequestDataSource>
+class TBS_HTTP_API RequestDataSource : public std::enable_shared_from_this<RequestDataSource>
 {
 public:
    using ReadHandler = std::function<void(std::vector<uint8_t>, std::exception_ptr)>;

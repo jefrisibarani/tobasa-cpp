@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <stdexcept>
 #include <string>
 
@@ -12,7 +14,7 @@ static const std::string ERR_BAD_MESSAGE              = "Validation Error - Bad 
 static const std::string ERR_PARSING_ERROR            = "Parsing Error";
 static const std::string ERR_SERIALIZATION_ERROR      = "Serialization Error";
 
-class HL7Exception : public std::runtime_error
+class TBS_LIS_API HL7Exception : public std::runtime_error
 {
 private:
    std::string _errorCode;

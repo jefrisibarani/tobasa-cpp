@@ -3,6 +3,7 @@
 #include <string_view>
 #include "tobasahttp/field.h"
 #include "tobasahttp/header_names.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -18,7 +19,7 @@ struct HeaderValue
  * \ingroup HTTP
  * \brief Request/Response headers
  */
-class Headers
+class TBS_HTTP_API Headers
    : public FieldLowerCaseCollection
 {
 public:

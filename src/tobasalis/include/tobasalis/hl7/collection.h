@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <stdexcept>
 #include <memory>
 #include <string>
@@ -9,7 +11,7 @@ namespace tbs {
 namespace hl7 {
 
 template<class T>
-class Collection
+class TBS_LIS_API Collection
 {
 private:
     std::vector<std::shared_ptr<T>> _vector;

@@ -11,16 +11,14 @@ target_sources( ${PROJECT_NAME}
    PRIVATE ${PROJECT_SOURCE_DIR}/src/build_info.cpp
    PRIVATE $<$<CXX_COMPILER_ID:MSVC>:${PROJECT_SOURCE_DIR}/src/tobasa_app.rc> )
 
-target_link_libraries( ${PROJECT_NAME}
-   PRIVATE tobasa tobasahttp tobasaweb )
+target_link_libraries( ${PROJECT_NAME} PRIVATE tobasa tobasahttp tobasaweb )
+
+tobasa_stage_shared_runtime(${PROJECT_NAME} tobasa tobasahttp tobasaweb tobasasql)
 
 target_include_directories( ${PROJECT_NAME}
    PRIVATE ${PROJECT_SOURCE_DIR}/src )
 
 if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
    target_compile_definitions( ${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS )
 endif()
 

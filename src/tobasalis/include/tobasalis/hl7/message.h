@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -36,7 +38,7 @@ Note:
 
 using byte = unsigned char;
 
-class Message
+class TBS_LIS_API Message
    : public lis::Message
 {
 private:

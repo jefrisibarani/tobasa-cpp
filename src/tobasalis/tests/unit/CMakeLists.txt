@@ -7,4 +7,6 @@ set_target_properties(tobasalis_unit_tests PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
 target_link_libraries(tobasalis_unit_tests PRIVATE tobasalis GTest::gtest_main)
+tobasa_stage_shared_runtime(tobasalis_unit_tests tobasalis)
+
 gtest_discover_tests(tobasalis_unit_tests)

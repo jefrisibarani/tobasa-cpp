@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasahttp/server/common.h>
 #include "tobasaweb/middleware.h"
 #include "tobasaweb/result.h"
@@ -13,7 +15,7 @@ class RouterBase;
  * \ingroup WEB
  * Middleware manager and HTTP server request handler.
  */
-class MiddlewareManager
+class TBS_WEB_API MiddlewareManager
 {
 private:
    using MiddlewareList = std::vector<MiddlewarePtr>;

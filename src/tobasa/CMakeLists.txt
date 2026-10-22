@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12-3.18)
 cmake_policy(SET CMP0091 NEW)
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   cmake_policy(SET CMP0079 NEW)
+endif()
 
 project(tobasa VERSION 1.0 LANGUAGES CXX)
 
@@ -44,7 +47,7 @@ if(NOT TOBASA_USE_STD_TEXT_FORMATTING)
       find_package(fmt CONFIG REQUIRED) 
    else()
       message(STATUS "tobasa Using bundled format library")
-      add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/fmt ${CMAKE_SOURCE_DIR}/build_ext/fmt EXCLUDE_FROM_ALL)
+      add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/fmt ${CMAKE_BINARY_DIR}/_exts/fmt EXCLUDE_FROM_ALL)
    endif()
 else()
    message(STATUS "tobasa Using std::fmt formatting library")
@@ -77,11 +80,6 @@ if(NOT TOBASA_USE_STD_CALENDAR_TZONE)
       if(TOBASA_BUILD_IN_MEMORY_TZDB)
          target_sources( timezone PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_assets.cpp )
       endif()   
-
-      if(MSVC)
-         set_property(TARGET timezone PROPERTY
-            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-      endif()
 
       target_include_directories(timezone PRIVATE ${TOBASA_EXTERNAL_DEPS_DIR}/date/include )
 
@@ -126,78 +124,86 @@ endif()
 # -------------------------------------------------------
 # The library
 # -------------------------------------------------------
-add_library(tobasa)
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasa_monolithic)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_SHARED)
+elseif(TOBASA_BUILD_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasa)
+   add_library(tobasa SHARED)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_SHARED)
+else()
+   set(TOBASA_MODULE_TARGET tobasa)
+   add_library(tobasa STATIC)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TBS_STATIC)
+endif()
+
 include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
 
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
+function(configure_tobasa_target target)
+   target_sources(${target}
+      PRIVATE ${MY_SOURCES_LIST}
+      PRIVATE ${MY_HEADERS_LIST})
 
+   target_include_directories(${target}
+      PUBLIC ${TOBASA_EXTERNAL_DEPS_DIR}/nlohmann/include
+      PUBLIC ${TOBASA_EXTERNAL_DEPS_DIR}/utf8cpp/include
+      PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
-target_sources(tobasa
-   PRIVATE ${MY_SOURCES_LIST}
-   PRIVATE ${MY_HEADERS_LIST})
-
-
-target_include_directories(tobasa
-   PUBLIC ${TOBASA_EXTERNAL_DEPS_DIR}/nlohmann/include
-   PUBLIC ${TOBASA_EXTERNAL_DEPS_DIR}/utf8cpp/include
-   PUBLIC ${PROJECT_SOURCE_DIR}/include )
-
-   
-if(NOT TOBASA_USE_STD_TEXT_FORMATTING)
-   if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
-      target_link_libraries(tobasa PUBLIC fmt::fmt )
-   else()
-      message(STATUS "tobasa Using bundled Formatting fmt library")
-      target_link_libraries(tobasa PUBLIC fmt::fmt)
-   endif()
-endif()
-
-
-if(NOT TOBASA_USE_STD_CALENDAR_TZONE)
-   if(NOT TOBASA_USE_BUNDLED_TZ_LIB)
-      target_link_libraries(tobasa PUBLIC date::date date::date-tz)
-   else()
-      target_include_directories(tobasa PUBLIC ${TOBASA_EXTERNAL_DEPS_DIR}/date/include )
-      target_link_libraries(tobasa PUBLIC timezone )
-      
-      if(WIN32)
-         if(TOBASA_BUILD_IN_MEMORY_TZDB)
-            target_compile_definitions(tobasa PUBLIC TOBASA_DATE_USE_IN_MEMORY_TZDB)
-         endif()
+   if(NOT TOBASA_USE_STD_TEXT_FORMATTING)
+      if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
+         target_link_libraries(${target} PUBLIC fmt::fmt)
       else()
-         if(TOBASA_BUILD_IN_MEMORY_TZDB)
-            target_compile_definitions(tobasa PUBLIC TOBASA_DATE_USE_IN_MEMORY_TZDB)
-         else()
-            target_compile_definitions(tobasa PUBLIC TOBASA_DATE_USE_OS_TZDB)
-         endif()
+         message(STATUS "tobasa Using bundled Formatting fmt library")
+         target_link_libraries(${target} PUBLIC fmt::fmt)
       endif()
-
    endif()
-endif()
 
 
-if(MSVC)
-   target_compile_definitions(tobasa PUBLIC _CRT_SECURE_NO_WARNINGS _UNICODE NOMINMAX)
-   target_compile_options(tobasa PRIVATE /bigobj /FS )
-   target_link_libraries(tobasa PUBLIC shlwapi )
-endif()
+   if(NOT TOBASA_USE_STD_CALENDAR_TZONE)
+      if(NOT TOBASA_USE_BUNDLED_TZ_LIB)
+         target_link_libraries(${target} PUBLIC date::date date::date-tz)
+      else()
+         target_include_directories(${target} PUBLIC ${TOBASA_EXTERNAL_DEPS_DIR}/date/include)
+         target_link_libraries(${target} PUBLIC timezone)
+
+         if(WIN32)
+            if(TOBASA_BUILD_IN_MEMORY_TZDB)
+               target_compile_definitions(${target} PUBLIC TOBASA_DATE_USE_IN_MEMORY_TZDB)
+            endif()
+         else()
+            if(TOBASA_BUILD_IN_MEMORY_TZDB)
+               target_compile_definitions(${target} PUBLIC TOBASA_DATE_USE_IN_MEMORY_TZDB)
+            else()
+               target_compile_definitions(${target} PUBLIC TOBASA_DATE_USE_OS_TZDB)
+            endif()
+         endif()
+
+      endif()
+   endif()
 
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-   target_compile_options(tobasa PRIVATE -fpic -c -Wall)
-endif()
+   if(MSVC)
+      target_compile_definitions(${target} PUBLIC _CRT_SECURE_NO_WARNINGS _UNICODE NOMINMAX)
+      target_compile_options(${target} PRIVATE /bigobj /FS)
+      target_link_libraries(${target} PUBLIC shlwapi)
+   endif()
 
 
-if(CMAKE_CXX20_COMPILE_FEATURES)
-   message(STATUS "tobasa use cxx_std_20")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
-else()
-   message(STATUS "tobasa use cxx_std_17")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-endif()
+   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+      target_compile_options(${target} PRIVATE -fpic -Wall)
+   endif()
+
+
+   if(CMAKE_CXX20_COMPILE_FEATURES)
+      message(STATUS "tobasa use cxx_std_20")
+      target_compile_features(${target} PUBLIC cxx_std_20)
+   else()
+      message(STATUS "tobasa use cxx_std_17")
+      target_compile_features(${target} PUBLIC cxx_std_17)
+   endif()
+endfunction()
+
+configure_tobasa_target(${TOBASA_MODULE_TARGET})
 
 
 # Show filtered headers in IDE

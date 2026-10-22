@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasasql/sql_conn_variant.h>
 #include <tobasasql/database_service_factory_base.h>
 
@@ -11,7 +13,7 @@ namespace web {
  * ServiceClientBase.
  * Class providing access to AuthDbRepo and SqlConnection
  */
-class ServiceClientBase
+class TBS_WEB_API ServiceClientBase
 {
 public:
    ServiceClientBase(const ServiceClientBase &) = delete;

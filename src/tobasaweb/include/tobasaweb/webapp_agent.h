@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <string>
 #include <memory>
 #include <tobasahttp/server/http_server.h>
@@ -14,7 +16,7 @@ namespace web {
 
 class Webapp;
 
-class WebappAgent
+class TBS_WEB_API WebappAgent
 {
    friend class Webapp;
 

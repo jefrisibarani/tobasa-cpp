@@ -137,6 +137,25 @@ void Webapp::useSession(web::SessionMiddlewareOptionBuilder builder)
    this->addMiddleware( factory );
 }
 
+/** Use CSRF middleware.
+ * @param builder Options builder functor for middleware
+ */
+void Webapp::useCsrf(web::CsrfMiddlewareOptionBuilder builder)
+{
+   auto factory = web::makeMiddleware<web::CsrfMiddleware>();
+   if (builder)
+   {
+      web::CsrfMiddlewareOption option;
+      builder(option);
+      factory->resultBuilder(std::move(option.resultBuilder));
+      auto middlewareInstance = std::static_pointer_cast<web::CsrfMiddleware>(factory->middleWare());
+      if (middlewareInstance)
+         middlewareInstance->option(std::move(option));
+   }
+
+   this->addMiddleware(factory);
+}
+
 /** Use Session middleware.
  * @param builder Options builder functor for middleware
  */

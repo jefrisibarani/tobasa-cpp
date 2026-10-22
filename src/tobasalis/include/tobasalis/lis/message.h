@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/record.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace lis {
 /** \defgroup LIS Laboratorium Information System
  */
 
-struct MessageOption
+struct TBS_LIS_API MessageOption
 {
    bool        autoDetectDelimiter = false;
    std::string fieldDelimiter;
@@ -26,7 +28,7 @@ struct MessageOption
  *    lis::MSG_LIS2A
  *    lis::MSG_HL7
  */
-class Message
+class TBS_LIS_API Message
 {
 public:
    Message();

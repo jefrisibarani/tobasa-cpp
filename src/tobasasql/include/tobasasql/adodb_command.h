@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
 #import "c:\Program Files\Common Files\System\ado\msado15.dll" rename("EOF", "EndOfFile")
@@ -22,7 +24,7 @@ class AdodbResult;
  * \ingroup SQL
  * \brief ADO command class.
  */
-class AdodbCommand : public Notifier
+class TBS_SQL_API AdodbCommand : public Notifier
 {
 public:
 

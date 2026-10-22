@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <set>
 #include <tobasa/non_copyable.h>
 #include "tobasalis/lis/netsession.h"
@@ -12,7 +14,7 @@ namespace lis {
  * Manages open connections so that they may be cleanly stopped when the server
  * needs to shut down.
  */
-class NetsessionManager : private NonCopyable
+class TBS_LIS_API NetsessionManager : private NonCopyable
 {
 public:
    NetsessionManager();

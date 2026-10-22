@@ -4,6 +4,7 @@
 #include <functional>
 #include "tobasa/span.h"
 #include "tobasahttp/http_parser.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -33,7 +34,7 @@ namespace http {
  *    much data was consumed.
  * 5. When the body is finished, call done(true).
  */
-class MultipartBodyReader
+class TBS_HTTP_API MultipartBodyReader
    : public std::enable_shared_from_this<MultipartBodyReader>
 {
 public:

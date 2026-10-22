@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 namespace tbs {
 namespace lis {
 
@@ -7,7 +9,7 @@ namespace lis {
  * Delimiter
  * 
  */
-struct Delimiter
+struct TBS_LIS_API Delimiter
 {
    char fieldDelimiter     = '\x00';   // '|'
    char repeatDelimiter    = '\x00';   // '\\'

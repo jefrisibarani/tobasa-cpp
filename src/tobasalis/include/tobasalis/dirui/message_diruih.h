@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/message.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace dirui {
 /** \ingroup LIS
  * Dirui Message
  */
-class Message
+class TBS_LIS_API Message
    : public lis::Message
 {
 public:

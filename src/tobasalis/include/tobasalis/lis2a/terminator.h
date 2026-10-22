@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/record.h"
 
 namespace tbs {
@@ -22,7 +24,7 @@ enum class TerminationCode
 /** TerminatorRecord
  * CLSI LIS2-A Message Terminator Record
  */
-class TerminatorRecord
+class TBS_LIS_API TerminatorRecord
    : public Record
 {
 public:

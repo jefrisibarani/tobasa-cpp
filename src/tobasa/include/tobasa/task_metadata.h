@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <chrono>
+#include "tobasa/exp_imp.h"
 #include "tobasa/json.h"
 #include "tobasa/task_result.h"
 
@@ -40,7 +41,7 @@ using TaskMetadataPtr = std::shared_ptr<TaskMetadata>;
  * This version is more friendly for API or frontend side,
  * because all data is converted to string (for JSON or text display).
  */
-struct TaskMetadataDto
+struct TBS_API TaskMetadataDto
 {
    int         id;
    int         taskId;

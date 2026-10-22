@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include "tobasasql/column_info.h"
 #include "tobasasql/odbc_result.h"
@@ -12,7 +14,7 @@ namespace sql {
  * \brief ODBC Table helper.
  * \note Tested only with MS SQL Server   
 */
-class OdbcTableHelper
+class TBS_SQL_API OdbcTableHelper
 {
 public:
    bool isView(OdbcConnection& connection);

@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include "tobasahttp/type_common.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -23,36 +24,36 @@ template <typename T> std::string toString(const T& v)
  * \param data
  * \param out ouput decoded value
  */
-bool percentDecode(const std::string& data, std::string& out);
+TBS_HTTP_API bool percentDecode(const std::string& data, std::string& out);
 
 /** 
  * Decode a percent-encoded data, return decoded value.
  * @param data
  */
-std::string percentDecode(const std::string& data);
+TBS_HTTP_API std::string percentDecode(const std::string& data);
 
 /** 
  * Extract and get path from uri.
  * @param uri
  * @sa https://www.rfc-editor.org/rfc/rfc3986#section-3.3
  */
-std::string urlGetPath(const std::string& uri);
+TBS_HTTP_API std::string urlGetPath(const std::string& uri);
 
 /** 
  * Extract and get query string from uri.
  * @param uri
  * @sa https://www.rfc-editor.org/rfc/rfc3986#section-3.4
  */
-std::string urlGetQueryString(const std::string& uri);
+TBS_HTTP_API std::string urlGetQueryString(const std::string& uri);
 
 /** 
  * Get TimerType as string
  */
-std::string timerTypeToString(TimerType timerType);
+TBS_HTTP_API std::string timerTypeToString(TimerType timerType);
 
-std::string logHttpTypeInfo(InstanceType _instanceType, bool tlsMode);
+TBS_HTTP_API std::string logHttpTypeInfo(InstanceType _instanceType, bool tlsMode);
 
-bool isCompressible(const std::string& ctype, const std::vector<std::string>& mimetypes);
+TBS_HTTP_API bool isCompressible(const std::string& ctype, const std::vector<std::string>& mimetypes);
 
 /** @}*/
 

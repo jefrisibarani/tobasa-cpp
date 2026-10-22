@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 #include <vector>
 #include "tobasalis/hl7/message_element.h"
@@ -7,7 +9,7 @@
 namespace tbs {
 namespace hl7 {
 
-class SubComponent : public MessageElement
+class TBS_LIS_API SubComponent : public MessageElement
 {
 public:
    ~SubComponent();

@@ -6,6 +6,7 @@
 #include <optional>
 #include "tobasahttp/headers.h"
 #include "tobasahttp/field.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -57,7 +58,7 @@ namespace http {
  * - If validation fails or structure mismatches, `match()` returns false 
  *   and and the server should respond with HTTP 404 (Not Found)
  */
-class PathArgument
+class TBS_HTTP_API PathArgument
    : public FieldCollection
 {
 public:

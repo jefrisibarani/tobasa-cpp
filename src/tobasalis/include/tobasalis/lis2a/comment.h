@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/record.h"
 
 namespace tbs {
@@ -9,7 +11,7 @@ namespace lis2a {
  * CommentRecord
  * CLSI LIS02-A2 Comment Record
  */
-class CommentRecord
+class TBS_LIS_API CommentRecord
    : public Record
 {
 public:

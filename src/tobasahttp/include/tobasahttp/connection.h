@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasahttp/exp_imp.h"
+
 #include <string>
 #include <memory>
 #include <functional>
@@ -17,7 +19,7 @@ namespace http {
 /**
  * @brief Base class for all HTTP connections.
  */
-class Connection
+class TBS_HTTP_API Connection
    : public std::enable_shared_from_this<Connection>
 {
 protected:

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasa/exp_imp.h" 
+
 namespace tbs {
 
 /**
@@ -9,7 +11,7 @@ namespace tbs {
  * Inheriting from this class deletes the copy constructor and copy
  * assignment operator of the derived type.
  */
-class NonCopyable
+class TBS_API NonCopyable
 {
 protected:
    NonCopyable() = default;

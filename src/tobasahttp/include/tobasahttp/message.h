@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include "tobasahttp/headers.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -11,7 +12,7 @@ namespace http {
  * \brief HTTP Message.
  * Base class for Request and Response
  */
-class Message
+class TBS_HTTP_API Message
 {
 protected:
    uint16_t    _majorVersion {1};

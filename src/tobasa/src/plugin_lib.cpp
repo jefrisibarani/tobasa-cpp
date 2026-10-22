@@ -54,10 +54,33 @@ void PluginLibrary::unload()
 {
    if (_loaded)
    {
-      if (_factory && _factory->getPlugin() != nullptr)
-         unloadPlugin();
+      try
+      {
+         if (_factory && _factory->getPlugin() != nullptr)
+            unloadPlugin();
+      }
+      catch (const std::exception& e)
+      {
+         Logger::logE("Exception while unloading plugin from: " + _path + ". " + e.what());
+      }
+      catch (...)
+      {
+         Logger::logE("Unknown exception while unloading plugin from: " + _path);
+      }
 
-      _lib->unload();
+      try
+      {
+         _lib->unload();
+      }
+      catch (const std::exception& e)
+      {
+         Logger::logE("Exception while unloading library: " + _path + ". " + e.what());
+      }
+      catch (...)
+      {
+         Logger::logE("Unknown exception while unloading library: " + _path);
+      }
+
       _factory = nullptr;
       _plugin = nullptr;
       _loaded = false;
@@ -75,13 +98,58 @@ bool PluginLibrary::loadPlugin()
    if (!_factory)
       return false;
 
-   _factory->createPlugin();
+   try
+   {
+      _factory->createPlugin();
+   }
+   catch (const std::exception& e)
+   {
+      Logger::logE("Exception creating plugin from: " + _path + ". " + e.what());
+      return false;
+   }
+   catch (...)
+   {
+      Logger::logE("Unknown exception creating plugin from: " + _path);
+      return false;
+   }
+
    Plugin* plugin = _factory->getPlugin();
    if (plugin)
    {
       _plugin = plugin;
-      plugin->load();
-      return true;
+      try
+      {
+         plugin->load();
+         return true;
+      }
+      catch (const std::exception& e)
+      {
+         Logger::logE("Exception loading plugin from: " + _path + ". " + e.what());
+         try
+         {
+            _factory->deletePlugin();
+         }
+         catch (const std::exception& ex)
+         {
+            Logger::logE("Exception deleting failed plugin from: " + _path + ". " + ex.what());
+         }
+         _plugin = nullptr;
+         return false;
+      }
+      catch (...)
+      {
+         Logger::logE("Unknown exception loading plugin from: " + _path);
+         try
+         {
+            _factory->deletePlugin();
+         }
+         catch (const std::exception& ex)
+         {
+            Logger::logE("Exception deleting failed plugin from: " + _path + ". " + ex.what());
+         }
+         _plugin = nullptr;
+         return false;
+      }
    }
    else
    {
@@ -98,8 +166,32 @@ void PluginLibrary::unloadPlugin()
    Plugin* plugin = _factory->getPlugin();
    if (plugin != nullptr)
    {
-      plugin->unload();
-      _factory->deletePlugin();
+      try
+      {
+         plugin->unload();
+      }
+      catch (const std::exception& e)
+      {
+         Logger::logE("Exception unloading plugin from: " + _path + ". " + e.what());
+      }
+      catch (...)
+      {
+         Logger::logE("Unknown exception unloading plugin from: " + _path);
+      }
+
+      try
+      {
+         _factory->deletePlugin();
+      }
+      catch (const std::exception& e)
+      {
+         Logger::logE("Exception deleting plugin from: " + _path + ". " + e.what());
+      }
+      catch (...)
+      {
+         Logger::logE("Unknown exception deleting plugin from: " + _path);
+      }
+
       _plugin = nullptr;
    }
 }
@@ -116,9 +208,24 @@ bool PluginLibrary::hasPlugin() const
 
 std::string PluginLibrary::getPluginName() const
 {
-   if (_factory != nullptr )
-      return _factory->name();
-   
+   if (_factory != nullptr)
+   {
+      const char* name = _factory->name();
+      return name ? std::string(name) : std::string();
+   }
+
+   return "";
+}
+
+
+std::string PluginLibrary::getPluginId() const
+{
+   if (_factory != nullptr)
+   {
+      const char* id = _factory->id();
+      return id ? std::string(id) : std::string();
+   }
+
    return "";
 }
 

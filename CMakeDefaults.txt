@@ -12,23 +12,36 @@ if(WIN32)
    # Supported values: vs2022, vs2017
    set(MSVS_VER "vs2022")
 
-   if(TOBASA_BUILD_WITH_VCPKG)
-      set(VCPKG_TARGET_TRIPLET_DEF     "x64-windows-static-${MSVS_VER}" )
+   # Tobasa Library build as static library, CRT Linkage: static,  Deps Library Linkage: static
+   set(MSVS_LINK "static")
+
+   if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+      # One Tobasa DLL, dynamic CRT, and static third-party libraries.
+      set(MSVS_LINK "tbs-shared-monolithic")
+   elseif(TOBASA_BUILD_SHARED_LIB)
+      # Tobasa Library build as shared library, CRT Linkage: dynamic, Deps Library Linkage: static
+      set(MSVS_LINK "tbs-shared")
+   endif()
+
+   if(TOBASA_BUILD_WITH_VCPKG)         
+      set(VCPKG_TARGET_TRIPLET_DEF     "x64-windows-${MSVS_LINK}-${MSVS_VER}" )
       set(VCPKG_OVERLAY_PORTS_DEF      "d:/vcpkg/my_ports_${MSVS_VER}" )
       set(VCPKG_TOOLCHAIN_FILE_DEF     "d:/vcpkg/scripts/buildsystems/vcpkg.cmake" )
    endif() 
 
-   set(TOBASA_OPENSSL_DIR_DEF          "d:/dev/openssl_x64-windows-static-${MSVS_VER}" )
-   set(TOBASA_ZLIB_DIR_DEF             "d:/dev/dcmtk/dcmtk_3.6.8_x64_MT_${MSVS_VER}/zlib-1.3" )
+   set(TOBASA_OPENSSL_DIR_DEF          "d:/dev/tbs_3rdparty_packages/openssl_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   set(TOBASA_LIBPQ_DIR_DEF            "d:/dev/tbs_3rdparty_packages/libpq_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   
+   set(TOBASA_ZLIB_DIR_DEF             "d:/dev/tbs_3rdparty_packages/zlib_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   set(TOBASA_MINIZIP_DIR_DEF          "d:/dev/tbs_3rdparty_packages/minizip_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
 
-   # Use a statically built libpq library.
-   # As an alternative, the libpq DLL provided in the PostgreSQL binary
-   # distribution can also be used (e.g., PostgreSQL 11.7 or 10.19).
-   # Example installation path: D:/programs/PostgreSQL/11.7_x64
-   set(TOBASA_LIBPQ_DIR_DEF            "d:/dev/libpq_x64-windows-static-${MSVS_VER}" )
+   set(TOBASA_PROTOBUF_DIR_DEF         "d:/dev/tbs_3rdparty_packages/protobuf_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   set(TOBASA_HTTP2_DIR_DEF            "d:/dev/tbs_3rdparty_packages/nghttp2_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
 
-   set(TOBASA_PROTOBUF_DIR_DEF         "d:/dev/protobuf_x64-windows-static-${MSVS_VER}" )
-   set(TOBASA_HTTP2_DIR_DEF            "d:/dev/nghttp2_x64-windows-static-${MSVS_VER}" )
+   set(TOBASA_LIBPNG_DIR_DEF           "d:/dev/tbs_3rdparty_packages/libpng_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   set(TOBASA_LIBXML2_DIR_DEF          "d:/dev/tbs_3rdparty_packages/libxml2_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   set(TOBASA_OPENJPEG_DIR_DEF         "d:/dev/tbs_3rdparty_packages/openjpeg_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+   set(TOBASA_LIBTIFF_DIR_DEF          "d:/dev/tbs_3rdparty_packages/tiff_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
 
 else()
    set(TOBASA_PROTOBUF_DIR_DEF         "/opt/protobuf" )

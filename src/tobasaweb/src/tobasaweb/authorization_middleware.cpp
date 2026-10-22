@@ -25,10 +25,8 @@ void AuthorizationMiddleware::option(AuthorizationMiddlewareOption option)
    _option = std::move(option);
 }
 
-void AuthorizationMiddleware::applyHttpResult(
-   const http::HttpContext& context,
-   http::StatusCode statusCode,
-   const std::string& message)
+void AuthorizationMiddleware::applyHttpResult( const http::HttpContext& context,
+   http::StatusCode statusCode, const std::string& message)
 {
    if (_resultBuilder)
    {

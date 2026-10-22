@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <string>
+#include "tobasa/exp_imp.h"
 #include "tobasa/data_reader.h"
 
 namespace tbs {
@@ -12,7 +13,7 @@ namespace tbs {
  * FileReader provides sequential and position-based reads from an input file,
  * either into a byte buffer or directly into an output stream.
  */
-class FileReader : public DataReader
+class TBS_API FileReader : public DataReader
 {
 public:
    explicit FileReader(const std::string& filePath);

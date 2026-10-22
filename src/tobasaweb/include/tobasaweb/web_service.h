@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include "tobasaweb/router.h"
 #include "tobasaweb/middleware_manager.h"
 #include "tobasaweb/web_service_base.h"
@@ -18,7 +20,7 @@ namespace web {
  * Encapsulates functionalities for managing web services, 
  * controllers, middlewares, and related configurations 
  */
-class WebService
+class TBS_WEB_API WebService
    : public WebServiceBase
 {
 private:

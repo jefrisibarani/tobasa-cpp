@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasaweb/result.h>
 
 namespace tbs {
@@ -15,7 +17,7 @@ class WebServiceBase;
 /** 
  * Middleware factory base class
  */
-class MiddlewareFactoryBase
+class TBS_WEB_API MiddlewareFactoryBase
 {
 public:
    MiddlewareFactoryBase( const MiddlewareFactoryBase & ) = delete;

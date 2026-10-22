@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/subuniversaltest.h"
 
 namespace tbs {
@@ -55,7 +57,7 @@ enum class OrderReportType
  * OrderRecord.
  * CLSI LIS02-A2 (formerly ASTM 1394-97) Test Order Record
  */
-class OrderRecord
+class TBS_LIS_API OrderRecord
    : public Record
 {
 public:

@@ -1,5 +1,5 @@
 
-# Tobasa C++ Libraries
+# Tobasa C++ Framework
 
 Tobasa is a collection of small, focused C++ libraries that form the
 building blocks web‑service applications.\

@@ -6,6 +6,7 @@
 #include <optional>
 #include "tobasahttp/headers.h"
 #include "tobasahttp/field.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -19,7 +20,7 @@ namespace http {
  * \sa https://www.rfc-editor.org/rfc/rfc3986#section-3.3
  * field1=value1&field2=value2&field3=value3... *
  */
-class QueryString
+class TBS_HTTP_API QueryString
    : public FieldCollection
 {
 public:

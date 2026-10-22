@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
 #include <string>
@@ -26,7 +28,7 @@ namespace sql {
  *
  * Provides full navigation and value retrieval via SqlResult interface.
  */
-class AdodbResult : public ResultCommon
+class TBS_SQL_API AdodbResult : public ResultCommon
 {
 public:
 

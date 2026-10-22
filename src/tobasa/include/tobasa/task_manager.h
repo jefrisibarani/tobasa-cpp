@@ -10,6 +10,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include "tobasa/exp_imp.h"
 #include "tobasa/task_metadata.h"
 
 namespace tbs {
@@ -46,7 +47,7 @@ namespace tbs {
  * }
  * @endcode
  */
-class TaskManager 
+class TBS_API TaskManager
 {
 public:
    /**

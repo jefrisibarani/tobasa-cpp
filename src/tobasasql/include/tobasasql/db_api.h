@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <cstdint>
 #include <cstddef>
 #include <memory>
@@ -71,7 +73,7 @@ class DbTable;
 
 // ------------------------------------------------------------------------------
 /// A backend-neutral connection to a SQL database.
-class DbConnection
+class TBS_SQL_API DbConnection
 {
    struct Impl;
    std::unique_ptr<Impl> _impl;
@@ -148,7 +150,7 @@ public:
 
 // ------------------------------------------------------------------------------
 /// A prepared SQL statement with parameter binding and execution methods.
-class DbCommand
+class TBS_SQL_API DbCommand
 {
    struct Impl;
    std::unique_ptr<Impl> _impl;
@@ -206,7 +208,7 @@ public:
 
 // ------------------------------------------------------------------------------
 /// A navigable result set returned by a SQL command.
-class DbResult
+class TBS_SQL_API DbResult
 {
    struct Impl;
    std::unique_ptr<Impl> _impl;
@@ -322,7 +324,7 @@ public:
 
 // ------------------------------------------------------------------------------
 /// Stores the key and display-value pairs for a table lookup.
-struct DbLookup
+struct TBS_SQL_API DbLookup
 {
    std::vector<std::string> keys;
    std::vector<std::string> values;
@@ -348,7 +350,7 @@ struct DbLookup
 
 // ------------------------------------------------------------------------------
 /// A navigable table view that can load, edit, and save rows.
-class DbTable
+class TBS_SQL_API DbTable
 {
    struct Impl;
    std::unique_ptr<Impl> _impl;
@@ -473,7 +475,7 @@ public:
 
 // ------------------------------------------------------------------------------
 /// Provides database connections from a shared connection pool.
-class DbConnectionPool
+class TBS_SQL_API DbConnectionPool
 {
    struct Impl;
    std::unique_ptr<Impl> _impl;

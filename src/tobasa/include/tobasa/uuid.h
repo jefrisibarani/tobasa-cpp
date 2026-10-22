@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace uuid {
@@ -10,7 +11,7 @@ namespace uuid {
  */
 
 /// Generates a Universally Unique Identifier (UUID) as a string.
-std::string generate();
+TBS_API std::string generate();
 
 /** @}*/
 

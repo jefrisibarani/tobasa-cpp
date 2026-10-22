@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/parser.h"
 
 namespace tbs {
@@ -10,7 +12,7 @@ namespace dirui {
 /** \ingroup LIS
  * ParserDirUih500
  */
-class ParserDirUih500
+class TBS_LIS_API ParserDirUih500
    : public lis::Parser
 {
 public:

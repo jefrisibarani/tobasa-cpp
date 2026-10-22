@@ -1,5 +1,6 @@
 #ifdef TOBASA_HTTP_USE_HTTP2
 
+#include <cstdio>
 #include "tobasa/util_string.h"
 #include "tobasahttp/server/http2_helper.h"
 
@@ -142,7 +143,19 @@ void configureTlsContext(asio::ssl::context &tlsContext)
   SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
   SSL_CTX_set_mode(ctx, SSL_MODE_RELEASE_BUFFERS);
 
-  SSL_CTX_set_cipher_list(ctx, tls::DEFAULT_CIPHER_LIST);
+   int cipherListResult = SSL_CTX_set_cipher_list(ctx, tls::DEFAULT_CIPHER_LIST);
+#ifndef NDEBUG
+   int keyMatchesCertificate = SSL_CTX_check_private_key(ctx);
+   std::fprintf(
+         stderr,
+         "[tls_diag] OpenSSL=%s ctx=%p set_cipher_list=%d key_matches_certificate=%d min_version=0x%04x max_version=0x%04x\n",
+         OpenSSL_version(OPENSSL_VERSION),
+         static_cast<void*>(ctx),
+         cipherListResult,
+         keyMatchesCertificate,
+         SSL_CTX_get_min_proto_version(ctx),
+         SSL_CTX_get_max_proto_version(ctx));
+#endif
 
 #ifndef OPENSSL_NO_EC
    auto ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);

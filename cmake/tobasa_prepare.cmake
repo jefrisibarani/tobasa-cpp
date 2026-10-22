@@ -66,25 +66,16 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 # File to C Array generator
 # -------------------------------------------------------
 add_executable(generate_resources_file ${PROJECT_SOURCE_DIR}/cmake/generate_resources.cpp)
-if(MSVC)
-  set_property(TARGET generate_resources_file PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
 target_compile_features(generate_resources_file PUBLIC cxx_std_17)
 
 
 # Time Zone Database to C Array generator
 # -------------------------------------------------------
 add_executable(generate_tzdata_assets_file ${PROJECT_SOURCE_DIR}/cmake/generate_tzdata_assets.cpp)
-if(MSVC)
-  set_property(TARGET generate_tzdata_assets_file PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
 target_compile_features(generate_tzdata_assets_file PUBLIC cxx_std_17)
 
 
 # Build Info generator
 # -------------------------------------------------------
 add_executable(generate_build_info ${PROJECT_SOURCE_DIR}/cmake/generate_build_info.cpp)
-if(MSVC)
-  set_property(TARGET generate_build_info PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
 target_compile_features(generate_build_info PUBLIC cxx_std_17)

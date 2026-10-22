@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/datalink.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace dirui {
 /** \ingroup LIS
  * DataLinkDirUih500
  */
-class DataLinkDirUih500
+class TBS_LIS_API DataLinkDirUih500
    : public lis::DataLink
 {
 public:

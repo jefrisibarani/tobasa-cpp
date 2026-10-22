@@ -65,3 +65,10 @@ target_compile_definitions(tbs_adodb_db_api_integration_tests PRIVATE
    TOBASA_PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 gtest_discover_tests(tbs_adodb_db_api_integration_tests)
+
+foreach(test_target IN ITEMS
+   tbs_adodb_integration_tests
+   tbs_adodb_tpl_api_integration_tests
+   tbs_adodb_db_api_integration_tests)
+   tobasa_stage_shared_runtime(${test_target} tobasasql tobasa)
+endforeach()

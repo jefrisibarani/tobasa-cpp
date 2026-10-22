@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 #include <vector>
 #include "tobasalis/hl7/collection.h"
@@ -14,7 +16,7 @@ class Field;
 using FieldPtr = std::shared_ptr<Field>;
 using FieldCollection = hl7::Collection<Field>;
 
-class Field : public MessageElement
+class TBS_LIS_API Field : public MessageElement
 {
 private:
    FieldCollection     _repetitionList;

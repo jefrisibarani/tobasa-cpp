@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/notifier.h>
 #include "tobasasql/sql_parameter.h"
 #include "tobasasql/pgsql_parameter.h"
@@ -15,7 +17,7 @@ class DataSet;
 class PgsqlConnection;
 class PgsqlResult;
 
-class PgsqlCommand : public Notifier
+class TBS_SQL_API PgsqlCommand : public Notifier
 {
    using VariantType   = DefaultVariantType;
    using VariantHelper = VariantHelper<VariantType>;

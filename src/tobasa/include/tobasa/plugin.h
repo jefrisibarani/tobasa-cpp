@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -20,7 +21,7 @@ enum class PluginType
  * @brief Base class for plugins
  * @note Managed by its factory
  */
-class Plugin
+class TBS_API Plugin
 {
 public:
    Plugin() = default;
@@ -38,18 +39,18 @@ private:
 /**
  * @brief Factory interface for plugins
  */
-class IPluginFactory
+class TBS_API IPluginFactory
 {
 public:
    IPluginFactory() = default;
    virtual ~IPluginFactory() = default;
 
    virtual PluginType  type() const        = 0;
-   virtual std::string name() const        = 0;
-   virtual std::string id() const          = 0;
-   virtual std::string author() const      = 0;
-   virtual std::string version() const     = 0;
-   virtual std::string description() const = 0;
+   virtual const char* name() const        = 0;
+   virtual const char* id() const          = 0;
+   virtual const char* author() const      = 0;
+   virtual const char* version() const     = 0;
+   virtual const char* description() const = 0;
 
 protected:
    virtual Plugin* getPlugin() = 0;
@@ -88,11 +89,11 @@ public:
    ~PluginFactory() override { deletePlugin(); }
 
    PluginType  type() const override         { return _type; }
-   std::string name() const override         { return _name; }
-   std::string id() const override           { return _id; }
-   std::string author() const override       { return _author; }
-   std::string version() const override      { return _version; }
-   std::string description() const override  { return _description; }
+   const char* name() const override         { return _name.c_str(); }
+   const char* id() const override           { return _id.c_str(); }
+   const char* author() const override       { return _author.c_str(); }
+   const char* version() const override      { return _version.c_str(); }
+   const char* description() const override  { return _description.c_str(); }
 
 protected:
 

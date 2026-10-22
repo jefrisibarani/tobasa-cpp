@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 namespace tbs {
 namespace lis2a {
 
@@ -33,7 +35,7 @@ class Record;
  * LisField
  * Holds one field and its metadata
  */
-class LisField
+class TBS_LIS_API LisField
 {
 public:
    LisField(int index, const std::string& name, const std::string& value = "");

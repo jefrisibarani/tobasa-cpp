@@ -5,6 +5,7 @@
 #include <map>
 
 #include "tobasahttp/status_codes.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -23,10 +24,10 @@ struct StatusPageData
 };   
 
 /// Get HTML Status Page data 
-std::shared_ptr<StatusPageData> statusPageData(HttpStatus status, const std::string& statusMessageLong = "");
+TBS_HTTP_API std::shared_ptr<StatusPageData> statusPageData(HttpStatus status, const std::string& statusMessageLong = "");
 
 /// Get HTML Status Page
-std::string statusPageHtml(HttpStatus status, const std::string& statusMessageLong = "");
+TBS_HTTP_API std::string statusPageHtml(HttpStatus status, const std::string& statusMessageLong = "");
 
 } // namespace http
 } // namespace tbs

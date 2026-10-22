@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "tobasa/exp_imp.h"
 #include "tobasa/format.h"
 
 namespace tbs {
@@ -39,7 +40,7 @@ class CoutLogSink;
  *      logger.info("Informational message");
  * @endcode
  */
-struct StdoutLogger
+struct TBS_API StdoutLogger
 {
 public:
    StdoutLogger( const StdoutLogger & ) = delete;

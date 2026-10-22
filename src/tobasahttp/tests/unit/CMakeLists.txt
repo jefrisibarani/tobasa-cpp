@@ -13,6 +13,7 @@ set_target_properties(tobasahttp_unit_tests PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
 target_link_libraries(tobasahttp_unit_tests PRIVATE tobasahttp tobasa tobasa_test_support GTest::gtest_main)
+tobasa_stage_shared_runtime(tobasahttp_unit_tests tobasahttp tobasa)
 target_compile_definitions(tobasahttp_unit_tests PRIVATE
    TOBASA_PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )

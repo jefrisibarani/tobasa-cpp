@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include "tobasaweb/middleware_factory_base.h"
 
 namespace tbs {
@@ -17,7 +19,7 @@ class RouterBase;
  * WebService does not put RouterFactoryPtr in its MiddlewareFactoryPtr collection
  * see WebService::useRouter()
  */
-class RouterFactoryBase
+class TBS_WEB_API RouterFactoryBase
    : public MiddlewareFactoryBase
 {
 public:

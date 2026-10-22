@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
 #include "tobasaweb/service_client_base.h"
 #include "tobasaweb/router_base.h"
 
@@ -12,7 +13,7 @@ namespace web {
  * \brief Foundational class for controllers, which handle router request handling.
  * These controllers are instantiated by a Factory.
  */
-class ControllerBase
+class TBS_WEB_API ControllerBase
    : public ServiceClientBase
 {
 public:

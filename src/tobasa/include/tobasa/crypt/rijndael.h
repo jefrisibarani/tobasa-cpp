@@ -60,6 +60,7 @@
 //
 
 #pragma once
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace crypt {
@@ -84,7 +85,7 @@ constexpr auto RIJNDAEL_NOT_INITIALIZED = -5;
 constexpr auto RIJNDAEL_BAD_DIRECTION = -6;
 constexpr auto RIJNDAEL_CORRUPTED_DATA = -7;
 
-class Rijndael
+class TBS_API Rijndael
 {
 public:
 	enum Direction { Encrypt , Decrypt };

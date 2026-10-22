@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis1a/datalink_base.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace bci {
 /** \ingroup LIS
  * BCI DataLink
  */
-class DataLinkBci
+class TBS_LIS_API DataLinkBci
    : public lis1a::DataLinkBase
 {
 public:

@@ -9,6 +9,7 @@
 #include "tobasahttp/cookie.h"
 #include "tobasahttp/authentication.h"
 #include "tobasahttp/path_argument.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -30,7 +31,7 @@ namespace http {
  * @sa https://datatracker.ietf.org/doc/html/rfc7231
  * @sa https://www.rfc-editor.org/rfc/rfc3986
  */
-class Request : public Message
+class TBS_HTTP_API Request : public Message
 {
 private:
    std::string _method      {};     // GET, POST

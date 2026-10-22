@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdexcept>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -9,7 +10,7 @@ namespace tbs {
  */
 
 /// Application error data structre.
-struct AppError
+struct TBS_API AppError
 {
    AppError();
    AppError(const std::string msg, const std::string& src = "", const char* fl = "", int ln = 0);
@@ -23,7 +24,7 @@ struct AppError
 
 
 /// Exception class used in Tobasa, derived from std::runtime_error.
-class AppException
+class TBS_API AppException
    : public std::runtime_error
 {
 public:

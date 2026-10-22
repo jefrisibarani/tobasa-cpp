@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -37,7 +38,7 @@ struct NotifyEventArgs
 using NotificationHandler = std::function<void(const NotifyEventArgs&)>;
 
 /// Notifier class.
-struct Notifier
+struct TBS_API Notifier
 {
    /// Process trace notification.
    void onNotifyTrace(const std::string& message, const std::string& source = "") const;

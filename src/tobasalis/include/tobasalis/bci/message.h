@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/message.h"
 #include "tobasalis/bci/record.h"
 
@@ -9,7 +11,7 @@ namespace bci {
 /** \ingroup LIS
  * BciMessage
  */
-class BciMessage
+class TBS_LIS_API BciMessage
    : public lis::Message
 {
 public:
@@ -25,7 +27,7 @@ public:
 /** \ingroup LIS
  * VidasMessage
  */
-class VidasMessage
+class TBS_LIS_API VidasMessage
    : public lis::Message
 {
 public:

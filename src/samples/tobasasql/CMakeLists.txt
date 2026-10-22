@@ -18,29 +18,19 @@ if(TOBASA_SQL_USE_MYSQL)
    add_executable(${MYSQL_TARGET} test_mysql.cpp)
 endif()   
 
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-   set_property(TARGET ${CONNECTOR_TARGET} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-   set_property(TARGET ${DBSERVICE_TARGET} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-   set_property(TARGET ${POOL_TARGET} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-   
-   if(TOBASA_SQL_USE_MYSQL)
-      set_property(TARGET ${MYSQL_TARGET} PROPERTY
-         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-   endif()   
-endif()
-
 target_link_libraries(${PROJECT_NAME}     PRIVATE tobasa tobasasql)
 target_link_libraries(${CONNECTOR_TARGET} PRIVATE tobasa tobasasql)
 target_link_libraries(${DBSERVICE_TARGET} PRIVATE tobasa tobasasql)
 target_link_libraries(${POOL_TARGET}      PRIVATE tobasa tobasasql)
 
+tobasa_stage_shared_runtime(${PROJECT_NAME} tobasa tobasasql)
+tobasa_stage_shared_runtime(${CONNECTOR_TARGET} tobasa tobasasql)
+tobasa_stage_shared_runtime(${DBSERVICE_TARGET} tobasa tobasasql)
+tobasa_stage_shared_runtime(${POOL_TARGET} tobasa tobasasql)
+
 if(TOBASA_SQL_USE_MYSQL)
    target_link_libraries(${MYSQL_TARGET}     PRIVATE tobasa tobasasql)
+   tobasa_stage_shared_runtime(${MYSQL_TARGET} tobasa tobasasql)
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)

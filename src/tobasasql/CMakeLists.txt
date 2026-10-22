@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12-3.18)
 cmake_policy(SET CMP0091 NEW)
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   cmake_policy(SET CMP0079 NEW)
+endif()
 include(CMakeDependentOption)
 
 # The project
@@ -11,13 +14,14 @@ endif()
 
 option(TOBASA_FIND_DEPS    "Use `find_package()` for including Tobasa SQL dependencies." OFF)
 
-option(TOBASA_SQL_USE_PGSQL    "Enable Tobasa PostgreSQL driver" OFF)
-option(TOBASA_SQL_USE_ADODB    "Enable Tobasa ADO driver for Microsoft SQL Server" OFF) # Only with MSVC compiler
-option(TOBASA_SQL_USE_ODBC     "Enable Tobasa ODBC driver for Microsoft SQL Server" OFF)
-option(TOBASA_SQL_USE_SQLITE   "Enable Tobasa SQLite driver"     OFF)
-option(TOBASA_SQL_USE_MYSQL    "Enable TobasaMariaDB driver"     OFF)
+option(TOBASA_SQL_USE_PGSQL      "Enable PostgreSQL driver"           ON )
+option(TOBASA_SQL_USE_ADODB      "Enable ADO driver"                  ON )
+option(TOBASA_SQL_USE_ODBC       "Enable ODBC driver"                 ON )
+option(TOBASA_SQL_USE_SQLITE     "Enable SQLite driver"               ON )
+option(TOBASA_SQL_USE_MYSQL      "Enable MariaDB driver"              ON )
 
-CMAKE_DEPENDENT_OPTION(TOBASA_SQL_USE_MARIADB_DLL "Use libmariadb shared (.dll) library" ON "TOBASA_SQL_USE_MYSQL" OFF)
+CMAKE_DEPENDENT_OPTION(TOBASA_SQL_USE_MARIADB_DLL 
+                       "Use libmariadb shared (.dll) library" OFF "TOBASA_SQL_USE_MYSQL" OFF )
 
 # -------------------------------------------------------
 # SQLite3 library
@@ -26,22 +30,26 @@ if(NOT TOBASA_SQL_USE_SQLITE)
    set(TOBASA_SQL_USE_SQLITE ON CACHE BOOL "Enable Tobasa SQLite driver" FORCE)
 endif()
 if(TOBASA_SQL_USE_SQLITE)
-   if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
-      set(TOBASA_SQL_USE_SQLITE3_MC OFF)
+   if(DEFINED TOBASA_SQLITE3_LIB AND NOT "${TOBASA_SQLITE3_LIB}" STREQUAL "")
+      message(STATUS "tobasasql use tobasa's sqlite3 lib: ${TOBASA_SQLITE3_LIB}")
    else()
-      set(TOBASA_SQL_USE_SQLITE3_MC ON)
-   endif()
+      if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
+         set(TOBASA_SQL_USE_SQLITE3_MC OFF)
+      else()
+         set(TOBASA_SQL_USE_SQLITE3_MC ON)
+      endif()
 
-   if(TOBASA_SQL_USE_SQLITE3_MC)
-      # SQLite3 Multiple Chipers sources included
-      set(TOBASA_SQLITE3_LIB "sqlite3_mc")
-      add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3_mc ${CMAKE_SOURCE_DIR}/build_ext/sqlite3_mc EXCLUDE_FROM_ALL)
-   else()
-      # SQLite3 library via find_package
-      find_package(unofficial-sqlite3 CONFIG REQUIRED)
-      set(TOBASA_SQLITE3_LIB "unofficial::sqlite3::sqlite3")
+      if(TOBASA_SQL_USE_SQLITE3_MC)
+         # SQLite3 Multiple Chipers sources included
+         set(TOBASA_SQLITE3_LIB "sqlite3_mc")
+         add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3_mc ${CMAKE_BINARY_DIR}/_exts/sqlite3_mc EXCLUDE_FROM_ALL)
+      else()
+         # SQLite3 library via find_package
+         find_package(unofficial-sqlite3 CONFIG REQUIRED)
+         set(TOBASA_SQLITE3_LIB "unofficial::sqlite3::sqlite3")
+      endif()
+      message(STATUS "tobasasql sqlite3 lib: ${TOBASA_SQLITE3_LIB}")
    endif()
-   message(STATUS "tobasasql sqlite3 lib: ${TOBASA_SQLITE3_LIB}")
 endif()
 
 
@@ -122,7 +130,7 @@ if(TOBASA_SQL_USE_MYSQL)
    else()
       set(TOBASA_SQL_USE_BUNDLED_LIBMARIADB ON)
       if(TOBASA_USE_PREBUILT_ZLIB)
-         set(ZLIB_LIBS_MARIADB optimized ${TOBASA_ZLIB_DIR}/lib/zlib_o.lib debug ${TOBASA_ZLIB_DIR}/lib/zlib_d.lib )
+         set(ZLIB_LIBS_MARIADB optimized ${TOBASA_ZLIB_DIR}/lib/zlib.lib debug ${TOBASA_ZLIB_DIR}/debug/lib/zlibd.lib )
          set(ZLIB_INC_DIR_MARIADB ${TOBASA_ZLIB_DIR}/include)
       elseif(TOBASA_USE_BUNDLED_ZLIB)
          set(ZLIB_LIBS_MARIADB ZLIB::ZLIBSTATIC )
@@ -156,7 +164,7 @@ if(TOBASA_SQL_USE_MYSQL)
       set(ZLIB_INCLUDE_DIR ${ZLIB_INC_DIR_MARIADB})
 
       message(STATUS "tobasasql use internal bundled MariaDB Connector C ")
-      add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/mariadb-connector-c ${CMAKE_SOURCE_DIR}/build_ext/mariadb-connector-c EXCLUDE_FROM_ALL)
+      add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/mariadb-connector-c ${CMAKE_BINARY_DIR}/_exts/mariadb-connector-c EXCLUDE_FROM_ALL)
    else()
       find_package(unofficial-libmariadb CONFIG REQUIRED)
       set(TOBASA_MARIADB_LIB unofficial::mariadbclient) # static library
@@ -173,15 +181,22 @@ endif()
 # -------------------------------------------------------
 # The library
 # -------------------------------------------------------
-add_library(${PROJECT_NAME})
-include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
-
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasa_monolithic)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_SQL_SHARED)
+elseif(TOBASA_BUILD_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET ${PROJECT_NAME})
+   add_library(${PROJECT_NAME} SHARED)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_SQL_SHARED)
+else()
+   set(TOBASA_MODULE_TARGET ${PROJECT_NAME})
+   add_library(${PROJECT_NAME} STATIC)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TBS_SQL_STATIC)
 endif()
 
-target_sources(${PROJECT_NAME}
+include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
+
+target_sources(${TOBASA_MODULE_TARGET}
    PRIVATE ${TOBASASQL_CORE_SOURCES_LIST}
    PRIVATE ${TOBASASQL_CORE_HEADERS_LIST}
    PRIVATE ${TOBASASQL_PGSQL_SOURCES_LIST}
@@ -196,53 +211,55 @@ target_sources(${PROJECT_NAME}
    PRIVATE ${TOBASASQL_MARIADB_HEADERS_LIST}
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC tobasa)
+if(NOT TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC tobasa)
+endif()
 
 if(TOBASA_SQL_USE_PGSQL)
    if(TOBASA_SQL_USE_PGSQL_CUSTOM AND MSVC)
-      target_include_directories(${PROJECT_NAME} PUBLIC ${TOBASA_PGSQL_INCLUDE_DIR})
+      target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_PGSQL_INCLUDE_DIR})
       #target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/NODEFAULTLIB:LIBCMTD>)
    endif()
 
-   target_link_libraries(${PROJECT_NAME} PUBLIC ${TOBASA_PGSQL_LIBRARY})
-   target_compile_definitions(${PROJECT_NAME} PUBLIC TOBASA_SQL_USE_PGSQL)
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_PGSQL_LIBRARY})
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_PGSQL)
 endif()
 
 if(TOBASA_SQL_USE_ADODB AND MSVC)
-   target_compile_definitions(${PROJECT_NAME} PUBLIC TOBASA_SQL_USE_ADODB)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_ADODB)
 endif()
 
 if(TOBASA_SQL_USE_SQLITE)
-   target_link_libraries(${PROJECT_NAME} PUBLIC ${TOBASA_SQLITE3_LIB})
-   target_compile_definitions(${PROJECT_NAME} PUBLIC TOBASA_SQL_USE_SQLITE)
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_SQLITE3_LIB})
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_SQLITE)
 endif()
 
 if(TOBASA_SQL_USE_ODBC)
-   target_link_libraries(${PROJECT_NAME} PRIVATE ${ODBC_LIBRARIES})
-   target_compile_definitions(${PROJECT_NAME} PUBLIC TOBASA_SQL_USE_ODBC)
+   target_link_libraries(${TOBASA_MODULE_TARGET} PRIVATE ${ODBC_LIBRARIES})
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_ODBC)
    if(MSVC)
-      target_compile_definitions(${PROJECT_NAME} PUBLIC WIN32_LEAN_AND_MEAN )
+      target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC WIN32_LEAN_AND_MEAN )
    endif()
 endif()
 
 if(TOBASA_SQL_USE_MYSQL)
-   target_link_libraries(${PROJECT_NAME} PUBLIC ${TOBASA_MARIADB_LIB})   
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_MARIADB_LIB})
    
    if(TOBASA_SQL_USE_BUNDLED_LIBMARIADB)
       if (MSVC)
-         target_include_directories(${PROJECT_NAME} PUBLIC ${TOBASA_MARIADB_INCLUDE_DIR})
+         target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_MARIADB_INCLUDE_DIR})
       else()
-         target_include_directories(${PROJECT_NAME} PUBLIC ${TOBASA_MARIADB_INCLUDE_DIR})
+         target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_MARIADB_INCLUDE_DIR})
       endif()
    endif()
    
-   target_compile_definitions(${PROJECT_NAME} PUBLIC TOBASA_SQL_USE_MYSQL)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_MYSQL)
    if(TOBASA_SQL_USE_MARIADB_DLL)
-      target_compile_definitions(${PROJECT_NAME} PUBLIC TOBASA_SQL_USE_MYSQL TOBASA_SQL_USE_MARIADB_DLL)
+      target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_MYSQL TOBASA_SQL_USE_MARIADB_DLL)
    endif()
 endif()
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include )
+target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${PROJECT_SOURCE_DIR}/include )
 
 if(TOBASA_BUILD_TESTS)
    add_subdirectory(tests)
@@ -252,22 +269,22 @@ endif()
 if(MSVC)
    # Add system libraries
    if(NOT (TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG))
-      target_link_libraries(${PROJECT_NAME} PUBLIC ws2_32 mswsock secur32 crypt32 shlwapi advapi32 kernel32)
+      target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ws2_32 mswsock secur32 crypt32 shlwapi advapi32 kernel32)
    endif()
    
-   target_compile_options(${PROJECT_NAME} PRIVATE /permissive /bigobj /FS )
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE /permissive /bigobj /FS )
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-   target_compile_options(${PROJECT_NAME} PRIVATE -fpic -c -Wall )
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE -fpic -c -Wall )
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    message(STATUS "${PROJECT_NAME} use cxx_std_20")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_20)
 else()
    message(STATUS "${PROJECT_NAME} use cxx_std_17")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_17)
 endif()
 
 # Show filtered sources in IDE

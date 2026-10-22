@@ -1,8 +1,11 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <mutex>
 #include <thread>
 #include <asio/strand.hpp>
+#include <asio/any_io_executor.hpp>
 #include <asio/serial_port.hpp>
 #include <asio/steady_timer.hpp>
 #include <asio/streambuf.hpp>
@@ -19,7 +22,7 @@ constexpr auto SERIAL_PORT_READ_BUF_SIZE = 128;
 /** \ingroup LIS
  * RS232Connection
  */
-class RS232Connection
+class TBS_LIS_API RS232Connection
    : public Connection
 {
 public:

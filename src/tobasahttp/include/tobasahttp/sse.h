@@ -12,6 +12,7 @@
 #include <mutex>
 #include <asio/ip/tcp.hpp>
 #include "tobasahttp/type_common.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -34,7 +35,7 @@ using SseStateUPtr = std::unique_ptr<SseState>;
 
 } // namespace sse
 
-class SseConnection
+class TBS_HTTP_API SseConnection
 {
 public:
    using SendHandler  = std::function<void(std::string)>;
@@ -80,7 +81,7 @@ public:
 };
 
 
-class SseContext : public std::enable_shared_from_this<SseContext>
+class TBS_HTTP_API SseContext : public std::enable_shared_from_this<SseContext>
 {
 public:
    using OpenHandler  = std::function<void(SseConnectionPtr)>;

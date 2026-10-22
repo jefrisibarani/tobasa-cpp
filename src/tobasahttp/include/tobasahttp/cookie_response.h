@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -14,7 +15,7 @@ using ResponseCookiePtr = std::shared_ptr<ResponseCookie>;
  * Never call ResponseCookie("tbs_session","12345678"),
  * because second constructor will be called instead of first one.
  */
-class ResponseCookie 
+class TBS_HTTP_API ResponseCookie
 {
 private:
    std::string _name;

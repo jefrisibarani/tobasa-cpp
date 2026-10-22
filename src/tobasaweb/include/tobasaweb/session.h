@@ -1,10 +1,14 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <mutex>
+#include <memory>
 #include <tobasa/json.h>
+#include "tobasaweb/session_store.h"
 
 namespace tbs {
 namespace web {
@@ -17,7 +21,7 @@ class Session;
 
 using SessionPtr = std::shared_ptr<Session>;
 
-class Session
+class TBS_WEB_API Session
 {
 public:
    static inline const std::string COOKIE_NAME = "tbs_session";
@@ -62,7 +66,7 @@ private:
    Session Cookies: Last only for the duration of the browser session and are deleted when the browser is closed.
 */
 
-class Cookie
+class TBS_WEB_API Cookie
 {
 public:
    std::string name;

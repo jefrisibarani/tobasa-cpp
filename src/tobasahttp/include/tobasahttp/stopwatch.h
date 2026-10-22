@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -30,7 +31,7 @@ namespace http {
    std::cout << "Detail: " << sw.report(true) << "\n";
  * 
  */
-class StopWatch
+class TBS_HTTP_API StopWatch
 {
 public:
    using TimePointSteady = std::chrono::steady_clock::time_point;

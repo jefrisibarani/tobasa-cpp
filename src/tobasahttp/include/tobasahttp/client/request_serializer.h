@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -8,7 +9,7 @@ namespace http {
 class ClientRequest;
 
 /** Serializes an outbound client request as an HTTP/1.x message. */
-class RequestSerializer
+class TBS_HTTP_API RequestSerializer
 {
 private:
    ClientRequest& _request;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasa/non_copyable.h>
 #include <tobasa/logger_tobasa.h>
 #include <tobasa/span.h>
@@ -9,6 +11,7 @@
 #include <tobasasql/database_service_factory.h>
 #include "tobasaweb/authentication_middleware.h"
 #include "tobasaweb/authorization_middleware.h"
+#include "tobasaweb/csrf_middleware.h"
 #include "tobasaweb/session_middleware.h"
 #include "tobasaweb/multipart_middleware.h"
 #include "tobasaweb/router.h"
@@ -31,7 +34,7 @@ namespace web {
  * \brief Web application builder.
  * \details Prepares and builds a web service application.
  */
-class Webapp : private NonCopyable
+class TBS_WEB_API Webapp : private NonCopyable
 {
    friend class WebappAgent;
 
@@ -144,6 +147,12 @@ public:
     * \param builder Options builder functor for middleware configuration.
     */
    virtual void useSession(web::SessionMiddlewareOptionBuilder builder = nullptr);
+
+   /**
+    * \brief Sets up CSRF protection for configured requests.
+    * \param builder Options builder functor for CSRF middleware.
+    */
+   virtual void useCsrf(web::CsrfMiddlewareOptionBuilder builder = nullptr);
 
    /**
     * \brief Sets up Multipart middleware for the Webapp.

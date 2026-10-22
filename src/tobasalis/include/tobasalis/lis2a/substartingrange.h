@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/subrecord.h"
 
 namespace tbs {
@@ -9,7 +11,7 @@ namespace lis2a {
  * StartingRange
  * CLSI LIS02-A2 Starting Range  - Record's component
  */
-class StartingRange
+class TBS_LIS_API StartingRange
    : public SubRecord
 {
 public:

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <memory>
 #include <functional>
 #include <signal.h>
@@ -33,7 +35,7 @@ enum class CommunicationState
    OrderMessageReceivedAckSent      // ACK message sent (in response to received Order Message from LIS Manager)
 };
 
-struct OutgoingMessage
+struct TBS_LIS_API OutgoingMessage
 {
    std::shared_ptr<Message> message;
    std::string              name;
@@ -42,7 +44,7 @@ struct OutgoingMessage
 
 typedef std::deque<OutgoingMessage> MessageQueue;
 
-class LisEngine : private NonCopyable
+class TBS_LIS_API LisEngine : private NonCopyable
 {
 private:
 

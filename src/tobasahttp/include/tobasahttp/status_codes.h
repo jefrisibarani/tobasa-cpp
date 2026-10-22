@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasahttp/exp_imp.h"
+
 #include <cstdint>
 #include <string_view>
 #include <string>
@@ -87,7 +89,7 @@ enum StatusCode : uint16_t
 /** 
  * Http status class.
  */
-class HttpStatus
+class TBS_HTTP_API HttpStatus
 {
 private:   
    StatusCode  _code     {StatusCode::UNKNOWN};

@@ -26,10 +26,8 @@ void AuthenticationMiddleware::option(AuthenticationMiddlewareOption option)
    _option = std::move(option); 
 }
 
-void AuthenticationMiddleware::applyHttpResult(
-   const http::HttpContext& context,
-   http::StatusCode statusCode,
-   const std::string& message)
+void AuthenticationMiddleware::applyHttpResult( const http::HttpContext& context,
+   http::StatusCode statusCode, const std::string& message)
 {
    if (_resultBuilder)
    {

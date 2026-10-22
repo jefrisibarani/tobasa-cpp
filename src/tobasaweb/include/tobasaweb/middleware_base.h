@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasahttp/server/common.h>
 #include "tobasaweb/middleware_factory.h"
 #include "tobasaweb/service_client_base.h"
@@ -17,7 +19,7 @@ namespace web {
  * which act as HTTP server request handlers. 
  * Instances of this class are instantiated by a Factory.
  */
-class MiddlewareBase
+class TBS_WEB_API MiddlewareBase
    : public ServiceClientBase
 {
 public:

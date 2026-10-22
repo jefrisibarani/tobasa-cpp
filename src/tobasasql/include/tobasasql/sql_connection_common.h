@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
 #include <utility>
 #include <tobasa/self_counter.h>
 #include <tobasa/notifier.h>
@@ -16,7 +17,7 @@ namespace sql {
  * \brief Sql connection base.
  * Class serves as a root class for all implemented sql connection
  */
-class ConnectionCommon : public Notifier
+class TBS_SQL_API ConnectionCommon : public Notifier
 {
 public:
    /// Constructor.
@@ -58,7 +59,7 @@ protected:
 };
 
 /// Temporarily apply sql logging.
-class SqlApplyLogInternal
+class TBS_SQL_API SqlApplyLogInternal
 {
 public:
    SqlApplyLogInternal(ConnectionCommon* pConn);

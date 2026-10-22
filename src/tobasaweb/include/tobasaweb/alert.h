@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
 #include <string>
 
 namespace tbs {
@@ -13,7 +14,7 @@ using AlertPtr = std::shared_ptr<Alert>;
  * Manages HTTP session alerts.
  * Handles and manages informational messages specific to an HTTP session.
  */
-class Alert
+class TBS_WEB_API Alert
 {
 public:
 

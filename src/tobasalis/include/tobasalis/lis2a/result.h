@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 #include "tobasalis/lis2a/subuniversaltest.h"
 
@@ -62,7 +64,7 @@ enum class ResultStatus
  * ResultRecord
  * CLSI LIS02-A2 Result Record
  */
-class ResultRecord
+class TBS_LIS_API ResultRecord
    : public Record
 {
 public:

@@ -1,13 +1,127 @@
 #include <fstream>
 #include <chrono>
+#include <filesystem>
+#include <cstdlib>
+#include <vector>
 #include <tobasa/path.h>
 #include <tobasa/logger.h>
 #include <tobasa/config.h>
+#include <tobasa/plugin_lib.h>
+#include <tobasa/plugin_manager.h>
 #include "tobasaweb/session.h"
+#include "tobasaweb/session_store_plugin.h"
 #include "tobasaweb/settings_webapp.h"
 
 namespace tbs {
 namespace web {
+namespace {
+
+std::string normalizeSessionBackendName(const std::string& value)
+{
+   std::string normalized = value;
+   std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch)
+      {
+         return static_cast<char>(std::tolower(ch));
+      });
+   while (!normalized.empty() && normalized.front() == ' ')
+      normalized.erase(normalized.begin());
+   while (!normalized.empty() && normalized.back() == ' ')
+      normalized.pop_back();
+   return normalized;
+}
+
+std::unique_ptr<ISessionStore>& sessionStoreInstance()
+{
+   static std::unique_ptr<ISessionStore> instance;
+   return instance;
+}
+
+std::unique_ptr<ISessionStore> loadSessionStoreFromPlugin(const std::string& pluginId)
+{
+   auto& manager = PluginManager::get();
+
+   const auto normalizedPluginId = normalizeSessionBackendName(pluginId);
+   const std::string actualPluginId =
+      (normalizedPluginId == "sqlite" || normalizedPluginId == "sqlite3") ? "session_store_sqlite_plugin" : normalizedPluginId;
+
+   std::string errorMsg;
+   auto* plugin = dynamic_cast<SessionStorePlugin*>(manager.getPluginById(actualPluginId));
+   if (!plugin)
+      plugin = dynamic_cast<SessionStorePlugin*>(manager.getPlugin(actualPluginId));
+
+   if (!plugin)
+   {
+      errorMsg = "Failed to load the configured session-store plugin: " + actualPluginId;
+      throw std::runtime_error(errorMsg);
+   }
+
+   auto webappOpt = Config::getOption<web::conf::Webapp>("webapp");
+   SessionStoreConfig config;
+   config.appDataDir = webappOpt.webService.dataDir;
+
+   auto store = plugin->createStore(config);
+   if (!store)
+   {
+      errorMsg = "Session plugin adapter failed to create a store instance";
+      throw std::runtime_error(errorMsg);
+   }
+
+   return store;
+}
+
+std::unique_ptr<ISessionStore> resolveSessionStore(const std::string& backendName, const std::string& sessionRootPath, const std::string& databasePath)
+{
+   const auto normalized = normalizeSessionBackendName(backendName);
+   if (normalized.empty() || normalized == "filesystem" || normalized == "file" || normalized == "default")
+      return std::make_unique<FileSessionStore>(sessionRootPath.empty() ? path::executableDir() + path::SEPARATOR + "appdata" + path::SEPARATOR + "session" : sessionRootPath);
+   else
+      return loadSessionStoreFromPlugin(normalized);
+}
+
+bool isUnspecifiedSessionBackend(const std::string& backendName)
+{
+   const auto normalized = normalizeSessionBackendName(backendName);
+   return normalized.empty() || normalized == "default" || normalized == "filesystem" || normalized == "file";
+}
+
+void ensureConfiguredSessionStore()
+{
+   auto& store = sessionStoreInstance();
+   if (store)
+      return;
+
+   try
+   {
+      auto appOption = Config::getOption<web::conf::Webapp>("webapp");
+      const auto configuredBackend = appOption.webService.sessionStore;
+      if (isUnspecifiedSessionBackend(configuredBackend))
+      {
+         store = resolveSessionStore(configuredBackend, appOption.webService.sessionSavePath, "");
+         Logger::logI("[webapp] Using session backend: filesystem");
+         return;
+      }
+
+      store = resolveSessionStore(configuredBackend, appOption.webService.sessionSavePath, "");
+      Logger::logI("[webapp] Using session backend: {}", configuredBackend);
+      return;
+   }
+   catch (const std::exception& ex)
+   {
+      auto appOption = Config::getOption<web::conf::Webapp>("webapp");
+      const auto configuredBackend = appOption.webService.sessionStore;
+      if (isUnspecifiedSessionBackend(configuredBackend))
+      {
+         Logger::logW("[webapp] Falling back to the built-in filesystem session store after configuration lookup failed: {}", ex.what());
+         store = std::make_unique<FileSessionStore>(path::executableDir() + path::SEPARATOR + "appdata" + path::SEPARATOR + "session");
+         return;
+      }
+
+      Logger::logE("[webapp] Failed to initialize the configured session backend '{}': {}", configuredBackend, ex.what());
+      throw;
+   }
+}
+
+} // namespace
 
 std::mutex Session::_fileMutex;
 static std::string sSessionFolder;
@@ -63,7 +177,6 @@ static std::string getSessionFolder()
    }
 }
 
-
 void Session::clearOldSessionFiles()
 {
    std::string theFolder = getSessionFolder();
@@ -115,9 +228,9 @@ void Session::clearOldSessionFiles()
    }
 }
 
-
 SessionPtr Session::create(const std::string& sessionId)
 {
+   ensureConfiguredSessionStore();
    auto ses = std::make_shared<Session>(sessionId);
    ses->save();
    return ses;
@@ -125,6 +238,7 @@ SessionPtr Session::create(const std::string& sessionId)
 
 SessionPtr Session::get(const std::string& sessionId)
 {
+   ensureConfiguredSessionStore();
    auto ses = std::make_shared<Session>(sessionId);
    ses->readStorage();
    return ses;
@@ -134,6 +248,7 @@ Session::Session(const std::string& sessionId)
 {
    _loaded    = false;
    _sessionId = sessionId;
+   _data      = Json::object();
 
    std::string fileName = Session::COOKIE_NAME + "_" + sessionId;
    _storagePath = getSessionFolder() + path::SEPARATOR +  fileName;
@@ -147,6 +262,18 @@ bool Session::destroy(const std::string& sessionId)
    {
       Logger::logD("[webapp] Error occurred while destroying session: invalid session id");
       return false;
+   }
+
+   ensureConfiguredSessionStore();
+   auto& store = sessionStoreInstance();
+   if (store)
+   {
+      const bool ok = store->remove(sessionId);
+      if (!ok)
+      {
+         Logger::logE("[webapp] Error occured while deleting session from the configured session store: {}", sessionId);
+      }
+      return ok;
    }
 
    auto ses      = Session(sessionId);
@@ -173,6 +300,34 @@ void Session::readStorage(bool reload)
 
    try
    {
+      ensureConfiguredSessionStore();
+      auto& store = sessionStoreInstance();
+      if (store)
+      {
+         const auto result = store->load(_sessionId);
+         if (result.status == SessionStoreStatus::ok || result.status == SessionStoreStatus::expired)
+         {
+            _data = result.value;
+            _loaded = true;
+            if (result.status == SessionStoreStatus::expired)
+               Logger::logT("[webapp] Session {} expired in configured store", _sessionId);
+            return;
+         }
+
+         if (result.status == SessionStoreStatus::not_found)
+         {
+            _data = {};
+            _loaded = true;
+            return;
+         }
+
+         if (result.status == SessionStoreStatus::invalid_session_id)
+         {
+            Logger::logE("[webapp] Session read failed due to invalid session id: {}", _sessionId);
+            return;
+         }
+      }
+
       if (! path::exists(_storagePath))
          Logger::logT("[webapp] Session file does not exist: {}",  _storagePath);
 
@@ -241,6 +396,19 @@ Json Session::getAlerts()
 void Session::save()
 {
    std::lock_guard<std::mutex> lock(_fileMutex);  // Lock the mutex to prevent race conditions
+
+   ensureConfiguredSessionStore();
+   auto& store = sessionStoreInstance();
+   if (store)
+   {
+      long long expiresAtUtcSeconds = 0;
+      if (_data.contains("expires") && !_data["expires"].empty())
+         expiresAtUtcSeconds = _data["expires"].get<long long>();
+      const bool ok = store->save(_sessionId, _data, expiresAtUtcSeconds);
+      if (!ok)
+         Logger::logE("[webapp] Failed to save session {} to the configured session store", _sessionId);
+      return;
+   }
    
    std::string folder = sessionFolder();
 

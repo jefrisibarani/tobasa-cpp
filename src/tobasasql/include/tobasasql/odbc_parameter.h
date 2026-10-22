@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(_MSC_VER) && defined(_WIN32)
 #include <windows.h>
 #endif
@@ -24,7 +26,7 @@ using VariantType = tbs::DefaultVariantType;
  * \brief ODBC Parameter wrapper.
  * \note Tested only with MS SQL Server
  */
-class OdbcParameter
+class TBS_SQL_API OdbcParameter
 {
 public:
    OdbcParameter();
@@ -53,7 +55,7 @@ public:
 /** 
  * \brief ODBC Parameter collection.
  */
-class OdbcParameterCollection
+class TBS_SQL_API OdbcParameterCollection
 {
 public:
 

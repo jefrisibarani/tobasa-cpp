@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/record.h"
 
 namespace tbs {
@@ -21,7 +23,7 @@ enum class HeaderProcessingID
  * HeaderRecord
  * CLSI LIS02-A2 (formerly ASTM 1394-97) Message Header Record
  */
-class HeaderRecord
+class TBS_LIS_API HeaderRecord
    : public Record
 {
 protected:

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
 #include <stdexcept>
 #include <tobasa/exception.h>
 
@@ -8,7 +9,7 @@ namespace tbs {
 /**
  * SQL Exception.
  */
-class SqlException : public AppException
+class TBS_SQL_API SqlException : public AppException
 {
 public:
    SqlException(const AppError& appErr)

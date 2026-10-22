@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <string>
+#include "tobasa/exp_imp.h"
 #include "tobasa/data_reader.h"
 
 namespace tbs {
@@ -10,7 +11,7 @@ namespace tbs {
  * @ingroup TBS
  * Data reader that reads bytes from an in-memory string.
  */
-class StringReader : public DataReader
+class TBS_API StringReader : public DataReader
 {
 public:
    explicit StringReader(const std::string& data);

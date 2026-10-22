@@ -3,6 +3,7 @@
 #include <string>
 #include "tobasa/date.h"
 #include "tobasa/format.h"
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace util {
@@ -92,7 +93,7 @@ namespace util {
  * @param[in]  format  Format of the input date/time string.
  * @return     Returns true if parsing is successful; otherwise, returns false.
  */
-bool parseDate(tbsdate::sys_seconds& time, const std::string& dateStr, const std::string& format);
+TBS_API bool parseDate(tbsdate::sys_seconds& time, const std::string& dateStr, const std::string& format);
 
 /**
  * @brief Parses a date string into a std::tm object.
@@ -101,7 +102,7 @@ bool parseDate(tbsdate::sys_seconds& time, const std::string& dateStr, const std
  * @param[in]  format  Format of the input date/time string.
  * @return     Returns true if parsing is successful; otherwise, returns false.
  */
-bool parseDate(std::tm& time, const std::string& dateStr, const std::string& format);
+TBS_API bool parseDate(std::tm& time, const std::string& dateStr, const std::string& format);
 
 /**
  * @brief Formats a date using tbsfmt::format.
@@ -109,14 +110,14 @@ bool parseDate(std::tm& time, const std::string& dateStr, const std::string& for
  * @param[in]  format Format specifier for the output date string.
  * @return     String containing the formatted date according to the given format.
  */
-std::string formatDate(tbsdate::sys_seconds& time, std::string_view format);
+TBS_API std::string formatDate(tbsdate::sys_seconds& time, std::string_view format);
 
 /**
  * @brief Formats the current UTC date and time using tbsfmt::format.
  * @param[in]  format Format specifier for the output date/time string.
  * @return     String containing the formatted current date and time in UTC.
  */
-std::string formatDateNow(std::string_view format);
+TBS_API std::string formatDateNow(std::string_view format);
 
 /** @}*/
 

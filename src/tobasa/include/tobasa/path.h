@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace path {
@@ -17,66 +18,66 @@ namespace path {
 #endif  // !_WIN32
    
    /// Get executable absolute path.
-   std::string executablePath();
+   TBS_API std::string executablePath();
    
    /// Get executable absolute directory.
-   std::string executableDir();
+   TBS_API std::string executableDir();
 
    /// Get system temporary directory
-   std::string temporaryDir();
+   TBS_API std::string temporaryDir();
 
    /// Get Application data directory
-   std::string appdataDir();
+   TBS_API std::string appdataDir();
 
-   std::string homeDir();
+   TBS_API std::string homeDir();
 
    /// Merge two paths.
-   std::string mergePaths(std::string path1, std::string path2);
+   TBS_API std::string mergePaths(std::string path1, std::string path2);
 
    /// Check for an existing path.
-   bool exists(const std::string& path);
+   TBS_API bool exists(const std::string& path);
    
    /// Get filename with extension
-   std::string fileNameWithExtension(const std::string& fileFullPath);
+   TBS_API std::string fileNameWithExtension(const std::string& fileFullPath);
 
    /// Get file extension part.
-   std::string fileExtension(const std::string& fileName);
+   TBS_API std::string fileExtension(const std::string& fileName);
    
    /// Get file extension from full path
-   std::string getExtension(const std::string& path);
+   TBS_API std::string getExtension(const std::string& path);
 
    /// Check if a path is a directory.
-   bool isDirectory(const std::string& path);
+   TBS_API bool isDirectory(const std::string& path);
    
    /// Create a directory.
-   bool mkdir(const std::string& path);
+   TBS_API bool mkdir(const std::string& path);
    
    /// @brief Create the given directory - and all directories leading to it
    /// @return true on success or if the directory already exists
-   bool createDir(const std::string& path);
+   TBS_API bool createDir(const std::string& path);
 
    /// Get the size of a file in bytes.
-   size_t fileSize(const std::string& path);
+   TBS_API size_t fileSize(const std::string& path);
 
    /// Convert a path to an absolute path.
-   std::string absolute(const std::string& path);
+   TBS_API std::string absolute(const std::string& path);
 
    /// Remove a file and return an error message on failure.
-   bool removeFile(const std::string& path, std::string& errorMessage);
+   TBS_API bool removeFile(const std::string& path, std::string& errorMessage);
 
    /// Check weheter a path is located within the given rootPath
-   bool isPathWithinRoot(const std::string& candidatePath, const std::string& rootPath);
+   TBS_API bool isPathWithinRoot(const std::string& candidatePath, const std::string& rootPath);
 
    /// Convert a path to the operating system's path format.
-   std::string convertToOsPath(const std::string& path);
+   TBS_API std::string convertToOsPath(const std::string& path);
 
    /// Normalize a path.
-   std::string normalize(const std::string& path);
+   TBS_API std::string normalize(const std::string& path);
    
    /// Resolves a path relative to the executable directory.
    /// Absolute paths are returned as-is.
    /// Returns empty string if the path escapes the executable directory.
-   std::string resolveExecutableRelativePath(const std::string& path);
+   TBS_API std::string resolveExecutableRelativePath(const std::string& path);
 
 } // namespace path
 } // namespace tbs

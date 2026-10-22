@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
 #include <tobasahttp/server/common.h>
 #include "tobasaweb/middleware.h"
 #include "tobasaweb/cookie.h"
@@ -24,15 +25,13 @@ struct AuthorizationMiddlewareOption
 };
 
 /// Functor for configuring AuthorizationMiddlewareOption members.
-using AuthorizationMiddlewareOptionBuilder =
-   std::function<void(AuthorizationMiddlewareOption& option)>;
+using AuthorizationMiddlewareOptionBuilder = std::function<void(AuthorizationMiddlewareOption& option)>;
 
 
 /**
  * \brief Handles authorization for incoming request.
  */
-class AuthorizationMiddleware
-   : public Middleware
+class TBS_WEB_API AuthorizationMiddleware : public Middleware
 {
 public:
    AuthorizationMiddleware();
@@ -43,7 +42,7 @@ public:
     * \param context The HTTP context containing request information.
     * \return The status of the HTTP request after authorization processing.
     */
-   virtual http::RequestStatus invoke(const http::HttpContext& context);
+   virtual http::RequestStatus invoke(const http::HttpContext& context) override;
    
    /**
     * \brief Sets middleware options for the AuthorizationMiddleware.
@@ -54,10 +53,8 @@ public:
 protected:
    AuthorizationMiddlewareOption _option;
 
-   void applyHttpResult(
-      const http::HttpContext& context,
-      http::StatusCode statusCode,
-      const std::string& message);
+   void applyHttpResult( const http::HttpContext& context,
+      http::StatusCode statusCode, const std::string& message);
 };
 
 /** @}*/

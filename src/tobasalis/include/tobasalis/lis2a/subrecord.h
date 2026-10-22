@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/record.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace lis2a {
 /** \ingroup LIS
  * SubRecord
  */
-class SubRecord
+class TBS_LIS_API SubRecord
    : public Record
 {
 public:

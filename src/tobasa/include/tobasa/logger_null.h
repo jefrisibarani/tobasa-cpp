@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasa/exp_imp.h"
+
 namespace tbs {
 namespace log {
 
@@ -7,7 +9,7 @@ namespace log {
  * @ingroup TBS
  * @brief Null Logger logs nothing.
  */
-class NullLogger 
+class TBS_API NullLogger 
 {
 public:
 

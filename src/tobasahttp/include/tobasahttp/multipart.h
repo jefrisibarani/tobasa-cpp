@@ -6,6 +6,7 @@
 #include <vector>
 #include "tobasahttp/headers.h"
 #include "tobasahttp/field.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -18,7 +19,7 @@ namespace http {
  * Multipart Media type.
  * @sa https://httpwg.org/specs/rfc7231.html#rfc.section.3.1.1.1
  */
-class MediaType
+class TBS_HTTP_API MediaType
    : public FieldLowerCaseCollection
 {
 private:
@@ -38,7 +39,7 @@ public:
  * Content disposition.
  * @sa https://www.rfc-editor.org/rfc/rfc6266
  */
-class Disposition
+class TBS_HTTP_API Disposition
    : public FieldLowerCaseCollection
 {
 private:
@@ -57,7 +58,7 @@ public:
 /** 
  * Multipart body.
  */
-class MultipartBody
+class TBS_HTTP_API MultipartBody
 {
 public:
    MultipartBody() = default;

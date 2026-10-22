@@ -51,3 +51,4 @@ build*/
 /src/app_server/wwwroot/css/styles.min.css.map
 /src/app_server/src/build_info.cpp
 /src/samples/app_client/src/build_info.cpp
+/.github

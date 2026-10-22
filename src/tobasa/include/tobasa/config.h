@@ -8,6 +8,7 @@
 #include "tobasa/span.h"
 #include "tobasa/exception.h"
 #include "tobasa/util_string.h"
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -15,7 +16,7 @@ namespace tbs {
  * @ingroup TBS
  * @brief Application Configuration class managing settings via a JSON configuration file.
  */
-class Config
+class TBS_API Config
 {
 private:
    /// Protects config data

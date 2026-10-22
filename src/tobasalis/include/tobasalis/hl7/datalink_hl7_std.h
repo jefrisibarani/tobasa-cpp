@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/datalink.h"
 
 namespace tbs {
@@ -25,7 +27,7 @@ namespace hl7 {
  *   ERR|||207|E|invalidMessage||Message rejected<CR>
  *   <FS><CR>
  */
-class DataLinkHl7Std
+class TBS_LIS_API DataLinkHl7Std
    : public lis::DataLink
 {
 public:

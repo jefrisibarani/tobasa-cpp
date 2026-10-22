@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12-3.18)
 cmake_policy(SET CMP0091 NEW)
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   cmake_policy(SET CMP0079 NEW)
+endif()
 
 # The project
 project(tobasaweb VERSION 1.0 LANGUAGES CXX)
@@ -23,24 +26,33 @@ set(JWTCPP_INCLUDE_DIR   ${TOBASA_EXTERNAL_DEPS_DIR}/jwt-cpp/include)
 message(STATUS "tobasaweb jwt-cpp include dir: ${JWTCPP_INCLUDE_DIR}")
 
 # The library
-add_library(tobasaweb)
-include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
-
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasa_monolithic)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_WEB_SHARED)
+elseif(TOBASA_BUILD_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasaweb)
+   add_library(tobasaweb SHARED)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_WEB_SHARED)
+else()
+   set(TOBASA_MODULE_TARGET tobasaweb)
+   add_library(tobasaweb STATIC)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TBS_WEB_STATIC)
 endif()
 
-target_sources( tobasaweb
+include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
+
+target_sources(${TOBASA_MODULE_TARGET}
    PRIVATE ${MY_SOURCES_LIST}
    PRIVATE ${MY_HEADERS_LIST} )
 
-target_link_libraries( tobasaweb
-   PRIVATE tobasa
-   PRIVATE tobasasql
-   PRIVATE tobasahttp )
+if(NOT TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   target_link_libraries(${TOBASA_MODULE_TARGET}
+      PRIVATE tobasa
+      PRIVATE tobasasql
+      PRIVATE tobasahttp)
+endif()
 
-target_include_directories( tobasaweb
+target_include_directories(${TOBASA_MODULE_TARGET}
    PUBLIC ${JWTCPP_INCLUDE_DIR}
    PUBLIC ${PROJECT_SOURCE_DIR}/include
    PUBLIC ${PROJECT_SOURCE_DIR}/src )
@@ -50,10 +62,10 @@ if(TOBASA_BUILD_TESTS)
 endif()
 
 if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
-   target_link_libraries( tobasaweb PUBLIC spdlog::spdlog )
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC spdlog::spdlog)
 else()
    message(STATUS "${PROJECT_NAME} use bundled spdlog")
-   target_include_directories( tobasaweb PUBLIC ${SPDLOG_INCLUDE_DIR} )
+   target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${SPDLOG_INCLUDE_DIR})
 
    set(HAS_STD_TEXT_FORMATTING FALSE) # __cpp_lib_format (Text formatting)
    if(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30.30705)
@@ -63,22 +75,22 @@ else()
    endif()
 
    if(HAS_STD_TEXT_FORMATTING)
-      target_compile_definitions(tobasaweb PUBLIC SPDLOG_USE_STD_FORMAT )
+      target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC SPDLOG_USE_STD_FORMAT )
    else()
-      target_compile_definitions(tobasaweb PUBLIC SPDLOG_FMT_EXTERNAL )
+      target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC SPDLOG_FMT_EXTERNAL )
    endif()
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    message(STATUS "${PROJECT_NAME} use cxx_std_20")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_20)
 else()
    message(STATUS "${PROJECT_NAME} use cxx_std_17")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_17)
 endif()
 
 if(MSVC)
-   target_compile_options(tobasaweb PRIVATE /bigobj /FS )
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE /bigobj /FS )
 endif()
 
 # Show filtered headers in IDE

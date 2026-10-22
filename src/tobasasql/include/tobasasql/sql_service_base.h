@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
 #include <string>
 #include <memory>
 #include <functional>
@@ -23,7 +24,7 @@ class DatabaseConnector;
 /**
  * SqlServiceBase.
  */
-class SqlServiceBase : private NonCopyable
+class TBS_SQL_API SqlServiceBase : private NonCopyable
 {
    friend class DatabaseConnector;
    

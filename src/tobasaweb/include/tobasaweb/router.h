@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasahttp/server/common.h>
 #include <tobasahttp/response.h>
 #include <tobasahttp/authentication.h>
@@ -15,7 +17,7 @@ namespace web {
  * RouteEntry.
  * Router route/path handler and matcher
  */
-class RouteEntry
+class TBS_WEB_API RouteEntry
 {
 private:
    http::Method      _method {http::Method::UNKNOWNN};
@@ -66,7 +68,7 @@ public:
  * Router
  * Web application router and HTTP server request handler
  */
-class Router
+class TBS_WEB_API Router
    : public Middleware
    , public RouterBase
 {

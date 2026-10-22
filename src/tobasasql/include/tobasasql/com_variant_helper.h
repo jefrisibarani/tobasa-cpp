@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
 #include <tobasa/variant_helper.h>
@@ -14,7 +16,7 @@ namespace tbs {
  * \sa https://docs.microsoft.com/en-us/windows/win32/api/wtypes/ne-wtypes-varenum
  * \sa https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-oaut/3fe7db9f-5803-4dc4-9d14-5425d3f5461f
  */
-class ComVariantHelper : public VariantHelper<ComVariantType>
+class TBS_SQL_API ComVariantHelper : public VariantHelper<ComVariantType>
 {
 public:
    using VariantType   = ComVariantType;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/non_copyable.h>
 #include <tobasasql/sql_conn_variant.h>
 
@@ -13,7 +15,7 @@ namespace sql {
 /** 
  * \brief DatabaseConnectorBase
  */
-class DatabaseConnectorBase : private NonCopyable
+class TBS_SQL_API DatabaseConnectorBase : private NonCopyable
 {
 protected:
    std::string _name;

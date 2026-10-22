@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include "tobasaweb/middleware_base.h"
 
 namespace tbs {
@@ -21,7 +23,7 @@ using MiddlewareIgnoreHandler = std::function<bool(const http::HttpContext& cont
  * The Middleware class serves as a processor for HTTP requests and responses
  * within the HttpContext, providing functionality to handle middleware-related tasks.
  */
-class Middleware
+class TBS_WEB_API Middleware
    : public MiddlewareBase
 {
 protected:

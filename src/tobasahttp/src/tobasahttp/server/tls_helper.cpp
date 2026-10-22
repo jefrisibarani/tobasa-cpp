@@ -1,4 +1,5 @@
 #include <tobasa/path.h>
+#include <new>
 #include "tobasahttp/server/tls_helper.h"
 
 #ifdef TOBASA_HTTP_USE_HTTP2
@@ -12,6 +13,21 @@ namespace http {
 // Map hostnames → SSL_CTX*
 std::unordered_map<std::string, std::unique_ptr<asio::ssl::context>> tlsCertMap;
 
+namespace {
+
+void freeSniHostname(void*, void* data, CRYPTO_EX_DATA*, int, long, void*)
+{
+   delete static_cast<std::string*>(data);
+}
+
+int sniHostnameIndex()
+{
+   static int index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, freeSniHostname);
+   return index;
+}
+
+} // namespace
+
 // Lookup function
 SSL_CTX* lookupSslCtx(const std::string& hostname) 
 {
@@ -22,12 +38,39 @@ SSL_CTX* lookupSslCtx(const std::string& hostname)
    return nullptr; // fall back to default
 }
 
+const char* getSniHostname(const SSL* ssl)
+{
+   auto index = sniHostnameIndex();
+   if (!ssl || index < 0)
+      return nullptr;
+
+   auto hostname = static_cast<const std::string*>(SSL_get_ex_data(ssl, index));
+   return hostname ? hostname->c_str() : nullptr;
+}
+
 // SNI callback
 int sniCallback(SSL* ssl, int* ad, void* arg) 
 {
    const char* servername = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
    if (!servername) 
       return SSL_TLSEXT_ERR_NOACK;
+
+   auto index = sniHostnameIndex();
+   if (index >= 0)
+   {
+      try
+      {
+         auto hostname = new std::string(servername);
+         auto previous = static_cast<std::string*>(SSL_get_ex_data(ssl, index));
+         if (SSL_set_ex_data(ssl, index, hostname) == 1)
+            delete previous;
+         else
+            delete hostname;
+      }
+      catch (...)
+      {
+      }
+   }
 
    SSL_CTX* ctx = lookupSslCtx(servername);
    if (ctx) 

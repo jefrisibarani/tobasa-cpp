@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include "tobasasql/mysql_result.h"
 
 namespace tbs {
@@ -15,7 +17,7 @@ class ColumnInfo;
  * \brief MySql Table helper.
  * \note Experimental
  */
-class MysqlTableHelper
+class TBS_SQL_API MysqlTableHelper
 {
 public:
    bool isView(MysqlConnection& connection);

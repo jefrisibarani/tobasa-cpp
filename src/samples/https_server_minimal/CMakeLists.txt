@@ -8,6 +8,8 @@ include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
 function(configure_https_server_target target source_file)
 
    add_executable(${target} ${PROJECT_SOURCE_DIR}/src/${source_file})
+   set_target_properties(${target} PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${target}")
 
    target_sources( ${target}
       PRIVATE ${MY_HEADERS_LIST}
@@ -15,12 +17,11 @@ function(configure_https_server_target target source_file)
 
    target_link_libraries( ${target} PRIVATE tobasahttp tobasa)
 
+   tobasa_stage_shared_runtime(${target} tobasahttp tobasa)
+
    target_include_directories( ${target} PRIVATE ${PROJECT_SOURCE_DIR}/src )
 
    if(MSVC)
-      set_property(TARGET ${target} PROPERTY
-         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-
       target_compile_definitions( ${target}
          PRIVATE _CRT_SECURE_NO_WARNINGS
          PRIVATE WIN32_LEAN_AND_MEAN )
@@ -62,7 +63,7 @@ function(configure_https_server_target target source_file)
    # Copy binary dir to _output dir
    # -------------------------------------------------------
    if(TOBASA_CREATE_PACKAGE_OUTPUT_DIR)
-      set(package_output_dir ${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>)
+      set(package_output_dir ${TOBASA_PACKAGE_OUTPUT_DIR}/${PROJECT_NAME}/${target}/$<$<CONFIG:Debug>:debug>$<$<CONFIG:Release>:release>)
 
       add_custom_command(TARGET ${target} POST_BUILD
          COMMAND ${CMAKE_COMMAND} -E copy_directory

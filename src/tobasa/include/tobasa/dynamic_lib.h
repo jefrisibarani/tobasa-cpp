@@ -4,6 +4,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <type_traits>   // for std::invoke_result_t
+#include "tobasa/exp_imp.h"
 
 #if defined(_WIN32) || defined(_WIN64)
   #include <windows.h>
@@ -33,7 +34,7 @@ namespace tbs {
  * std::cout << "2+3=" << add(2,3) << "\n";
  * @endcode
  */
-class DynamicLib
+class TBS_API DynamicLib
 {
 public:
    /// Default constructor (library not loaded yet).

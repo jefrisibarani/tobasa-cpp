@@ -4,6 +4,7 @@
 #include <tobasa/non_copyable.h>
 #include "tobasahttp/status_codes.h"
 #include "tobasahttp/headers.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -89,7 +90,7 @@ public:
  * processed)
  */
 
- struct Line
+ struct TBS_HTTP_API Line
 {
    std::string fieldName  {};
    std::string fieldValue {};
@@ -97,7 +98,7 @@ public:
 };
 
 
-struct StartLineContext
+struct TBS_HTTP_API StartLineContext
 {
    std::string data      {};
    bool        gotCR     {false};
@@ -113,7 +114,7 @@ struct StartLineContext
  * \brief HTTP headers parsing context.
  * This is working context for parsing HTTP headers.
  */
-struct HeadersContext
+struct TBS_HTTP_API HeadersContext
 {
    struct LineContext
    {
@@ -149,7 +150,7 @@ struct HeadersContext
 /** 
  * \brief Chuncked data parsing context.
  */
-struct ChunkedContext
+struct TBS_HTTP_API ChunkedContext
 {
    bool           sizeCR         {false};
    bool           sizeLF         {false};
@@ -183,7 +184,7 @@ class MultipartParser;
  * \brief Http Message Parser
  * Parse Request, Response, Chunked body, Multipart body
  */
-class Parser : private NonCopyable
+class TBS_HTTP_API Parser : private NonCopyable
 {
 public:
 
@@ -421,10 +422,10 @@ private:
 };
 
 /// Helper function for returning parsing status code
-Info withSuccess(size_t lastIndex=0, size_t bytesRead=0);
-Info withError(std::string_view message, size_t lastIndex=0, HttpStatus httpStatus = HttpStatus{StatusCode::BAD_REQUEST}, size_t bytesRead=0 );
+TBS_HTTP_API Info withSuccess(size_t lastIndex=0, size_t bytesRead=0);
+TBS_HTTP_API Info withError(std::string_view message, size_t lastIndex=0, HttpStatus httpStatus = HttpStatus{StatusCode::BAD_REQUEST}, size_t bytesRead=0 );
 
-Info parseHeaders(HeadersContext& hdrCtx, const uint8_t *data, size_t dataStart, size_t totalData);
+TBS_HTTP_API Info parseHeaders(HeadersContext& hdrCtx, const uint8_t *data, size_t dataStart, size_t totalData);
 
 /** @}*/
 

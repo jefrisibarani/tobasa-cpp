@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
 #include <tobasa/notifier.h>
 #include <tobasa/self_counter.h>
 #include "tobasasql/common_types.h"
@@ -12,7 +13,7 @@ namespace sql {
  * \brief Sql result common.
  * Abstact base class serves as a root class for all implemented sql result
 */
-class ResultCommon : public Notifier
+class TBS_SQL_API ResultCommon : public Notifier
 {
 public:
    ResultCommon();

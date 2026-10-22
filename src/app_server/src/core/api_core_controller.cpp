@@ -578,7 +578,6 @@ http::ResultPtr ApiCoreController::onApiServerStatus(const web::RouteArgument& a
    resp.emplace_back( Json::array_t{21, "Using in-memory resources",       web::conf::Webapp::useInMemoryResources } );
 
 
-
    bool builWithInMemoryTZDB = false;
 #if !defined(TOBASA_USE_STD_DATE) && defined(TOBASA_DATE_USE_IN_MEMORY_TZDB)
    builWithInMemoryTZDB = true;

@@ -1,12 +1,14 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 #include "tobasalis/hl7/encoding.h"
 
 namespace tbs {
 namespace hl7 {
 
-class MessageElement
+class TBS_LIS_API MessageElement
 {
 protected:
    int _myId = 0;

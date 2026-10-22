@@ -2,18 +2,19 @@
 
 #include <string>
 #include <memory>
+#include "tobasa/dynamic_lib.h"
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
 class IPluginFactory;
 class Plugin;
-class DynamicLib;
 
 /**
  * @ingroup TBS
  * Represents a dynamically loaded Tobasa plugin library and its plugin instance.
  */
-class PluginLibrary
+class TBS_API PluginLibrary
 {
 public:
    /**
@@ -56,10 +57,16 @@ public:
    bool hasPlugin() const;
 
    /// Returns the library name derived from its path.
-   std::string getName() const { return _name; } ;
+   std::string getName() const { return _name; }
+
+   /// Returns the original library path used to load it.
+   std::string getPath() const { return _path; }
 
    /// Returns the name reported by the plugin factory.
    std::string getPluginName() const;
+
+   /// Returns the Id reported by the plugin factory.
+   std::string getPluginId() const;
 
    /// Returns the current plugin instance, or nullptr if none exists.
    Plugin* getPlugin() const;

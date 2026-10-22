@@ -113,8 +113,19 @@
       }
 
       TBS.logout = function() {
-        TBS.clearAuthCookie();
-        window.location.href = TBS.baseUrl + "/logout";
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        fetch(TBS.urlLogout(), {
+          method: "POST",
+          headers: { "X-CSRF-Token": csrfToken },
+          credentials: "same-origin"
+        })
+        .then(response => {
+          if (!response.ok)
+            throw new Error("Failed to log out from the server");
+          TBS.clearAuthCookie();
+          window.location.href = TBS.baseUrl + "/login";
+        })
+        .catch(error => console.error("Logout error:", error));
         /*
         fetch(TBS.urlLogout(), {
           method: 'GET',

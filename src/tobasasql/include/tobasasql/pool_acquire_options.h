@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <chrono>
 #include <cstddef>
 #include <functional>
@@ -14,21 +16,21 @@ class ConnectionPool;
 class PoolAcquireCancellationSource;
 
 /// Thrown when a pool wait reaches its configured timeout.
-class PoolAcquireTimeoutError : public std::runtime_error
+class TBS_SQL_API PoolAcquireTimeoutError : public std::runtime_error
 {
 public:
    using std::runtime_error::runtime_error;
 };
 
 /// Thrown when a pool wait is cancelled through its cancellation token.
-class PoolAcquireCancelledError : public std::runtime_error
+class TBS_SQL_API PoolAcquireCancelledError : public std::runtime_error
 {
 public:
    using std::runtime_error::runtime_error;
 };
 
 /// A copyable token that lets one or more pool waits observe cancellation.
-class PoolAcquireCancellationToken
+class TBS_SQL_API PoolAcquireCancellationToken
 {
    struct State;
    std::shared_ptr<State> _state;
@@ -49,7 +51,7 @@ public:
 };
 
 /// Creates tokens and cancels pool waits using those tokens.
-class PoolAcquireCancellationSource
+class TBS_SQL_API PoolAcquireCancellationSource
 {
    std::shared_ptr<PoolAcquireCancellationToken::State> _state;
 

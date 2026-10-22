@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/exception.h>
 #include <tobasasql/database_service_factory_base.h>
 #include <tobasasql/sql_connection_pool.h>
@@ -15,7 +17,7 @@ namespace sql {
  * connection pool, and creates database services for the configured
  * database connections.
  */
-class DbServiceFactory
+class TBS_SQL_API DbServiceFactory
    : public DbServiceFactoryBase
 {
 protected:

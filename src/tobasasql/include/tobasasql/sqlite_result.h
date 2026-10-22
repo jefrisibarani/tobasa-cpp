@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include <tobasa/navigator.h>
 #include "tobasasql/sql_result_common.h"
@@ -22,7 +24,7 @@ namespace sql {
  *
  * Provides full navigation and value retrieval via SqlResult interface.
  */
-class SqliteResult : public ResultCommon
+class TBS_SQL_API SqliteResult : public ResultCommon
 {
 public:
    using VariantType   = DefaultVariantType;

@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/subrecord.h"
 
 namespace tbs {
@@ -9,7 +11,7 @@ namespace lis2a {
  * PatientName
  * CLSI LIS02-A2 Patient Name - Record's component
  */
-class PatientName
+class TBS_LIS_API PatientName
    : public SubRecord
 {
 public:

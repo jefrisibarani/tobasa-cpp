@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <vector>
 #include <functional>
 #include <string>
@@ -127,7 +129,7 @@ private:
 };
 
 
-void runDbMigration(const sql::conf::ConnectorOption* option, MigrationJob& job);
+TBS_WEB_API void runDbMigration(const sql::conf::ConnectorOption* option, MigrationJob& job);
 
 /** @}*/
 

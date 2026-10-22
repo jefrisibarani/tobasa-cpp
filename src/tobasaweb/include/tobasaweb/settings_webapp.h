@@ -44,6 +44,9 @@ struct WebService
    // Setting to 0 (zero) means expire when the browser is closed.
    int sessionExpirationMinutes     {15};
 
+   // Session backend selection. Supported values: filesystem, sqlite.
+   std::string sessionStore         {"filesystem"};
+
    std::string sessionSavePath      {"./appdata/session"}; // Do not include trailing slash
 
    /// Client app ID accepted by this server
@@ -81,7 +84,7 @@ struct WebService
    std::vector<RouteSession> noSessionList;
  
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WebService, routeAuthLists, sessionExpirationMinutes, 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WebService, routeAuthLists, sessionExpirationMinutes, sessionStore,
    sessionSavePath, acceptedClientAppId, authJwtIssuer, authJwtSecret, authJwtSecretRefresh,
    authJwtExpireTimeSpanMinutes, authJwtRefreshExpireTimeSpanMinutes, 
    useInMemoryResources, templateDir, uploadDir, dataDir, homePage, loginPage, logoutPage, noSessionList)

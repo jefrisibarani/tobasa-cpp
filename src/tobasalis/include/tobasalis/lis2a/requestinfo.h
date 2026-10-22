@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/substartingrange.h"
 #include "tobasalis/lis2a/subuniversaltest.h"
 
@@ -30,7 +32,7 @@ enum class QueryStatusCode
  * RequestInfoRecord
  * CLSI LIS02-A2 (formerly ASTM 1394-97) Request Information Record
  */
-class RequestInfoRecord
+class TBS_LIS_API RequestInfoRecord
    : public Record
 {
 public:

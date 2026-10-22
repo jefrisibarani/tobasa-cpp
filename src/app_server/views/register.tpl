@@ -14,6 +14,7 @@
                   </div>
                   <div class="card-body">
                     <form action="{{ pageBaseUrl }}/register" method="post">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
                       <div class="row mb-3">
                         <div class="col-md-6">
                           <div class="form-floating mb-3 mb-md-0">

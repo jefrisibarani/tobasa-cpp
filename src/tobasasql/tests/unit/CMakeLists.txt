@@ -12,6 +12,7 @@ set_target_properties(tobasasql_unit_tests PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
 target_link_libraries(tobasasql_unit_tests PRIVATE tobasasql GTest::gtest_main)
+tobasa_stage_shared_runtime(tobasasql_unit_tests tobasasql)
 gtest_discover_tests(tobasasql_unit_tests)
 
 
@@ -26,6 +27,7 @@ set_target_properties(tobasasql_dbapi_unit_tests PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
 target_link_libraries(tobasasql_dbapi_unit_tests PRIVATE tobasasql GTest::gtest_main)
+tobasa_stage_shared_runtime(tobasasql_dbapi_unit_tests tobasasql)
 gtest_discover_tests(tobasasql_dbapi_unit_tests)
 
 add_executable(tobasasql_connection_pool_unit_tests
@@ -37,4 +39,5 @@ set_target_properties(tobasasql_connection_pool_unit_tests PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
 target_link_libraries(tobasasql_connection_pool_unit_tests PRIVATE tobasasql GTest::gtest_main)
+tobasa_stage_shared_runtime(tobasasql_connection_pool_unit_tests tobasasql)
 gtest_discover_tests(tobasasql_connection_pool_unit_tests)

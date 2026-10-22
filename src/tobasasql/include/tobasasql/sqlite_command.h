@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/notifier.h>
 #include "tobasasql/sql_parameter.h"
 #include "tobasasql/sqlite_type.h"
@@ -13,7 +15,7 @@ class DataSet;
 class SqliteConnection;
 class SqliteResult;
 
-class SqliteCommand : public Notifier
+class TBS_SQL_API SqliteCommand : public Notifier
 {
    using VariantType   = DefaultVariantType;
    using VariantHelper = VariantHelper<VariantType>;

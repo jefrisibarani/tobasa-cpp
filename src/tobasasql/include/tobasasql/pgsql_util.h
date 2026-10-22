@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include <tobasasql/sql_parameter.h>
 #include "tobasasql/pgsql_type.h"
@@ -12,22 +14,22 @@ namespace sql {
  */
 
  /// Convert PostgreSQL data type from std::string.
-PgsqlType pgsqlDataTypeFromString(const std::string& ftype);
+TBS_SQL_API PgsqlType pgsqlDataTypeFromString(const std::string& ftype);
 
 /// Convert PostgreSQL data type to string.
-std::string pgsqlDataTypeToString(PgsqlType ftype);
+TBS_SQL_API std::string pgsqlDataTypeToString(PgsqlType ftype);
 
 /// Convert sql::DataType to PostgreSQL data type.
-PgsqlType pgsqlDataTypeFromDataType(DataType type);
+TBS_SQL_API PgsqlType pgsqlDataTypeFromDataType(DataType type);
 
 /// Convert PostgreSQL data type to sql::DataType.
-DataType pgsqlDataTypeToDataType(PgsqlType ftype);
+TBS_SQL_API DataType pgsqlDataTypeToDataType(PgsqlType ftype);
 
 /// Convert PostgreSQL data type to sql::DataType.
-DataType pgsqlDataTypeToDataType(long ftype);
+TBS_SQL_API DataType pgsqlDataTypeToDataType(long ftype);
 
 /// Get Type class from PostgreSQL type.
-TypeClass typeClassFromPgsqlType(const long type);
+TBS_SQL_API TypeClass typeClassFromPgsqlType(const long type);
 
 /** @}*/
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 
 namespace tbs {
@@ -31,7 +33,7 @@ enum class FieldType
 /** \ingroup LIS
  * BciField
  */
-class BciField
+class TBS_LIS_API BciField
 {
 public:
    BciField(int index, const std::string& code, const std::string& name, const std::string& value = "");

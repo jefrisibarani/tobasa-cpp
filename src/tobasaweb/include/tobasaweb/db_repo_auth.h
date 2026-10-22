@@ -61,7 +61,7 @@ public:
 
       // check if userName exists
       if (user == nullptr)
-         throw ValidationException("Username not found");
+         throw ValidationException("Invalid username or password");
 
       if (user->userName.empty())
          throw AppException("Internal error occured when getting user data");

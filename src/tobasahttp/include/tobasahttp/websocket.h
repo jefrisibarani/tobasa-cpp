@@ -19,6 +19,7 @@
 #include "tobasahttp/headers.h"
 #include "tobasahttp/field.h"
 #include "tobasahttp/connection.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -160,7 +161,7 @@ struct WebSocketTransport
  * dispatch context. The public WebSocket handle is passed to application
  * callbacks and stored by WebSocketContext.
  */
-struct WebSocketState
+struct TBS_HTTP_API WebSocketState
 {
    asio::streambuf     sendStreamBuf;
 #ifdef TOBASA_HTTP_USE_HTTP2
@@ -281,7 +282,7 @@ class ServerConnection;
  * Provides application code with access to WebSocket messaging, connection
  * metadata, and connection control.
  */
-class WebSocket
+class TBS_HTTP_API WebSocket
 {
 private:
    // Non-owning reference to the underlying HTTP connection.
@@ -373,7 +374,7 @@ public:
  *     });
  * @endcode
  */
-class WebSocketContext 
+class TBS_HTTP_API WebSocketContext
    : public std::enable_shared_from_this<WebSocketContext>
 {
 private:

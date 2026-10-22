@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasahttp/exp_imp.h"
+
 namespace tbs {
 namespace http {
 
@@ -7,7 +9,7 @@ namespace http {
  * \ingroup HTTP
  * Do nothing logger.
  */
-struct NoLogger
+struct TBS_HTTP_API NoLogger
 {
 public:
    template<class... Args>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
 #include "tobasaweb/controller_base.h"
 #include "tobasaweb/alert.h"
 
@@ -11,7 +12,7 @@ namespace web {
  * \brief Controller for handling page requests.
  * Instances of this class are instantiated by a Factory.
  */
-class ControllerPage
+class TBS_WEB_API ControllerPage
    : public ControllerBase
 {
 public:

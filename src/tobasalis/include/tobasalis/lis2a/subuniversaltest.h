@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/subrecord.h"
 
 namespace tbs {
@@ -9,7 +11,7 @@ namespace lis2a {
  * UniversalTestID
  * CLSI LIS02-A2 Universal Test ID - Record's component
  */
-class UniversalTestID
+class TBS_LIS_API UniversalTestID
    : public SubRecord
 {
 public:

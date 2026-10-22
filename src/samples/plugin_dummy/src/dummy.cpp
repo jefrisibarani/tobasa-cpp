@@ -26,7 +26,7 @@ static PluginFactory<DummyPlugin> dummyPluginFactory(
  * This function must be exported from the plugin DLL/SO and is called
  * by PluginLibrary to retrieve the plugin factory.
  */
-TBS_PLUGIN IPluginFactory* GetTobasaPlugin()
+TBS_PLUGIN_API IPluginFactory* GetTobasaPlugin()
 {
    return &dummyPluginFactory;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <memory>
 #include <vector>
 #include <string>
@@ -14,7 +16,7 @@ namespace lis {
 class Record;
 using RecordPtr = std::shared_ptr<Record>;
 
-class Record
+class TBS_LIS_API Record
 {
 public:
    Record();

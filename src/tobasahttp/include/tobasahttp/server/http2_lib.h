@@ -11,6 +11,7 @@
 #include <string>
 #include <nghttp2/nghttp2.h>
 #include "tobasahttp/server/string_ref.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http2 {
@@ -66,17 +67,17 @@ using HeaderIndex = std::array<int16_t, HD_MAXIDX>;
 // Looks up header token for header name |name|.  Only headers we are
 // interested in are tokenized.  If header name cannot be tokenized,
 // returns -1.
-int lookupToken(const StringRef &name);
+TBS_HTTP_API int lookupToken(const StringRef &name);
 
 
 // Creates nghttp2_nv using |name| and |value| and returns it. The
 // returned value only references the data pointer to name.c_str() and
 // value.c_str().  If |no_index| is true, nghttp2_nv flags member has
 // NGHTTP2_NV_FLAG_NO_INDEX flag set.
-nghttp2_nv makeNv(const std::string &name, const std::string &value,
+TBS_HTTP_API nghttp2_nv makeNv(const std::string &name, const std::string &value,
                    bool no_index = false);
 
-nghttp2_nv makeNv(const StringRef &name, const StringRef &value,
+TBS_HTTP_API nghttp2_nv makeNv(const StringRef &name, const StringRef &value,
                    bool no_index = false);
 
 // Create nghttp2_nv from string literal |name| and std::string

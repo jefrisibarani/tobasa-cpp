@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <functional>
 #include <string>
 #include <tobasa/non_copyable.h>
@@ -15,7 +17,7 @@ constexpr auto CONNECTION_READ_BUF_SIZE = 4096;
 /** \ingroup LIS
  * Connection class.
  */
-class Connection : private NonCopyable
+class TBS_LIS_API Connection : private NonCopyable
 {
 public:
    virtual ~Connection() = default;

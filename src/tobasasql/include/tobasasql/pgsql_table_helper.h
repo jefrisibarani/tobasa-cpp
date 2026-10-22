@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include "tobasasql/pgsql_result.h"
 
@@ -17,7 +19,7 @@ class ColumnInfo;
  * \ingroup SQL
  * \brief PostgreSQL Table helper.
  */
-class PgsqlTableHelper
+class TBS_SQL_API PgsqlTableHelper
 {
 public:
    bool isView(PgsqlConnection& connection );

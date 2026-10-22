@@ -15,6 +15,7 @@
                   <div class="card-body">
                     <div class="small mb-3 text-muted">Enter your user name and we will send you a link to reset your password.</div>
                     <form action="{{ pageBaseUrl }}/password" method="post">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
                       <div class="form-floating mb-3">
                         <input class="form-control" name="username" id="inputUsername" type="text" placeholder="user name" />
                         <label for="inputUsername">User name</label>

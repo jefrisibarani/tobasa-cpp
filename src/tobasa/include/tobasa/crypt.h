@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "tobasa/common.h"
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -31,7 +32,7 @@ enum class ShaType
  * @return               32 characters hex encoded encrypted password (128 bit)
  * Throw std::exception on error
  */
-std::string passwordEncrypt(
+TBS_API std::string passwordEncrypt(
                const std::string& clearPassword,
                const std::string& salt = "");
 
@@ -44,7 +45,7 @@ std::string passwordEncrypt(
  * @return                   Decrypted password
  * Throw std::exception on error
  */
-std::string passwordDecrypt(
+TBS_API std::string passwordDecrypt(
                const std::string& encryptedPassword,
                const std::string& salt = "");
 
@@ -54,7 +55,7 @@ std::string passwordDecrypt(
  * @param message    The data to hash
  * @return           32 characters hex encoded MD5 hash (16 bytes/128 bit)
  */
-std::string hashMD5(const std::string& message);
+TBS_API std::string hashMD5(const std::string& message);
 
 
 /** 
@@ -62,7 +63,7 @@ std::string hashMD5(const std::string& message);
  * @param message    The data to hash
  * @return           40 characters hex encoded SHA1 hash (20 bytes/160 bit)
  */
-std::string hashSHA1(const std::string& message);
+TBS_API std::string hashSHA1(const std::string& message);
 
 
 /** 
@@ -71,7 +72,7 @@ std::string hashSHA1(const std::string& message);
  * @param hashOut    Buffer to receive the hash (20 bytes long)
  * Throw std::exception on error
  */
-void hashSHA1(const std::string& message, byte_t* hashOut);
+TBS_API void hashSHA1(const std::string& message, byte_t* hashOut);
 
 
 /** 
@@ -79,14 +80,14 @@ void hashSHA1(const std::string& message, byte_t* hashOut);
  * @param message    The data to hash
  * @return           40 characters hex encoded SHA1 hash (20 bytes/160 bit)
  */
-std::string hashSHA1(const std::string& message);
+TBS_API std::string hashSHA1(const std::string& message);
 
 /** 
  * @brief Calculates the hash of data using the SHA1 algorithm.
  * @param message    The data to hash
  * @return           std::vector containing the hash
  */
-std::vector<byte_t> hashSHA1Bytes(const std::string& message);
+TBS_API std::vector<byte_t> hashSHA1Bytes(const std::string& message);
 
 
 /** 
@@ -100,7 +101,7 @@ std::vector<byte_t> hashSHA1Bytes(const std::string& message);
  *                   SHA-512 : must be at least 64 bytes long
  * Throw std::exception on error
  */
-void hashSHA(
+TBS_API void hashSHA(
          ShaType            shaType,
          const std::string& message,
          byte_t*            hashOut);
@@ -117,7 +118,7 @@ void hashSHA(
  *                   SHA-512 : 128 characters (64 bytes/512 bit)
  * Throw std::exception on error
  */
-std::string hashSHA(ShaType shaType, const std::string& message);
+TBS_API std::string hashSHA(ShaType shaType, const std::string& message);
 
 
 /** 
@@ -133,7 +134,7 @@ std::string hashSHA(ShaType shaType, const std::string& message);
  *                   SHA-512 : 128 characters (64 bytes/512 bit)
  * Throw std::exception on error
  */
-std::string hmacSHA(
+TBS_API std::string hmacSHA(
                ShaType                    shaType,
                const std::string&         message,
                const std::vector<byte_t>& keyIn,
@@ -153,7 +154,7 @@ std::string hmacSHA(
  *                   SHA-512 : 128 characters (64 bytes/512 bit)
  * Throw std::exception on error
  */
-std::vector<byte_t> hmacSHABytes(
+TBS_API std::vector<byte_t> hmacSHABytes(
                ShaType                    shaType,
                const std::string&         message,
                const std::vector<byte_t>& keyIn,
@@ -173,7 +174,7 @@ std::vector<byte_t> hmacSHABytes(
  *                   SHA-512 : 128 characters (64 bytes/512 bit)
  * Throw std::exception on error
  */
-std::string hmacSHA(
+TBS_API std::string hmacSHA(
                ShaType            shaType,
                const std::string& message,
                const std::string& keyIn,
@@ -192,7 +193,7 @@ std::string hmacSHA(
  *                   SHA-512 : 128 characters (64 bytes/512 bit)
  * Throw std::exception on error
  */
-std::vector<byte_t> hmacSHABytes(
+TBS_API std::vector<byte_t> hmacSHABytes(
                ShaType            shaType,
                const std::string& message,
                const std::string& keyIn,
@@ -205,7 +206,7 @@ std::vector<byte_t> hmacSHABytes(
  * @param byteLength number of random bytes to generate
  * @return a hex string of length (byteLength × 2)
  */
-std::string getCryptoRandomHex(size_t byteLength=16);
+TBS_API std::string getCryptoRandomHex(size_t byteLength=16);
 
 /**
  * Generates a cryptographically strong random string encoded in Base64-URL.
@@ -217,7 +218,7 @@ std::string getCryptoRandomHex(size_t byteLength=16);
  *
  *   8 -> 11–12 , 16 -> 22 , 32 -> 43, 64 -> 86
  */
-std::string getCryptoRandomBase64Url(size_t byteLength=16);
+TBS_API std::string getCryptoRandomBase64Url(size_t byteLength=16);
 
 /** @}*/
 

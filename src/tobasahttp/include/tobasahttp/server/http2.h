@@ -18,6 +18,7 @@
 #include "tobasahttp/server/string_ref.h"
 #include "tobasahttp/server/settings_tls.h"
 #include "tobasahttp/multipart_parser.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http { class Response; }
@@ -27,7 +28,7 @@ namespace http2 {
 /**
  * \brief Stores the result of an HTTP/2 operation.
  */
-class Result
+class TBS_HTTP_API Result
 {
 private:
    bool        _success  {true};
@@ -70,7 +71,7 @@ struct RequestHeader
 
 
 /// Stores request data and state for one HTTP/2 stream.
-class Http2StreamData
+class TBS_HTTP_API Http2StreamData
 {
 public:
    Http2StreamData(int32_t id, http::ConnectionId connId);
@@ -125,7 +126,7 @@ private:
 class Http2Session;
 
 /// Tracks entry and exit while an HTTP/2 callback is running.
-struct CallbackGuard 
+struct TBS_HTTP_API CallbackGuard
 {
    CallbackGuard(Http2Session &h);
    ~CallbackGuard();
@@ -173,9 +174,12 @@ struct Http2Option
 };
 using Http2OptionPtr = std::shared_ptr<Http2Option>;
 
-class Http2Session : public std::enable_shared_from_this<Http2Session>
+class TBS_HTTP_API Http2Session : public std::enable_shared_from_this<Http2Session>
 {
 public:
+   Http2Session(const Http2Session&) = delete;
+   Http2Session& operator=(const Http2Session&) = delete;
+
    Http2Session(http::ConnectionId connId
       , asio::streambuf* sendBuffer
       , std::shared_ptr<http2::Http2Option>& option );
@@ -273,7 +277,6 @@ public:
    void enterCallback();
    void leaveCallback();
 
-   nghttp2_session* rawSession() { return _session; }
    http::ConnectionId connId() { return _connId; }
    asio::streambuf& sendBuffer() { return *_sendBuffer;}
 
@@ -307,6 +310,8 @@ public:
    void fillPendingData(asio::streambuf* srcBuff, size_t length);
 
 private:
+
+   nghttp2_session* rawSession() { return _session; }
    Result sendServerConnectionHeader();
 
    std::map<int32_t, std::unique_ptr<Http2StreamData>> _streams;

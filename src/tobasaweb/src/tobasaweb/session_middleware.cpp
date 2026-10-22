@@ -71,16 +71,15 @@ SessionMiddleware::SessionMiddleware()
 
 void SessionMiddleware::option(SessionMiddlewareOption option)
 {
-   _option.cookieAuthOption = std::move(option.cookieAuthOption);
-   _option.ignoreHandler    = std::move(option.ignoreHandler);
-   _option.cookieRules      = std::move(option.cookieRules);
-   _option.loginPathBuilder = std::move(option.loginPathBuilder);
+   _option.cookieAuthOption    = std::move(option.cookieAuthOption);
+   _option.ignoreHandler       = std::move(option.ignoreHandler);
+   _option.forceSessionHandler = std::move(option.forceSessionHandler);
+   _option.cookieRules         = std::move(option.cookieRules);
+   _option.loginPathBuilder    = std::move(option.loginPathBuilder);
 }
 
-void SessionMiddleware::applyHttpResult(
-   const http::HttpContext& context,
-   http::StatusCode statusCode,
-   const std::string& message)
+void SessionMiddleware::applyHttpResult(const http::HttpContext& context, 
+   http::StatusCode statusCode, const std::string& message)
 {
    if (_resultBuilder)
    {
@@ -106,6 +105,9 @@ void SessionMiddleware::applyHttpResult(
 bool SessionMiddleware::skipSessionProcessing(const http::HttpContext& context)
 {
    using namespace tbs::http;
+
+   if (_option.forceSessionHandler && _option.forceSessionHandler(context))
+      return false;
 
    auto reqPath     = context->request()->path();
    auto authContext = context->request()->authContext();

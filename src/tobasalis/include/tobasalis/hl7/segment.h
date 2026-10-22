@@ -1,12 +1,14 @@
 ﻿#pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <string>
 #include "tobasalis/hl7/field.h"
 
 namespace tbs {
 namespace hl7 {
 
-class Segment : public MessageElement
+class TBS_LIS_API Segment : public MessageElement
 {
 private:
    FieldCollection _fieldList;

@@ -57,3 +57,10 @@ target_compile_definitions(tbs_sqlite_db_api_integration_tests PRIVATE
 )
 gtest_discover_tests(tbs_sqlite_db_api_integration_tests)
 
+foreach(test_target IN ITEMS
+   tbs_sqlite_integration_tests
+   tbs_sqlite_tpl_api_integration_tests
+   tbs_sqlite_db_api_integration_tests)
+   tobasa_stage_shared_runtime(${test_target} tobasasql tobasa)
+endforeach()
+

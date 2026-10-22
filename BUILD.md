@@ -1,313 +1,115 @@
-# Building Tobasa C++ 
+# Building Tobasa C++
 
-This document provides comprehensive instructions for building the Tobasa C++ framework and its components.
+Tobasa uses CMake. Configure the build from the repository root, then build the generated tree. The project requires C++17; CMake enables C++20 where the compiler and standard library support the required features.
 
 ## Prerequisites
 
-### Required Tools
+- CMake 3.12 or newer. Enabling the monolithic shared library requires CMake 3.13 or newer.
+- A C++17-capable compiler. The repository has Windows/MSVC and Linux/GCC build paths.
+- OpenSSL development files. HTTP/2 is enabled by default and also needs nghttp2.
+- Dependencies for enabled SQL drivers: PostgreSQL, ODBC, SQLite, and MariaDB/MySQL are enabled by default. ADO is applicable to Windows. Some dependencies are bundled; others are found through VCPKG, CMake package discovery, or the paths in `CMakeDefaults.txt`.
+- GoogleTest is fetched by CMake when `TOBASA_BUILD_TESTS` is enabled, so configuration needs network access unless that dependency is already available to FetchContent.
 
-- **CMake 3.12-3.18**: Build system generator
-- **Git**: For cloning the repository (if not already done)
-
-### Compilers
-
-#### Windows
-- **Visual Studio 2017** or **Visual Studio 2022** (MSVC)
-- **VCPKG** (optional, for dependency management)
-
-#### Linux (Ubuntu Server 20.04.5)
-- **GCC 9.4.0** or **GCC 11.1.0**
-
-### Dependencies
-
-Tobasa requires several third-party libraries. You can either:
-
-1. **Use VCPKG** (Windows only): Automatic dependency management
-2. **Use prebuilt libraries**: Download and configure paths in `CMakeDefaults.txt`
-3. **Build from source**: Compile dependencies manually
-
-#### Required Libraries
-
-- **OpenSSL**: TLS/SSL support
-- **Zlib**: Compression
-- **SQLite**: Database support
-- **MariaDB/MySQL**: Database support
-- **PostgreSQL**: Database support
-- **Protobuf**: Protocol buffer support (optional)
-- **nghttp2**: HTTP/2 support (optional)
-
-## Quick Start
+## Dependency Setup
 
 ### Windows
 
-Run the provided build script from the project root:
+VCPKG is disable by default and supported only with MSVC. Set `VCPKG_TOOLCHAIN_FILE_DEF`, `VCPKG_OVERLAY_PORTS_DEF`, and `VCPKG_TARGET_TRIPLET_DEF` in `CMakeDefaults.txt` for the local VCPKG installation and the selected Visual Studio version. The checked-in defaults point to `d:/vcpkg` and select `vs2022` packages.
 
-```cmd
-.\build_all.cmd
-```
-
-This will:
-1. Create a `build` directory
-2. Configure CMake for Visual Studio 2017 (x64)
-3. Build both Release and Debug configurations
+To use prebuilt dependencies instead, set `TOBASA_BUILD_WITH_VCPKG=OFF` and configure the dependency directories in `CMakeDefaults.txt`. The compiler, VCPKG triplet, and prebuilt libraries must use compatible architectures, toolsets, and runtime linkage.
 
 ### Linux
 
-Run the provided build script from the project root:
-
-```bash
-./build_all.sh
-```
-
-This will:
-1. Create `build_d` (Debug) and `build_r` (Release) directories
-2. Configure CMake with Unix Makefiles
-3. Build both configurations
-
-## Manual Build Process
-
-### Step 1: Prepare Dependencies
-
-#### Option A: Using VCPKG (Windows)
-
-1. Install VCPKG:
-   ```cmd
-   git clone https://github.com/microsoft/vcpkg.git
-   cd vcpkg
-   .\bootstrap-vcpkg.bat
-   ```
-
-2. Set VCPKG paths in `CMakeDefaults.txt`:
-   ```cmake
-   set(VCPKG_TOOLCHAIN_FILE_DEF "d:/vcpkg/scripts/buildsystems/vcpkg.cmake")
-   set(VCPKG_OVERLAY_PORTS_DEF "d:/vcpkg/my_ports_vs2017")  # or vs2022
-   set(VCPKG_TARGET_TRIPLET_DEF "x64-windows-static-vs2017")  # or vs2022
-   ```
-
-3. Enable VCPKG in CMake:
-   ```cmake
-   -DTOBASA_BUILD_WITH_VCPKG=ON
-   ```
-
-#### Option B: Prebuilt Libraries (Windows)
-
-Download and extract prebuilt libraries to the paths specified in `CMakeDefaults.txt`:\
-Example:
-- OpenSSL: `d:/dev/openssl_x64-windows-static-vs2017`
-- Zlib: `d:/dev/dcmtk/dcmtk_3.6.8_x64_MT_vs2017/zlib-1.3`
-- PostgreSQL libpq: `d:/dev/libpq_x64-windows-static-vs2017`
-- Protobuf: `d:/dev/protobuf_x64-windows-static-vs2017`
-- nghttp2: `d:/dev/nghttp2_x64-windows-static-vs2017`
-
-#### Option C: System Packages (Linux)
-
-Install via package manager:
+Set `TOBASA_BUILD_WITH_VCPKG` to `OFF` when configuring on Linux. Install development packages for enabled system dependencies. On Ubuntu, a typical starting set is:
 
 ```bash
 sudo apt-get update
-sudo apt-get install libssl-dev zlib1g-dev libsqlite3-dev \
-                     libmariadb-dev libpq-dev protobuf-compiler \
-                     libprotobuf-dev libnghttp2-dev
+sudo apt-get install build-essential cmake pkg-config libssl-dev zlib1g-dev \
+   libpq-dev unixodbc-dev libnghttp2-dev
 ```
 
-### Step 2: Configure Build
+The MariaDB connector and SQLite encryption library can be built from bundled sources. Disable HTTP/2 with `-DTOBASA_HTTP_USE_HTTP2=OFF` if nghttp2 is not installed. Additional packages may be required for enabled features or tests.
 
-Create a build directory and run CMake configuration:
+## Configure and Build
 
-#### Windows (Visual Studio)
+### Windows with Visual Studio 2022
 
-```cmd
-mkdir build
-cd build
-cmake -S .. -G "Visual Studio 15 2017" -T host=x64 -A x64
+First configure the VCPKG or prebuilt dependency paths as described above. The checked-in dependency defaults select Visual Studio 2022 packages.
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Debug --parallel
+cmake --build build --config Release --parallel
 ```
 
-For Visual Studio 2022:
-```cmd
-cmake -S .. -G "Visual Studio 17 2022" -T host=x64 -A x64
-```
+If using `build_all.cmd` helper, update `CMakeDefaults.txt` so the selected package paths and toolset match. The helper configures one `build` directory and builds both Debug and Release.
 
-#### Linux (GCC)
+### Linux with GCC
 
 ```bash
-mkdir build
-cd build
-cmake -S .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -G "Unix Makefiles" \
+   -DTOBASA_BUILD_WITH_VCPKG=OFF \
+   -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
 ```
 
-### Step 3: Build
+For a Debug build, configure a separate directory with `-DCMAKE_BUILD_TYPE=Debug`. The `build_all.sh` helper does this in `build_d` and `build_r`.
 
-#### Windows
+## Main Build Options
 
-```cmd
-cmake --build . --config Debug
-cmake --build . --config Release
-```
+Options and defaults are defined in the top-level `CMakeLists.txt`. Pass overrides to `cmake -S . -B build`.
 
-#### Linux
+| Option | Default | Effect |
+| --- | --- | --- |
+| `TOBASA_BUILD_SHARED_LIB` | `ON` | Build Tobasa modules as shared libraries and use the dynamic MSVC runtime. Set `OFF` for static libraries and the static MSVC runtime. |
+| `TOBASA_BUILD_MONOLITHIC_SHARED_LIB` | `OFF` | Combine Tobasa modules into one shared library. Requires `TOBASA_BUILD_SHARED_LIB=ON`; CMake forces this option off when shared builds are disabled. |
+| `TOBASA_BUILD_WITH_VCPKG` | `ON` | Use VCPKG. Supported only with MSVC; explicitly set `OFF` on Linux. |
+| `TOBASA_BUILD_LIS_ENGINE` | `ON` | Include the LIS engine. |
+| `TOBASA_BUILD_TESTS` | `ON` | Build test modules. GoogleTest is fetched during configuration. |
+| `TOBASA_BUILD_TESTS_SQLDB_INTEGRATION` | `ON` | Include SQL database integration tests when tests and the relevant driver are enabled. |
+| `TOBASA_BUILD_TESTS_WSCHAT_USE_PROBUF` | `ON` | Include protobuf-based websocket tests; this option is disabled when tests are disabled. |
+| `TOBASA_HTTP_USE_HTTP2` | `ON` | Enable HTTP/2 support; nghttp2 is required. |
+| `TOBASA_BUILD_IN_MEMORY_RESOURCES` | `ON` | Compile selected application resources into the executable. |
+| `TOBASA_BUILD_IN_MEMORY_TZDB` | `ON` | Compile timezone data into the build when the platform does not provide the required standard library support. |
+
+The SQL driver options `TOBASA_SQL_USE_PGSQL`, `TOBASA_SQL_USE_ADODB`, `TOBASA_SQL_USE_ODBC`, `TOBASA_SQL_USE_SQLITE`, and `TOBASA_SQL_USE_MYSQL` default to `ON`. The current SQL CMake configuration forces SQLite support on, so `TOBASA_SQL_USE_SQLITE=OFF` does not disable it.
+
+Examples:
 
 ```bash
-cmake --build .
+# Static libraries, no tests, and no HTTP/2
+cmake -S . -B build-static \
+   -DTOBASA_BUILD_WITH_VCPKG=OFF \
+   -DTOBASA_BUILD_SHARED_LIB=OFF \
+   -DTOBASA_BUILD_TESTS=OFF \
+   -DTOBASA_HTTP_USE_HTTP2=OFF
+
+# One shared Tobasa library (CMake 3.13 or newer)
+cmake -S . -B build-monolithic \
+   -DTOBASA_BUILD_SHARED_LIB=ON \
+   -DTOBASA_BUILD_MONOLITHIC_SHARED_LIB=ON
 ```
 
-## Build Options
+## Tests and Targets
 
-Tobasa provides several CMake options to customize the build:
-
-### Core Options
-
-- `TOBASA_BUILD_WITH_VCPKG`: Use VCPKG for dependency management (Windows only, default: OFF)
-- `TOBASA_BUILD_IN_MEMORY_RESOURCES`: Embed resources in binary (default: ON)
-- `TOBASA_BUILD_IN_MEMORY_TZDB`: Embed timezone data in binary (default: ON)
-
-### Database Drivers
-
-- `TOBASA_SQL_USE_SQLITE`: Enable SQLite support (default: ON)
-- `TOBASA_SQL_USE_MYSQL`: Enable MariaDB/MySQL support (default: ON)
-- `TOBASA_SQL_USE_PGSQL`: Enable PostgreSQL support (default: ON)
-- `TOBASA_SQL_USE_ODBC`: Enable ODBC support (default: ON)
-- `TOBASA_SQL_USE_ADODB`: Enable ADO support (default: ON)
-
-### Optional Components
-
-- `TOBASA_BUILD_LIS_ENGINE`: Build LIS (Lab Instrument) support (default: ON)
-- `TOBASA_BUILD_TESTS`: Build test modules (default: ON)
-- `TOBASA_BUILD_TESTS_WSCHAT_USE_PROBUF`: Build WebSocket tests with protobuf (default: ON)
-- `TOBASA_HTTP_USE_HTTP2`: Enable HTTP/2 support (default: ON)
-
-### Example Custom Configuration
+Run registered tests after building:
 
 ```bash
-cmake -S . -B build \
-  -DTOBASA_BUILD_TESTS=OFF \
-  -DTOBASA_BUILD_LIS_ENGINE=OFF \
-  -DTOBASA_HTTP_USE_HTTP2=OFF \
-  -DCMAKE_BUILD_TYPE=Release
+ctest --test-dir build --output-on-failure
 ```
 
-## Output Structure
+For a multi-configuration generator such as Visual Studio, select the configuration with `-C Debug` or `-C Release`. SQL integration tests may require accessible database services and test configuration. To see the targets generated for the current options and generator, run `cmake --build build --target help`.
 
-After successful build, the output is organized as follows:
+## Outputs
 
-```
-_output/
-├── dyn_lib_sample/
-│   └── debug/          # Dynamic library samples
-├── http_server/
-│   └── debug/          # HTTP server sample
-├── https_client/
-│   └── debug/          # HTTPS client sample
-├── https_server_minimal/
-│   └── debug/          # Minimal HTTPS server
-├── test_tobasa/
-│   └── debug/          # Core library tests
-├── test_tobasasql/
-│   └── debug/          # SQL library tests
-├── webclient/
-│   └── debug/          # Web client demo
-└── webservice/
-    └── debug/          # Main web service application
-```
-
-## Build Targets
-
-Available CMake targets:
-
-- `ALL_BUILD`: Build all components
-- `webservice`: Main web service application
-- `webclient`: HTTP client demo
-- `test_tobasa`: Core library tests
-- `test_tobasasql`: SQL library tests
-- `dyn_lib_sample`: Dynamic library sample
-- `http_server`: HTTP server sample
-- `https_client`: HTTPS client sample
-- `https_server_minimal`: Minimal HTTPS server
+The default package destination is `_output` and can be changed with `TOBASA_PACKAGE_OUTPUT_DIR`. Application and sample targets with packaging commands copy their runtime files into a per-target directory under `_output`, with `debug` or `release` configuration subdirectories. Test executables are placed under the build tree; exact targets and outputs depend on enabled options and the selected generator.
 
 ## Troubleshooting
 
-### Common Issues
+- **VCPKG is rejected on Linux:** configure with `-DTOBASA_BUILD_WITH_VCPKG=OFF`.
+- **CMake cannot find a dependency:** check the enabled feature options, installed development packages, and the corresponding paths in `CMakeDefaults.txt`. With VCPKG, verify the toolchain, overlay ports, and triplet match the compiler.
+- **Monolithic mode is unavailable:** it requires shared-library mode and CMake 3.13 or newer. Configure with `TOBASA_BUILD_SHARED_LIB=ON` and `TOBASA_BUILD_MONOLITHIC_SHARED_LIB=ON`.
+- **Tests fail to configure or build:** tests are enabled by default and CMake fetches GoogleTest. Check network access and the configure output.
+- **Linker errors:** confirm that third-party libraries match the target architecture, compiler toolset, and runtime linkage.
 
-#### CMake Configuration Errors
-
-**Problem**: CMake cannot find dependencies
-**Solution**:
-- Verify paths in `CMakeDefaults.txt`
-- Ensure libraries are built with matching compiler version
-- Check that library directories contain expected files
-
-#### Linker Errors
-
-**Problem**: Missing symbols or unresolved externals
-**Solution**:
-- Ensure all required libraries are installed
-- Check that library versions match (32-bit vs 64-bit)
-- Verify runtime library settings (MT vs MD)
-
-#### Compiler Errors
-
-**Problem**: C++ standard or feature support issues
-**Solution**:
-- Ensure compiler supports C++17
-- Update to supported Visual Studio or GCC version
-
-### Debug Build
-
-For debugging issues, build with debug symbols:
-
-```bash
-# Windows
-cmake --build . --config Debug
-
-# Linux
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-```
-
-### Verbose Output
-
-Enable verbose CMake output:
-
-```bash
-cmake -S . -B build --log-level=VERBOSE
-```
-
-### Clean Build
-
-To start fresh:
-
-```bash
-# Remove build directory
-rm -rf build/
-
-# Remove output directory
-rm -rf _output/
-```
-
-## Advanced Configuration
-
-### Custom Library Paths
-
-Edit `CMakeDefaults.txt` to customize dependency paths:
-
-```cmake
-# Example custom paths
-set(TOBASA_OPENSSL_DIR_DEF "C:/custom/openssl")
-set(TOBASA_ZLIB_DIR_DEF "C:/custom/zlib")
-```
-
-### IDE Integration
-
-#### Visual Studio
-- Open `build/TobasaFramework.sln`
-- Build from within Visual Studio
-
-#### VS Code
-- Use CMake Tools extension
-- Configure with `cmake.configureSettings`
-
-## Getting Help
-
-- Check individual component README files for specific build instructions
-- Review CMake output for detailed error messages
-- Ensure all prerequisites are correctly installed
-- Verify compiler and library versions match requirements
+For custom Windows dependency locations, edit `CMakeDefaults.txt`. For IDE builds, open the generated solution in Visual Studio or configure the repository with the VS Code CMake Tools extension.

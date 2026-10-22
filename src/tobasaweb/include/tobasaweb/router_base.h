@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <map>
 #include <tobasahttp/server/common.h>
 #include <tobasahttp/request.h>
@@ -27,7 +29,7 @@ class RouteEntry;
 /** 
  * Route handler argument store
  */
-class RouteArgument
+class TBS_WEB_API RouteArgument
 {
 private:
    friend class RouteEntry;
@@ -46,7 +48,7 @@ using RouteHandler = std::function<std::shared_ptr<http::Result>(const RouteArgu
 /** 
  * Router base class
  */
-class RouterBase
+class TBS_WEB_API RouterBase
 {
 protected:
    /// Factory to manage this router

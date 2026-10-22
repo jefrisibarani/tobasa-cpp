@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <memory>
 #include <mutex>
 #include <deque>
@@ -19,7 +21,7 @@ class NetsessionManager;
 /** \ingroup LIS
  * NetSession
  */
-class NetSession
+class TBS_LIS_API NetSession
    : public std::enable_shared_from_this<NetSession>
    , private NonCopyable
 {

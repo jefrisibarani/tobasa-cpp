@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasa/non_copyable.h>
 #include <tobasasql/sql_conn_variant.h>
 #include <tobasasql/database_service_factory_base.h>
@@ -19,7 +21,7 @@ namespace web {
 /** 
  * WebServiceBase.
  */
-class WebServiceBase : private NonCopyable
+class TBS_WEB_API WebServiceBase : private NonCopyable
 {
 public:
    WebServiceBase() = default;

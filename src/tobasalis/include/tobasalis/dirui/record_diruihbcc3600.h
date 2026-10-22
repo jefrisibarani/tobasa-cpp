@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/record.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace dirui {
 /** \ingroup LIS
  * FieldsDirUiBcc3600
  */
-class FieldsDirUiBcc3600
+class TBS_LIS_API FieldsDirUiBcc3600
 {
 public:
    FieldsDirUiBcc3600()
@@ -45,7 +47,7 @@ public:
 /** \ingroup LIS
  * RecordDirUiBcc3600
  */
-class RecordDirUiBcc3600
+class TBS_LIS_API RecordDirUiBcc3600
    : public lis::Record
 {
 public:

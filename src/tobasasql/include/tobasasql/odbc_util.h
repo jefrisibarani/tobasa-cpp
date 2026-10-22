@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(_MSC_VER) && defined(_WIN32)
 #include <windows.h>
 #endif
@@ -14,20 +16,20 @@ namespace util {
 
 /// convert UTF-8 string to odbc string
 #if defined(_WIN32)
-std::wstring utf8_to_odbcString(const std::string& str);
+TBS_SQL_API std::wstring utf8_to_odbcString(const std::string& str);
 #else
-std::string utf8_to_odbcString(const std::string& str);
+TBS_SQL_API std::string utf8_to_odbcString(const std::string& str);
 #endif
 
 /// convert odbc string to UTF-8 string
 #if defined(_WIN32)
-std::string odbcString_to_utf8(const std::wstring& str);
+TBS_SQL_API std::string odbcString_to_utf8(const std::wstring& str);
 #else
-std::string odbcString_to_utf8(const std::string& str);
+TBS_SQL_API std::string odbcString_to_utf8(const std::string& str);
 #endif
 
 #if !defined(_WIN32)
-std::string odbcString_to_utf8(const SQLTCHAR* sqlchar);
+TBS_SQL_API std::string odbcString_to_utf8(const SQLTCHAR* sqlchar);
 #endif
 
 } //namespace util
@@ -38,7 +40,7 @@ struct Notifier;
 /**
  * ODBC Diag record
  */
-struct OdbcDiagRecord
+struct TBS_SQL_API OdbcDiagRecord
 {
 public:
    OdbcDiagRecord();
@@ -81,21 +83,21 @@ private:
    std::string _diagState;
 };
 
-OdbcDiagRecord statementDiagRecord(
+TBS_SQL_API OdbcDiagRecord statementDiagRecord(
    SQLHSTMT    hanlde,
    RETCODE     retCode,
    std::string source="",
    const char* fl = "",
    int         ln = 0);
 
-OdbcDiagRecord connectionDiagRecord(
+TBS_SQL_API OdbcDiagRecord connectionDiagRecord(
    SQLHDBC     hanlde,
    RETCODE     retCode,
    std::string source="",
    const char* fl = "",
    int         ln = 0);
 
-OdbcDiagRecord environmentDiagRecord(
+TBS_SQL_API OdbcDiagRecord environmentDiagRecord(
    SQLHDBC     hanlde,
    RETCODE     retCode,
    std::string source="",
@@ -110,22 +112,22 @@ namespace sql {
  */
 
  /// Get ODBC type from string.
-short odbcDataTypeFromString(std::string type);
+TBS_SQL_API short odbcDataTypeFromString(std::string type);
 
 /// Convert ODBC data type to string.
-std::string odbcDataTypeToString(short type);
+TBS_SQL_API std::string odbcDataTypeToString(short type);
 
  /// Convert sql::DataType from ODBC type.
-short odbcTypeFromDataType(DataType type);
+TBS_SQL_API short odbcTypeFromDataType(DataType type);
 
 /// Convert ODBC type to sql::DataType.
-DataType odbcTypeToDataType(short type);
+TBS_SQL_API DataType odbcTypeToDataType(short type);
 
 /// Convert sql::ParameterDirection to ODBC Parameter Direction.
-int odbcParamDirectionFromParamDirection(ParameterDirection direction);
+TBS_SQL_API int odbcParamDirectionFromParamDirection(ParameterDirection direction);
 
 /// Get Type class from  ODBC type.
-TypeClass typeClassFromOdbcType(const long type);
+TBS_SQL_API TypeClass typeClassFromOdbcType(const long type);
 
 /** @}*/
 

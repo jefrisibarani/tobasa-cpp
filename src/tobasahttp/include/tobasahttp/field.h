@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -14,7 +15,7 @@ namespace http {
 /** 
  * \brief Field, name-value storage
  */
-class Field
+class TBS_HTTP_API Field
 {
 private:
    std::string _name  {};
@@ -41,7 +42,7 @@ using FieldPtr = std::shared_ptr<Field>;
 /** 
  * \brief Collection of Fields
  */
-class FieldCollection
+class TBS_HTTP_API FieldCollection
 {
 protected:
    std::vector<FieldPtr> _fields;
@@ -81,7 +82,7 @@ public:
 /** 
  * \brief Collection of FieldLowerCase
  */
-class FieldLowerCaseCollection
+class TBS_HTTP_API FieldLowerCaseCollection
 {
 protected:
    std::vector<FieldPtr> _fields;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include <any>
 
@@ -12,7 +14,7 @@ namespace sql {
  * Store start date and end date
  * Store optional filter if any 
  */
-struct SqlQueryOption
+struct TBS_SQL_API SqlQueryOption
 {
    SqlQueryOption() {}
    SqlQueryOption(int queryLimit, int queryOffset, const std::string& filterCode="")

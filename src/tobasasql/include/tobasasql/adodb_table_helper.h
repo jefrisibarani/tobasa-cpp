@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
 
 #include "tobasasql/column_info.h"
@@ -12,7 +14,7 @@ namespace sql {
  * \ingroup SQL
  * \brief ADO Table helper class.
  */
-class AdodbTableHelper
+class TBS_SQL_API AdodbTableHelper
 {
 public:
    bool isView(AdodbConnection& connection);

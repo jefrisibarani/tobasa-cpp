@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <functional>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -13,7 +14,7 @@ namespace tbs {
  * @brief Navigator class interface.
  * Provides navigation for row/column based class
  */
-class Navigator
+class TBS_API Navigator
 {
 public:
    /// Move to the next row.
@@ -48,7 +49,7 @@ using NavigatorPtr = std::shared_ptr<Navigator>;
  * Implementation of Navigator
  * Provides navigation for row/column based class
  */
-class NavigatorBasic
+class TBS_API NavigatorBasic
    : public Navigator
 {
 public:

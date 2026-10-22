@@ -7,11 +7,17 @@ set(CODEC_TYPE "CODEC_TYPE_SQLCIPHER")
 # WE use $<BOOL:$<$<CONFIG:Debug>:DEBUG_BUILD>>
 #set(SQLITE_ENABLE_DEBUG 0)
 
-add_library(${PROJECT_NAME})
-
-if(WIN32)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(TOBASA_BUILD_SHARED_LIB AND NOT TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   add_library(${PROJECT_NAME} SHARED)
+   if(WIN32)
+      set_target_properties(${PROJECT_NAME} PROPERTIES
+         RUNTIME_OUTPUT_DIRECTORY "${TOBASA_FRAMEWORK_BINARY_DIR}/bin")
+      target_compile_definitions(${PROJECT_NAME}
+         PRIVATE "SQLITE_API=__declspec(dllexport)"
+         INTERFACE "SQLITE_API=__declspec(dllimport)")
+   endif()
+else()
+   add_library(${PROJECT_NAME} STATIC)
 endif()
 
 target_sources(${PROJECT_NAME}

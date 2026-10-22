@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include "tobasa/common.h"
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace base64 {
@@ -18,14 +19,14 @@ namespace base64 {
  * \param bufLen Length of the byte buffer.
  * \return A Base64-encoded string.
  */
-std::string encodeFromBytes(byte_t const* buf, unsigned int bufLen);
+TBS_API std::string encodeFromBytes(byte_t const* buf, unsigned int bufLen);
 
 /**
  * \brief Decodes a Base64-encoded string to a byte buffer.
  * \param str Base64-encoded string to decode.
  * \return A vector of bytes.
  */
-std::vector<byte_t> decodeIntoBytes(std::string const&);
+TBS_API std::vector<byte_t> decodeIntoBytes(std::string const&);
 
 
 /** 
@@ -33,20 +34,20 @@ std::vector<byte_t> decodeIntoBytes(std::string const&);
  * @param data       The data to encode
  * @return           Base64 encoded string
  */
-std::string encode(const std::vector<byte_t>& data);
+TBS_API std::string encode(const std::vector<byte_t>& data);
 
 /** 
  * @brief Base64 encode
  * @param data       The data to encode
  * @return           Base64 encoded string
  */
-std::string encode(const std::string& data);
+TBS_API std::string encode(const std::string& data);
 
 /** Base64 decode
  * @param data       Base64 encoded data
  * @return           Decoded string
  */
-std::string decode(const std::string& data);
+TBS_API std::string decode(const std::string& data);
 
 /** @}*/
 

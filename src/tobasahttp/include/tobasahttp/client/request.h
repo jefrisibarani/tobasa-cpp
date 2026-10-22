@@ -9,6 +9,7 @@
 #include "tobasahttp/message.h"
 #include "tobasahttp/client/request_data_source.h"
 #include "tobasahttp/client/response.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -24,7 +25,7 @@ using ClientResponseBodyHandler = std::function<void(const uint8_t *data, size_t
  * @brief Outbound HTTP client request message.
  * 
  */
-class ClientRequest : public Message
+class TBS_HTTP_API ClientRequest : public Message
 {
 private:
    std::string _method      {};

@@ -6,6 +6,8 @@
 #include <asio/read.hpp>
 #include <asio/placeholders.hpp>
 #include <asio/bind_executor.hpp>
+#include <asio/executor.hpp>
+#include <asio/any_io_executor.hpp>
 #include <tobasa/logger.h>
 #include <tobasa/exception.h>
 #include "tobasalis/lis/connection_rs232.h"

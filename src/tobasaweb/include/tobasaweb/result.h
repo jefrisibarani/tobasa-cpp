@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <memory>
 #include <functional>
 #include <tobasa/json.h>
@@ -32,7 +34,7 @@ using ResultContentBuilder = std::function<std::string(std::shared_ptr<Result> r
  * related to an HTTP response. It provides methods to manipulate these properties and to
  * apply them to an actual HTTP response object.
  */
-class Result
+class TBS_WEB_API Result
    : public std::enable_shared_from_this<Result>
 {
 protected:
@@ -111,7 +113,7 @@ std::shared_ptr<Result> makeResult(Params&&... args)
  * A result that returns an HTML status page.
  * The page shows the HTTP status and an optional message.
  */
-class StatusResult : public Result
+class TBS_WEB_API StatusResult : public Result
 {
 private:
    std::string _message;
@@ -141,7 +143,7 @@ statusResultHtml(Params&&... args)
  * The content type is inferred from the file name unless supplied.
  * Byte-range requests are disabled by default.
  */
-class FileResult : public Result
+class TBS_WEB_API FileResult : public Result
 {
 private:
    std::string _filePath;
@@ -174,7 +176,7 @@ fileResult(Params&&... args)
  * A result that sends a byte span as the response body.
  * An optional content type can be supplied.
  */
-class RawBytesResult : public Result
+class TBS_WEB_API RawBytesResult : public Result
 {
 private:
    nonstd::span<const unsigned char> _rawBytes;

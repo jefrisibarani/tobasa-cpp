@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <string>
+#include "tobasa/exp_imp.h"
 #include "tobasa/nonstd_span.hpp"
 #include "tobasa/data_reader.h"
 
@@ -15,7 +16,7 @@ namespace tbs {
  * The reader does not take ownership of the supplied data, which must remain
  * valid for the lifetime of this object.
  */
-class BytesReader : public DataReader
+class TBS_API BytesReader : public DataReader
 {
 public:
    explicit BytesReader(const nonstd::span<const unsigned char>& data);

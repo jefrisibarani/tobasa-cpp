@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
 #include <cctype>
 #include <string>
 #include "tobasasql/common_types.h"
@@ -15,27 +16,27 @@ namespace sql {
  */
 
 /// Check if value need needs quoting.
-bool needsQuoting(const std::string& value);
+TBS_SQL_API bool needsQuoting(const std::string& value);
 
 /// Quote identifier.
-std::string quoteIdent(const std::string& value);
+TBS_SQL_API std::string quoteIdent(const std::string& value);
 
 /// Convert BackendType enum to std::string.
-std::string backendTypeToString(BackendType type);
+TBS_SQL_API std::string backendTypeToString(BackendType type);
 
 /// Convert std::string to BackendType.
-BackendType backendTypeFromString(const std::string& type);
+TBS_SQL_API BackendType backendTypeFromString(const std::string& type);
 
 /// Convert DataType enum to std::string.
-std::string dataTypeToString(DataType type);
+TBS_SQL_API std::string dataTypeToString(DataType type);
 
 /// Get column type class in string.
-std::string columnTypeClassToString(TypeClass typeClass);
+TBS_SQL_API std::string columnTypeClassToString(TypeClass typeClass);
 
 /// Get sql DataType from declared type
-DataType dataTypeFromDeclaredType(const std::string& colType);
+TBS_SQL_API DataType dataTypeFromDeclaredType(const std::string& colType);
 
-TypeClass typeClassFromDataType(DataType type);
+TBS_SQL_API TypeClass typeClassFromDataType(DataType type);
 
 /**
  * Builds a database connection string from the supplied database options.
@@ -45,7 +46,7 @@ TypeClass typeClassFromDataType(DataType type);
  * @param securitySalt Salt used when decrypting an encrypted password.
  * @return The generated database connection string.
  */
-std::string getConnectionString(const conf::Database& dbOption, const std::string& securitySalt);
+TBS_SQL_API std::string getConnectionString(const conf::Database& dbOption, const std::string& securitySalt);
 
 /**
  * Rewrites colon-style named parameters like :id into the database's native

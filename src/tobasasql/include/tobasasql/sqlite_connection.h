@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include "tobasasql/sql_connection_common.h"
 #include "tobasasql/sql_parameter.h"
 #include "tobasasql/sqlite_type.h"
@@ -18,7 +20,7 @@ class DataSet;
  * \details
  * Backend implementation using SQLite C API.  
  */
-class SqliteConnection : public ConnectionCommon
+class TBS_SQL_API SqliteConnection : public ConnectionCommon
 {
 public:
    SqliteConnection();

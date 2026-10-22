@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <mutex>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace log {
@@ -15,7 +16,7 @@ namespace log {
  * @brief Base class for logging sink class.
  * Default implementation do nothing.
  */
-class LogSink
+class TBS_API LogSink
 {
 public:
    LogSink() = default;
@@ -39,7 +40,7 @@ public:
 
 
 /// Implement logging to stdout.
-class CoutLogSink : public LogSink
+class TBS_API CoutLogSink : public LogSink
 {
 public:
    CoutLogSink(const CoutLogSink&) = delete;

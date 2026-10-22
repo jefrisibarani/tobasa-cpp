@@ -22,11 +22,13 @@
 #endif
 
 
-#ifdef TBS_DLL
+#if defined(TBS_STATIC)
+   #define TBS_API
+#elif defined(TBS_SHARED)
    #define TBS_API TBS_EXPORT
 #else
    #define TBS_API TBS_IMPORT
 #endif
 
 
-#define TBS_PLUGIN extern "C" TBS_EXPORT
+#define TBS_PLUGIN_API extern "C" TBS_EXPORT

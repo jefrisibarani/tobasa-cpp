@@ -6,6 +6,7 @@
 #include "tobasahttp/type_common.h"
 #include "tobasahttp/message.h"
 #include "tobasahttp/status_codes.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -19,7 +20,7 @@ namespace http {
  * @brief HTTP response message.
  * 
  */
-class ClientResponse : public Message
+class TBS_HTTP_API ClientResponse : public Message
 {
 private:
    HttpStatus  _httpStatus         {StatusCode::OK};

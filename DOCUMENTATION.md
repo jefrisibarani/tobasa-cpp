@@ -4,10 +4,12 @@ This index groups the repository's main documents by topic.
 
 ## Development notes
 
-These technical notes explain internal request handling, startup, and connection cleanup in the HTTP server and WebSocket code.
+These technical notes explain internal subsystem behavior, startup, and execution flows.
 
 | Document | What it covers |
 | --- | --- |
+| [`plugin.md`](dev_notes/plugin.md) | Plugin factories, dynamic loading, lifecycle, lookup, and app-server session-store plugins. |
+| [`third_party_libraries.md`](dev_notes/third_party_libraries.md) | Vendored, discovered, and prebuilt dependencies, including provider and linkage behavior across Tobasa build modes. |
 | [`http_connection_cleanup_flow.md`](dev_notes/http_connection_cleanup_flow.md) | How an HTTP connection is removed after the browser closes it or the socket reports an error. |
 | [`http_server_request_handling_flow.md`](dev_notes/http_server_request_handling_flow.md) | Low-level HTTP/1.x parsing, connection registration, and request processing. |
 | [`sse_connection_cleanup_flow.md`](dev_notes/sse_connection_cleanup_flow.md) | How an SSE connection is removed after the client disconnects. |

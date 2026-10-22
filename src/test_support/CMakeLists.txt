@@ -16,5 +16,5 @@ target_link_libraries(tobasa_test_support
 
 if(MSVC)
    set_property(TARGET tobasa_test_support PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+      MSVC_RUNTIME_LIBRARY "${CMAKE_MSVC_RUNTIME_LIBRARY}")
 endif()

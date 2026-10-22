@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -68,17 +69,17 @@ struct AuthContext
 using AuthContextPtr  = std::shared_ptr<AuthContext>;
 
 /// Convert string to AuthScheme.
-AuthScheme authSchemeFromString(const std::string& scheme);
+TBS_HTTP_API AuthScheme authSchemeFromString(const std::string& scheme);
 
 /// Convert AuthScheme to string.
-std::string authSchemeToString(AuthScheme scheme);
+TBS_HTTP_API std::string authSchemeToString(AuthScheme scheme);
 
 /**
  * \brief Parse authentication from http header text.
  * \param rawText
  * \return shared pointer of AuthContext
  */
-AuthContextPtr parseAuthorizationHeader(const std::string& rawText);
+TBS_HTTP_API AuthContextPtr parseAuthorizationHeader(const std::string& rawText);
 
 /** @}*/
 

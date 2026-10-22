@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "tobasa/exp_imp.h"
 #include "tobasa/format.h"
 #include "tobasa/path.h"
 #include "tobasa/logger_sink.h"
@@ -26,7 +27,7 @@ namespace tbs {
  *     Logger::logI("Informational message");
  * @endcode
  */
-class Logger
+class TBS_API Logger
 {
 public:
    Logger(const Logger&) = delete;

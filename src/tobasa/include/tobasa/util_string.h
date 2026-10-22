@@ -6,6 +6,7 @@
 #include <vector>
 #include <string_view>
 #include <functional>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace util {
@@ -16,7 +17,7 @@ namespace util {
 
 
 /// Trim Double Quote from a string view 
-std::string_view trimDoubleQuote(std::string_view s);
+TBS_API std::string_view trimDoubleQuote(std::string_view s);
 
 
 /// Lowercases string.
@@ -38,69 +39,69 @@ std::basic_string<T> toUpper(const std::basic_string<T>& s)
 }
 
 /// Lowercases string.
-std::string toLower(std::string s);
-void strLower(std::string& s);
+TBS_API std::string toLower(std::string s);
+TBS_API void strLower(std::string& s);
 
 /// Uppercases string.
-std::string toUpper(std::string s);
-void strUpper(std::string& s);
+TBS_API std::string toUpper(std::string s);
+TBS_API void strUpper(std::string& s);
 
 /// Replace part of a std::string.
-std::string replace(const std::string& str, const std::string& from, const std::string& to);
+TBS_API std::string replace(const std::string& str, const std::string& from, const std::string& to);
 
 /// Replace part of a std::string.
-void replaceAll(std::string &str, const std::string& from, const std::string& to);
+TBS_API void replaceAll(std::string &str, const std::string& from, const std::string& to);
 
 /// Trim a string.
-std::string trim(const std::string& s);
+TBS_API std::string trim(const std::string& s);
 
-std::string trim(std::string_view s);
+TBS_API std::string trim(std::string_view s);
 
 /// Check if a string str starts with some other string.
-bool startsWith(const std::string& str, const std::string& other);
+TBS_API bool startsWith(const std::string& str, const std::string& other);
 
 /// Check if a string_view str starts with some other string.
-bool startsWith(std::string_view str, std::string_view other);
+TBS_API bool startsWith(std::string_view str, std::string_view other);
 
-bool endsWith(std::string_view str, std::string_view other ) noexcept;
+TBS_API bool endsWith(std::string_view str, std::string_view other ) noexcept;
 
 /// Check if a string str contains searchVal.
-bool contains(const std::string& str, const std::string& searchVal);
+TBS_API bool contains(const std::string& str, const std::string& searchVal);
 
 /// Split string (C String) using a char delimiter.
-std::vector<std::string> split(const char* str, char delimiter);
+TBS_API std::vector<std::string> split(const char* str, char delimiter);
 
 /// Split std::string using a std::string delimiter.
-std::vector<std::string> split(const std::string& s, const std::string& delim, const bool keepEmpty = true);
+TBS_API std::vector<std::string> split(const std::string& s, const std::string& delim, const bool keepEmpty = true);
 
 /// Split std::string using a char delimiter.
-std::vector<std::string> split(const std::string& s, char delim, const bool keepEmpty = true);
+TBS_API std::vector<std::string> split(const std::string& s, char delim, const bool keepEmpty = true);
 
 /// Check if a std::string is a unsigned number (integer).
-bool isNumber(const std::string& str);
+TBS_API bool isNumber(const std::string& str);
 
 /// Convert number(int) to boolean.
-bool numToBool(int value);
+TBS_API bool numToBool(int value);
 
 /// Convert boolean to std::string  "true" / "false".
-std::string boolToStr(bool value, std::string valIfTrue = "true", std::string valIfFalse = "false");
+TBS_API std::string boolToStr(bool value, std::string valIfTrue = "true", std::string valIfFalse = "false");
 
 /// Convert std::string to bool.
-bool strToBool(const std::string& value);
+TBS_API bool strToBool(const std::string& value);
 
 /// Remove non apphabet and numeric and space from string.
-bool removeWhiteSpace(std::string& str);
+TBS_API bool removeWhiteSpace(std::string& str);
 
 /// Remove tarailing white space (including cr lf tab) from string.
-bool removeTrailingWhiteSpace(std::string& data);
+TBS_API bool removeTrailingWhiteSpace(std::string& data);
 
 /// Remove trailing char from string.
-bool removeTraillingChar(std::string& data, char ch);
+TBS_API bool removeTraillingChar(std::string& data, char ch);
 
-bool isOnlyWhiteSpace(const std::string& str); 
+TBS_API bool isOnlyWhiteSpace(const std::string& str);
 
 /// Parse name and value from a string in format:  name=value.
-void parseNameValue(const std::string& tok, std::function<void(const std::string,const std::string)> handler );
+TBS_API void parseNameValue(const std::string& tok, std::function<void(const std::string,const std::string)> handler );
 
 
 template <typename InputIt1, typename InputIt2>
@@ -130,11 +131,11 @@ bool streq(const T &a, const S &b, size_t blen)
                     std::next(std::begin(b), blen));
 }
 
-std::string doubleToString(double value);
-void doubleToString(double value, std::string& outStr);
+TBS_API std::string doubleToString(double value);
+TBS_API void doubleToString(double value, std::string& outStr);
 
-std::string floatToString(float value);
-void floatToString(float value, std::string& outStr);
+TBS_API std::string floatToString(float value);
+TBS_API void floatToString(float value, std::string& outStr);
 
 /** @}*/
 } // namespace util

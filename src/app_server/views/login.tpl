@@ -15,6 +15,7 @@
                   </div>
                   <div class="card-body">
                     <form action="{{ pageBaseUrl }}/login" method="post">
+                      <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
                       <div class="form-floating mb-3">
                         <input name="loginName" class="form-control" id="inputEmail" type="text" placeholder="user name" />
                         <label for="inputEmail">User name</label>

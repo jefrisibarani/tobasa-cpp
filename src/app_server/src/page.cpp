@@ -164,6 +164,9 @@ Page::Page(http::HttpContext contex)
 {
    auto session = Session::get(_httpcontext->sessionId());
 
+   auto csrfToken = session->getData("csrf_token");
+   _data["csrfToken"] = csrfToken.is_string() ? csrfToken.get<std::string>() : std::string();
+
    _data["appBuildMode"] = Page::appBuildMode;
    _data["appHomePage"]  = Page::appHomePage;
    _data["appMainTitle"] = "Tobasa Web Service";

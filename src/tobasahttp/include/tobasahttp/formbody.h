@@ -6,6 +6,7 @@
 #include <optional>
 #include "tobasahttp/headers.h"
 #include "tobasahttp/field.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -17,7 +18,7 @@ namespace http {
 /** 
  * \brief Html Form Data.
  */
-class FormBody
+class TBS_HTTP_API FormBody
    : public FieldLowerCaseCollection
 {
 public:

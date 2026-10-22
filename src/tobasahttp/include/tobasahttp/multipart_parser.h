@@ -2,6 +2,7 @@
 
 #include "tobasahttp/multipart.h"
 #include "tobasahttp/http_parser.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -11,7 +12,7 @@ namespace parser {
  * \brief Multipart body parsing context
  * \sa https://datatracker.ietf.org/doc/html/rfc1521#section-7.2.1
  */
-struct MultipartContext
+struct TBS_HTTP_API MultipartContext
 {
    // total bytes processed for all parts
    size_t         bytesDone       {0};
@@ -57,7 +58,7 @@ struct MultipartContext
    void savePart(MultipartBodyUPtr &partHolder);
 };
 
-class MultipartParser
+class TBS_HTTP_API MultipartParser
 {
 private:
    bool              _contentDone      {false};

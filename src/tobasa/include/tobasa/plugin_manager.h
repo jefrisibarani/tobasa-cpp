@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -16,7 +17,7 @@ class PluginLibrary;
  * @ingroup TBS 
  * Manages dynamically loaded plugin libraries and plugin instances.
  */
-class PluginManager
+class TBS_API PluginManager
 {
 public:
    /// Returns the singleton plugin manager instance.
@@ -42,6 +43,9 @@ public:
     */
    bool loadPlugin(const std::string& path);
 
+   /// 
+   void loadPluginsFromFolder(std::vector<std::string>& folders);
+
    /// Unloads and removes the plugin library with the specified name.
    void unloadPlugin(const std::string& name);
 
@@ -50,6 +54,9 @@ public:
 
    /// Returns the plugin with the specified name, or nullptr if it is not found.
    Plugin* getPlugin(const std::string& name) const;
+
+   /// Returns the plugin with the specified id, or nullptr if it is not found.
+   Plugin* getPluginById(const std::string& id) const;
 
    /// Returns whether a plugin library with the specified name is registered.
    bool hasPlugin(const std::string& name) const;
@@ -67,7 +74,10 @@ private:
    PluginManager() = default;
    ~PluginManager();
 
-   PluginLibrary* findPluginLibrary(const std::string& name) const;
+   PluginLibrary* findLibraryByPath(const std::string& path) const;
+   PluginLibrary* findLibraryByName(const std::string& name) const;
+   PluginLibrary* findLibraryByPluginName(const std::string& name) const;
+   PluginLibrary* findLibraryByPluginId(const std::string& id) const;
 
    std::vector<std::unique_ptr<PluginLibrary>> _pluginLibs;
    std::unordered_map<std::string, bool> _autoload;

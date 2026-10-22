@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <spdlog/spdlog.h>
 #include <tobasa/logger_sink.h>
 #include "tobasaweb/settings_log.h"
@@ -16,7 +18,7 @@ namespace log {
  * as a parameter for tbs::Logger::setTarget().
  */
 
-class MultiLogger
+class TBS_WEB_API MultiLogger
    : public LogSink
 {
 private:

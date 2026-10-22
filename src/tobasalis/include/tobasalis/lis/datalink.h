@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <condition_variable>
 #include <sstream>
 #include <mutex>
@@ -30,7 +32,7 @@ enum class LinkState
 /** 
  * LinkLimit.
  */
-class LinkLimit
+class TBS_LIS_API LinkLimit
 {
 public:
    LinkLimit();
@@ -55,7 +57,7 @@ public:
  *   |                 +---------------------------+  |
  *   +------------------------------------------------+
  */
-class DataLink : private NonCopyable
+class TBS_LIS_API DataLink : private NonCopyable
 {
 public:
    /**

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include <tobasasql/sql_parameter.h>
 #include <mysql/mysql.h>
@@ -15,22 +17,22 @@ using MySqlType = enum_field_types;
 
 
 /// Convert MySQL data type from std::string.
-MySqlType mysqlDataTypeFromString(const std::string& ftype);
+TBS_SQL_API MySqlType mysqlDataTypeFromString(const std::string& ftype);
 
 /// Convert MySQL data type to string.
-std::string mysqlDataTypeToString(MySqlType ftype);
+TBS_SQL_API std::string mysqlDataTypeToString(MySqlType ftype);
 
 /// Convert sql::DataType to MySQL data type.
-MySqlType mysqlDataTypeFromDataType(DataType type);
+TBS_SQL_API MySqlType mysqlDataTypeFromDataType(DataType type);
 
 /// Convert MySQL data type to sql::DataType.
-DataType mysqlDataTypeToDataType(MySqlType ftype);
+TBS_SQL_API DataType mysqlDataTypeToDataType(MySqlType ftype);
 
 /// Convert MySQL data type to sql::DataType.
-DataType mysqlDataTypeToDataType(long ftype);
+TBS_SQL_API DataType mysqlDataTypeToDataType(long ftype);
 
 /// Get Type class from MySQL type.
-TypeClass typeClassFromMySqlType(const long type);
+TBS_SQL_API TypeClass typeClassFromMySqlType(const long type);
 
 /** @}*/
 

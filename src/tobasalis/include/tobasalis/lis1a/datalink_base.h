@@ -1,6 +1,10 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
+#include <asio/io_context.hpp>
 #include <asio/strand.hpp>
+
 #include "tobasalis/lis/datalink.h"
 
 namespace tbs {
@@ -15,12 +19,12 @@ namespace lis1a {
  *   |                 +---------------------------+  |
  *   +------------------------------------------------+
  */
-class DataLinkBase
+class TBS_LIS_API DataLinkBase
    : public lis::DataLink
 {
 public:
 
-   using AsioExecutor = asio::any_io_executor;
+   using AsioExecutor = asio::io_context::executor_type;
    using Executor     = asio::strand<AsioExecutor>;
 
    /**

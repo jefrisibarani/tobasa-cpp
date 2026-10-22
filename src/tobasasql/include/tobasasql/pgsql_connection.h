@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include "tobasasql/sql_connection_common.h"
 #include "tobasasql/sql_parameter.h"
 #include <libpq-fe.h>
@@ -14,7 +16,7 @@ namespace sql {
  * Backend implementation using libpq (PGconn).  
  * - Connects to PostgreSQL server using connection string or individual parameters.
  */
-class PgsqlConnection : public ConnectionCommon
+class TBS_SQL_API PgsqlConnection : public ConnectionCommon
 {
 public:
    PgsqlConnection();

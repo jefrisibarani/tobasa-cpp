@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis2a/subpatient.h"
 
 namespace tbs {
@@ -21,7 +23,7 @@ class PatientName;
  * PatientRecord
  * CLSI LIS02-A2 (formerly ASTM 1394-97) Patient Information Record
  */
-class PatientRecord
+class TBS_LIS_API PatientRecord
    : public Record
 {
 public:

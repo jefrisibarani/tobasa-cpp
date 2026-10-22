@@ -12,26 +12,26 @@ They combine `Client` with traits that select the settings, logger, socket,
 and connection starter.
 
 - [`Client`](../src/tobasahttp/include/tobasahttp/client/client.h) is the
-	coordinator. It owns an `io_context`, settings, a connector, a connection
-	manager, an idle-connection pool, and a queue of waiting asynchronous
-	requests.
+   coordinator. It owns an `io_context`, settings, a connector, a connection
+   manager, an idle-connection pool, and a queue of waiting asynchronous
+   requests.
 - [`ClientRequest`](../src/tobasahttp/include/tobasahttp/client/request.h)
-	holds the outbound method, complete target, headers, body, and HTTP version
-	metadata. `Client::buildRequest()` adds `Host`, keep-alive, and default
-	headers to the same `ClientRequest` before it reaches the connection.
+   holds the outbound method, complete target, headers, body, and HTTP version
+   metadata. `Client::buildRequest()` adds `Host`, keep-alive, and default
+   headers to the same `ClientRequest` before it reaches the connection.
 - [`RequestSerializer`](../src/tobasahttp/include/tobasahttp/client/request_serializer.h)
-	serializes a `ClientRequest` as an HTTP/1 request. The server-side `Request`
-	model is not used by the client.
+   serializes a `ClientRequest` as an HTTP/1 request. The server-side `Request`
+   model is not used by the client.
 - [`Connector`](../src/tobasahttp/include/tobasahttp/client/connector.h)
-	resolves the configured address and opens a TCP connection. The plain
-	connection starter passes the socket through directly; the TLS starter wraps
-	it in an SSL stream and performs the TLS handshake.
+   resolves the configured address and opens a TCP connection. The plain
+   connection starter passes the socket through directly; the TLS starter wraps
+   it in an SSL stream and performs the TLS handshake.
 - [`ClientConnection`](../src/tobasahttp/include/tobasahttp/client/client_connection.h)
-	owns one socket, serializes requests, parses responses, and calls the
-	response handler for the request currently in flight on that connection.
+   owns one socket, serializes requests, parses responses, and calls the
+   response handler for the request currently in flight on that connection.
 - [`ConnectionMgr`](../src/tobasahttp/include/tobasahttp/connection_manager.h)
-	assigns connection IDs, tracks live connections, and reports connection
-	errors, timeouts, and closure.
+   assigns connection IDs, tracks live connections, and reports connection
+   errors, timeouts, and closure.
 
 One connection processes one request at a time. When an HTTP/1 response allows
 keep-alive and the request limit has not been reached, the connection resets
@@ -66,7 +66,7 @@ scheduling onto its client strand, where it chooses one of three paths:
 1. Take an idle connection and send the request on it.
 2. If the pool has room, start a new resolve/connect operation.
 3. If all allowed connections are busy, append the request and its result handler to
-	 the pending queue.
+    the pending queue.
 
 When a request completes or fails, its result handler receives that request's
 `ClientResult`. The connection then posts itself back to the client strand.
@@ -119,13 +119,13 @@ each `ClientResult`.
 ## Code map
 
 - Public aliases and client traits:
-	[`http_client.h`](../src/tobasahttp/include/tobasahttp/client/http_client.h)
-	and [`client_traits.h`](../src/tobasahttp/include/tobasahttp/client/client_traits.h).
+   [`http_client.h`](../src/tobasahttp/include/tobasahttp/client/http_client.h)
+   and [`client_traits.h`](../src/tobasahttp/include/tobasahttp/client/client_traits.h).
 - Mode selection, request scheduling, pool, and shutdown:
-	[`client.h`](../src/tobasahttp/include/tobasahttp/client/client.h).
+   [`client.h`](../src/tobasahttp/include/tobasahttp/client/client.h).
 - Resolve and TCP connect:
-	[`connector.h`](../src/tobasahttp/include/tobasahttp/client/connector.h).
+   [`connector.h`](../src/tobasahttp/include/tobasahttp/client/connector.h).
 - Per-connection request/response work:
-	[`client_connection.h`](../src/tobasahttp/include/tobasahttp/client/client_connection.h).
+   [`client_connection.h`](../src/tobasahttp/include/tobasahttp/client/client_connection.h).
 - Regression coverage for pooled handlers and repeated sync requests:
-	[`client_pool_test.cpp`](../src/tobasahttp/tests/unit/client_pool_test.cpp).
+   [`client_pool_test.cpp`](../src/tobasahttp/tests/unit/client_pool_test.cpp).

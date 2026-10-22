@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasa/exp_imp.h"
 #include "tobasa/logger.h"
 
 namespace tbs {
@@ -22,7 +23,7 @@ namespace log {
  *    logger.info("Informational message");
  * @endcode
  */
-struct TobasaLogger
+struct TBS_API TobasaLogger
 {
 public:
    /// Log Trace message

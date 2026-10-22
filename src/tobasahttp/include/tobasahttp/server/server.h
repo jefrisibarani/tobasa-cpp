@@ -32,7 +32,7 @@ class Server : private NonCopyable
    using Logger                    = typename Traits::Logger;
    using Connection                = ServerConnection<Traits>;
    using ConnectionPtr             = std::shared_ptr<Connection>;
-   using AsioExecutor              = asio::any_io_executor;
+   using AsioExecutor              = asio::io_context::executor_type;
    using Executor                  = asio::strand<AsioExecutor>;
    using IoContextPtr              = std::shared_ptr<asio::io_context>;
 

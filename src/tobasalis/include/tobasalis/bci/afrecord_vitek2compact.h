@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/bci/record.h"
 
 namespace tbs {
@@ -8,7 +10,7 @@ namespace bci {
 /** \ingroup LIS
  * AfRecordVitek2Compact
  */
-class AfRecordVitek2Compact
+class TBS_LIS_API AfRecordVitek2Compact
    : public Record
 {
 protected:
@@ -19,7 +21,7 @@ public:
    ~AfRecordVitek2Compact() = default;
 };
 
-class ApRecordVitek2Compact : public Record
+class TBS_LIS_API ApRecordVitek2Compact : public Record
 {
 protected:
    virtual void initFields();

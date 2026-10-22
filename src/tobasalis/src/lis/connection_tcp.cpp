@@ -2,6 +2,7 @@
 #include <asio/write.hpp>
 #include <asio/read.hpp>
 #include <asio/bind_executor.hpp>
+#include <asio/executor.hpp>
 #include <tobasa/logger.h>
 #include <tobasa/exception.h>
 #include "tobasalis/lis/connection_tcp.h"

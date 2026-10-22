@@ -9,13 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(${PROJECT_NAME})
 target_sources( ${PROJECT_NAME} PRIVATE main.cpp )
 
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
-
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE tobasa)
+tobasa_stage_shared_runtime(${PROJECT_NAME} tobasa)
 
 # Platform-specific linking
 if(UNIX AND NOT APPLE)

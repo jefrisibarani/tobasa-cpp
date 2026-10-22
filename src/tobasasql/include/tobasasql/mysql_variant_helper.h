@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/variant_helper.h>
 #include "tobasasql/mysql_variant.h"
 
@@ -9,7 +11,7 @@ namespace tbs {
  * \ingroup SQL
  * \brief MySql Variant helper
  */
-class MysqlVariantHelper : public VariantHelper<MysqlVariantType>
+class TBS_SQL_API MysqlVariantHelper : public VariantHelper<MysqlVariantType>
 {
 public:
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/parser.h"
 
 namespace tbs {
@@ -10,7 +12,7 @@ class Record;
 /** \ingroup LIS
  * Vitek2CompactParser
  */
-class Vitek2CompactParser
+class TBS_LIS_API Vitek2CompactParser
    : public lis::Parser
 {
 public:

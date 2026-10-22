@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12-3.18)
 cmake_policy(SET CMP0091 NEW)
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   cmake_policy(SET CMP0079 NEW)
+endif()
 
 # The project
 project(tobasalis VERSION 1.0 LANGUAGES CXX)
@@ -15,22 +18,30 @@ set(ASIO_INCLUDE_DIR ${TOBASA_EXTERNAL_DEPS_DIR}/asio/include)
 message(STATUS "tobasalis Asio include folder: ${ASIO_INCLUDE_DIR}")
 
 # The library
-add_library(${PROJECT_NAME})
-include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
-
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET tobasa_monolithic)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_LIS_SHARED)
+elseif(TOBASA_BUILD_SHARED_LIB)
+   set(TOBASA_MODULE_TARGET ${PROJECT_NAME})
+   add_library(${PROJECT_NAME} SHARED)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PRIVATE TBS_LIS_SHARED)
+else()
+   set(TOBASA_MODULE_TARGET ${PROJECT_NAME})
+   add_library(${PROJECT_NAME} STATIC)
+   target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TBS_LIS_STATIC)
 endif()
 
-target_sources(${PROJECT_NAME}
+include(${PROJECT_SOURCE_DIR}/cmake/sources.cmake)
+
+target_sources(${TOBASA_MODULE_TARGET}
    PRIVATE ${MY_SOURCES_LIST}
    PRIVATE ${MY_HEADERS_LIST})
 
-target_link_libraries(${PROJECT_NAME}
-   PRIVATE tobasa )
+if(NOT TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC tobasa)
+endif()
 
-target_include_directories(${PROJECT_NAME}
+target_include_directories(${TOBASA_MODULE_TARGET}
    PUBLIC ${ASIO_INCLUDE_DIR}
    PUBLIC ${PROJECT_SOURCE_DIR}/include )
 
@@ -38,23 +49,25 @@ if(TOBASA_BUILD_TESTS)
    add_subdirectory(tests)
 endif()
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC ASIO_STANDALONE )
+target_compile_definitions(${TOBASA_MODULE_TARGET}
+   PUBLIC ASIO_STANDALONE
+   PUBLIC ASIO_USE_TS_EXECUTOR_AS_DEFAULT )
 
 if(MSVC)
-   target_compile_definitions(${PROJECT_NAME}
+   target_compile_definitions(${TOBASA_MODULE_TARGET}
       PUBLIC _WIN32_WINNT=0x0601 _SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING NOMINMAX)
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    message(STATUS "${PROJECT_NAME} use cxx_std_20")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_20)
 else()
    message(STATUS "${PROJECT_NAME} use cxx_std_17")
-   target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+   target_compile_features(${TOBASA_MODULE_TARGET} PUBLIC cxx_std_17)
 endif()
 
 if(MSVC)
-   target_compile_options(${PROJECT_NAME} PRIVATE /bigobj /FS )
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE /bigobj /FS )
 endif()
 
 # Show filtered headers in IDE

@@ -6,6 +6,7 @@
 #include <optional>
 #include "tobasahttp/headers.h"
 #include "tobasahttp/field.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -19,7 +20,7 @@ namespace http {
  * \sa https://httpwg.org/specs/rfc6265.html#cookie
  * Cookie: name=value; name=value; name=value
  */
-class Cookie
+class TBS_HTTP_API Cookie
    : public FieldCollection
 {
 public:

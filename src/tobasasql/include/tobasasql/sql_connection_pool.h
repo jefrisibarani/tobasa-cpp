@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
 #include <memory>
 #include <mutex>
 #include <condition_variable>
@@ -23,7 +24,7 @@ class ConnectionPoolTestAccess;
 /**
  * @brief RAII connection handle that automatically returns the connection to the pool.
  */
-class PooledConnection 
+class TBS_SQL_API PooledConnection
 {
    std::shared_ptr<ConnectionPool> _connPool;
    std::shared_ptr<DatabaseConnector> _connector;
@@ -72,7 +73,7 @@ private:
  * @brief Thread-safe database connection pool.
  * Holds multiple DatabaseConnector instances and hands out pooled connections.
  */
-class ConnectionPool : public std::enable_shared_from_this<ConnectionPool> 
+class TBS_SQL_API ConnectionPool : public std::enable_shared_from_this<ConnectionPool>
 {
    friend class PooledConnection;
    // TODO_JEFRI: remove this friend
@@ -122,7 +123,7 @@ private:
 /**
  * @brief Manager that holds multiple named connection pools.
  */
-class ConnectionPoolManager 
+class TBS_SQL_API ConnectionPoolManager
 {
    std::unordered_map<std::string, std::shared_ptr<ConnectionPool>> _pools;
    std::mutex _mutex;

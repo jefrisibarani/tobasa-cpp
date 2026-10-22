@@ -10,6 +10,7 @@
 #include "tobasahttp/message.h"
 #include "tobasahttp/status_codes.h"
 #include "tobasahttp/cookie_response.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -56,7 +57,7 @@ class Request;
  * to connect the data source to a response object and to set the writer callback
  * for the response serialization.
  */
-class ResponseDataSource 
+class TBS_HTTP_API ResponseDataSource
    : public std::enable_shared_from_this<ResponseDataSource> 
 {
 private:
@@ -101,7 +102,7 @@ public:
  * ResponseSerializer and ResponseDataSource to handle the serialization and
  * data sourcing of the response.
  */
-class Response : public Message
+class TBS_HTTP_API Response : public Message
 {
 private:
    friend class ResponseSerializer;
@@ -220,7 +221,7 @@ private:
  * @note The class supports conditional compilation for HTTP/2 serialization
  *       with or without data copying, based on the defined macros.
  */
-class ResponseSerializer
+class TBS_HTTP_API ResponseSerializer
 {
 private:
    std::shared_ptr<Response> _response {nullptr};

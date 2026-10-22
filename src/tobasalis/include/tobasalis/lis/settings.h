@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
 #include <string>
 #include <nlohmann/json.hpp>
 #include "tobasalis/lis/common.h"
@@ -13,7 +14,7 @@ namespace conf {
  */
 
 
-struct TcpIpServer
+struct TBS_LIS_API TcpIpServer
 {
    std::string listenAddress;       // "127.0.0.1"
    int         listenPort;          // 5151
@@ -21,7 +22,7 @@ struct TcpIpServer
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TcpIpServer, listenAddress, listenPort)
 
 
-struct TcpIpClient
+struct TBS_LIS_API TcpIpClient
 {
    std::string serverAddress;       // "127.0.0.1"
    int         serverPort;          // 5151
@@ -29,7 +30,7 @@ struct TcpIpClient
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TcpIpClient, serverAddress, serverPort)
 
 
-struct TcpIp
+struct TBS_LIS_API TcpIp
 {
    std::string activeMode;
    TcpIpServer server;
@@ -38,7 +39,7 @@ struct TcpIp
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(TcpIp, activeMode, server, client)
 
 
-struct SerialPort
+struct TBS_LIS_API SerialPort
 {
    std::string portName;            // "COM3"
    int         baudRate;            // 9600
@@ -50,7 +51,7 @@ struct SerialPort
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SerialPort, portName, baudRate, parity, dataBits, stopBits, handShake)
 
 
-struct Instrument
+struct TBS_LIS_API Instrument
 {
    std::string type;
    std::string dataLink;
@@ -59,7 +60,7 @@ struct Instrument
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Instrument, type, dataLink, name)
 
 
-struct Connection
+struct TBS_LIS_API Connection
 {
    int         receiveTimeOutSeconds;           // 30 seconds
    int         enqTimeOutSeconds;               // 15 seconds
@@ -75,7 +76,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Connection, receiveTimeOutSeconds, enqTimeOut
    incomingDataAsIntermediateFrame, activeConnection)
 
 
-struct ConnectionType
+struct TBS_LIS_API ConnectionType
 {
    TcpIp      tcpIp;
    SerialPort serialPort;
@@ -84,7 +85,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ConnectionType, tcpIp, serialPort)
 
 
 //! Database context configuration options
-struct Database
+struct TBS_LIS_API Database
 {
    std::string dbDriver;
    std::string connectionString;
@@ -95,7 +96,7 @@ struct Database
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Database, dbDriver, connectionString, password, logInternalSqlQuery, logSqlQuery)
 
 
-struct Result
+struct TBS_LIS_API Result
 {
    bool saveData;          // true
    int  dbThreadPoolSize = 2;
@@ -103,7 +104,7 @@ struct Result
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Result, saveData, dbThreadPoolSize)
 
 
-struct Delimiters
+struct TBS_LIS_API Delimiters
 {
    std::string field;
    std::string repeat;
@@ -114,7 +115,7 @@ struct Delimiters
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Delimiters, field, repeat, component, escape, subComponent)
 
 
-struct LisMessage
+struct TBS_LIS_API LisMessage
 {
    bool       autoDetectDelimiters;
    Delimiters delimiters;
@@ -125,7 +126,7 @@ struct LisMessage
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(LisMessage, autoDetectDelimiters, delimiters, logOnLinkReceive, logOnParserRead, logOnMessageReady)
 
 
-struct Engine
+struct TBS_LIS_API Engine
 {
    std::string             hostId;
    std::string             hostProvider;

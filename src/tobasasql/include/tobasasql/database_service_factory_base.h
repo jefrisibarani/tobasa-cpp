@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/non_copyable.h>
 #include <tobasasql/sql_driver.h>
 #include <tobasasql/sql_conn_variant.h>
@@ -18,7 +20,7 @@ namespace sql {
  * connection pool size, and creates database services for configured
  * connections.
  */
-class DbServiceFactoryBase : private NonCopyable
+class TBS_SQL_API DbServiceFactoryBase : private NonCopyable
 {
 public:
    DbServiceFactoryBase() = default;

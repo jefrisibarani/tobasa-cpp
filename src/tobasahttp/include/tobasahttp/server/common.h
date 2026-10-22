@@ -6,6 +6,7 @@
 #include <tobasa/non_copyable.h>
 #include "tobasahttp/type_common.h"
 #include "tobasahttp/sse.h"
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -45,7 +46,7 @@ class MultipartBodyReader;
  * a WebSocket or Server-Sent Events connection. With HTTP/2, the context also
  * stores the stream ID that identifies the request within the connection.
  */
-class Context : private NonCopyable
+class TBS_HTTP_API Context : private NonCopyable
 {
 private:
    std::shared_ptr<Request>   _request          {nullptr};

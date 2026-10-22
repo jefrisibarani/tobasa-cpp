@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <tobasa/notifier.h>
 #include "tobasasql/sql_parameter.h"
 #include "tobasasql/mysql_common.h"
@@ -19,7 +21,7 @@ class MysqlResult;
 
 const uint64_t MYSQL_NON_AFFECTING_ROWS_QUERY = (unsigned long long) ~0;
 
-class MysqlCommand : public Notifier
+class TBS_SQL_API MysqlCommand : public Notifier
 {
    using VariantType   = MysqlVariantType;
    using VariantHelper = MysqlVariantHelper;

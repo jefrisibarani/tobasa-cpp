@@ -1,4 +1,5 @@
 #pragma once
+#include "tobasasql/exp_imp.h"
 #include <string>
 #include <vector>
 #include <cctype>
@@ -39,7 +40,7 @@ namespace sql {
  * This allows queries to be written in a DB-agnostic way with `:name` placeholders 
  * while supporting multiple database backends transparently.
  */
-class SqlParameterRewriter 
+class TBS_SQL_API SqlParameterRewriter
 {
 public:
 

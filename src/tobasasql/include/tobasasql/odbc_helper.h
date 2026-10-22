@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 
 namespace tbs {
@@ -10,7 +12,7 @@ namespace sql {
  * \brief Helper
  * \note Tested only with MS SQL Server
  */
-struct OdbcHelper
+struct TBS_SQL_API OdbcHelper
 {
    static std::string limitAndOffset(long limit, long offset, const std::string& dbmsName = {});
 };

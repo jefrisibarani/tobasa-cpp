@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include "tobasasql/sql_connection_common.h"
 #include "tobasasql/mysql_common.h"
 #include "tobasasql/sql_dataset.h"
@@ -17,7 +19,7 @@ class MysqlCommand;
  * Backend implementation using LibMariaDB C API.  
  * - Connects to MySQL server using host, port, username, password, and database.
  */
-class MysqlConnection : public ConnectionCommon
+class TBS_SQL_API MysqlConnection : public ConnectionCommon
 {
 public:
    MysqlConnection();

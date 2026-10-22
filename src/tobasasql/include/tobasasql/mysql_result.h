@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include <memory>
 #include <tobasa/navigator.h>
@@ -24,7 +26,7 @@ class MysqlRowInfo;
  *
  * Provides full navigation and value retrieval via SqlResult interface.
  */
-class MysqlResult : public ResultCommon
+class TBS_SQL_API MysqlResult : public ResultCommon
 {
 public:
 

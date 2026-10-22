@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #include <string>
 #include "tobasasql/sqlite_result.h"
 
@@ -16,7 +18,7 @@ class ColumnInfo;
 /**
  * \brief SQLite Table helper class.
  */
-class SqliteTableHelper
+class TBS_SQL_API SqliteTableHelper
 {
 public:
    bool isView(SqliteConnection& connection);

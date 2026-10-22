@@ -5,6 +5,7 @@
 #include <deque>
 #include <set>
 #include <string>
+#include "tobasahttp/exp_imp.h"
 
 namespace tbs {
 namespace http {
@@ -22,7 +23,7 @@ using namespace std::chrono;
  * If an IP exceeds the allowed limit, it may be temporarily blocked
  * or permanently blacklisted after repeated violations.
  */
-class RateLimiter 
+class TBS_HTTP_API RateLimiter
 {
 public:
    /**

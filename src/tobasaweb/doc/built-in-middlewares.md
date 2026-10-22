@@ -3,13 +3,28 @@
 Each built-in helper adds a request-processing step to the web service. The steps run in registration order, followed by the router. Use only the helpers your app needs:
 
 ```cpp
+webapp.useMultipart();
 webapp.useSession();
+webapp.useCsrf();
 webapp.useAuthentication();
 webapp.useAuthorization();
-webapp.useMultipart();
 ```
 
-The app-server setup is in [main.cpp](../../app_server/src/main.cpp). Register session before authentication when it restores the user's identity, and authorization after authentication. `useAuthentication()` also inserts a small step that initializes `AuthResult` before the authentication middleware. The helpers and their option-builder callbacks are declared in [webapp.h](../include/tobasaweb/webapp.h).
+The app-server setup is in [main.cpp](../../app_server/src/main.cpp). Register session before CSRF, authentication, and authorization. Register multipart parsing before CSRF when request forms may be multipart. `useAuthentication()` also inserts a small step that initializes `AuthResult` before the authentication middleware. The helpers and their option-builder callbacks are declared in [webapp.h](../include/tobasaweb/webapp.h).
+
+## Validate browser requests
+
+`useCsrf()` adds `CsrfMiddleware`. It creates a URL-safe random token in a loaded server-side session during safe requests (`GET`, `HEAD`, or `OPTIONS`). Other methods require that token either in the `_csrf` form field or the `X-CSRF-Token` request header. Missing sessions, missing tokens, or mismatched tokens are rejected with HTTP 403. The comparison is constant-time for the submitted token lengths.
+
+The middleware does not add the token to rendered pages. The application must read the `csrf_token` value from the session and render it into each protected form or expose it to its JavaScript client. For example:
+
+```html
+<input type="hidden" name="_csrf" value="{{ csrfToken }}">
+```
+
+Use `CsrfMiddlewareOption::protectHandler` to select requests that require tokens. When it is unset, all routes are selected. `ignoreHandler` bypasses the middleware for requests that match it. Configure these handlers consistently with `SessionMiddlewareOption::forceSessionHandler`, because a protected browser route needs a session even before the user signs in. Bearer-token APIs should normally be excluded from cookie-based CSRF checks; cookie-authenticated API endpoints need an explicit policy.
+
+The app server configures CSRF for browser cookie-authenticated routes and selected public forms. Its cookie-based `/api/refresh_auth_token` endpoint is not covered by that policy and needs separate CSRF protection if it continues authenticating from a cookie.
 
 ## Restore a signed-in user
 

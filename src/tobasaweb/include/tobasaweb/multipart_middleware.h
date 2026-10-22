@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasahttp/server/common.h>
 #include <tobasahttp/multipart_parser.h>
 #include "tobasaweb/middleware.h"
@@ -42,7 +44,7 @@ using MultipartMiddlewareOptionBuilder =
  * uploaded files directly from the request object, without handling raw bytes.
  */
 
-class MultipartMiddleware
+class TBS_WEB_API MultipartMiddleware
    : public Middleware
 {
 public:

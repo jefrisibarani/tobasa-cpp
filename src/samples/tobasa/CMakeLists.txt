@@ -21,13 +21,10 @@ if(TOBASA_BUILD_IN_MEMORY_RESOURCES)
    target_compile_definitions( ${PROJECT_NAME} PRIVATE TOBASA_BUILD_IN_MEMORY_RESOURCES )
 endif()
 
-if(MSVC)
-   set_property(TARGET ${PROJECT_NAME} PROPERTY
-      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-endif()
-
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE tobasa)
+
+tobasa_stage_shared_runtime(${PROJECT_NAME} tobasa)
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <memory>
 #include <functional>
 #include <string>
@@ -14,7 +16,7 @@ class Record;
 /** \ingroup LIS
  * Parser
  */
-class Parser : private NonCopyable
+class TBS_LIS_API Parser : private NonCopyable
 {
 public:
    virtual ~Parser() = default;

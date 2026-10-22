@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include "tobasalis/lis/parser.h"
 #include "tobasalis/lis/delimiter.h"
 
@@ -9,7 +11,7 @@ namespace lis2a {
 class Message;
 class Record;
 
-struct ParserOption
+struct TBS_LIS_API ParserOption
    : public lis::Delimiter
 {
    int  resultRecordTotalField = 14;
@@ -40,7 +42,7 @@ struct ParserOption
  * Parser
  * Parse raw clsi raw data and build complete clsi message
  */
-class Parser
+class TBS_LIS_API Parser
    : public lis::Parser
 {
 public:

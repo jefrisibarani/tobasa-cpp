@@ -72,8 +72,8 @@ void CoreController::bindHandler()
    router()->httpPost("/login",
       std::bind(&CoreController::onLogin, self, _1) );
 
-   //! Handle GET request to /logout?redirect=false
-   router()->httpGet("/logout",
+   //! Handle POST request to /logout?redirect=false
+   router()->httpPost("/logout",
       std::bind(&CoreController::onLogout, self, _1) );
 
    //! Handle GET request to /register page

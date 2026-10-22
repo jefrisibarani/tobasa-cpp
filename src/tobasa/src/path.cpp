@@ -417,9 +417,16 @@ std::string convertToOsPath(const std::string& path)
 
 std::string normalize(const std::string& path)
 {
+   if (path.empty())
+      return {};
+
    std::filesystem::path p(path);
-   p = p.lexically_normal();
-   return p.string();
+   std::error_code ec;
+   auto normalized = std::filesystem::weakly_canonical(p, ec);
+   if (ec)
+      normalized = p.lexically_normal();
+
+   return normalized.string();
 }
 
 std::string resolveExecutableRelativePath(const std::string& path)

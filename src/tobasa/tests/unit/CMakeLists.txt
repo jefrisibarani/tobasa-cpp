@@ -19,6 +19,7 @@ set_target_properties(tobasa_unit_tests PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>"
 )
 target_link_libraries(tobasa_unit_tests PRIVATE tobasa GTest::gtest_main)
+tobasa_stage_shared_runtime(tobasa_unit_tests tobasa)
 
 if(NOT TOBASA_USE_STD_CALENDAR_TZONE AND NOT TOBASA_BUILD_IN_MEMORY_TZDB)
    add_custom_command(TARGET tobasa_unit_tests POST_BUILD

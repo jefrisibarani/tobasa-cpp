@@ -1,4 +1,6 @@
 #pragma once
+
+#include "tobasaweb/exp_imp.h"
 #include <memory>
 
 namespace tbs {
@@ -13,7 +15,7 @@ class WebServiceBase;
 /** 
  * ControllerFactoryBase
  */
-class ControllerFactoryBase
+class TBS_WEB_API ControllerFactoryBase
 {
 public:
    ControllerFactoryBase(const ControllerFactoryBase &) = delete;

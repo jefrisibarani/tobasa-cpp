@@ -3,6 +3,7 @@
 #include <tobasa/path.h>
 #include <tobasa/datetime.h>
 #include <tobasa/config.h>
+#include <tobasa/plugin_manager.h>
 #include <tobasaweb/multipart_middleware.h>
 #include <tobasaweb/webapp.h>
 
@@ -101,6 +102,26 @@ int main(int argc, char* argv[])
       }
 
 
+
+      // -------------------------------------------------------
+      // Load all plugins
+      // -------------------------------------------------------
+      {
+         auto& pluginManager = PluginManager::get();
+
+         std::vector<std::string> candidatePaths;
+         const char* pluginDirEnv = std::getenv("TOBASA_PLUGIN_DIR");
+         if (pluginDirEnv != nullptr && *pluginDirEnv != '\0')
+            candidatePaths.push_back( (std::filesystem::path(pluginDirEnv)).string() );
+
+         const auto executableDir = std::filesystem::path(path::executableDir());
+         candidatePaths.push_back((executableDir / "plugins").string());
+
+         pluginManager.loadPluginsFromFolder(candidatePaths);
+         auto x = 1;
+      }
+
+
       // -------------------------------------------------------
       // Base database migration
       // -------------------------------------------------------
@@ -189,10 +210,28 @@ int main(int argc, char* argv[])
       // Add middleware to validate the content-type header before executing authentication and authorization processes
       webapp.addMiddleware(web::contentTypeMiddleware, "ContentType" );
 
+      auto csrfRoutePolicy = [](const http::HttpContext& context) {
+         const auto path = context->request()->path();
+         if (path == "/api" || path.rfind("/api/", 0) == 0)
+            return false;
+
+         const auto authContext = context->request()->authContext();
+         if (authContext && authContext->effectiveScheme == http::AuthScheme::COOKIE)
+            return true;
+
+         return path == "/login" || path == "/logout" || path == "/register" || path == "/password" ;
+      };
+
       // Session
       webapp.useSession(
-         [&webappOpt](web::SessionMiddlewareOption& option) {
+         [&webappOpt, &csrfRoutePolicy](web::SessionMiddlewareOption& option) {
             web::builSessionMiddlewareOption(webappOpt, option);
+            option.forceSessionHandler = csrfRoutePolicy;
+         } );
+
+      webapp.useCsrf(
+         [&csrfRoutePolicy](web::CsrfMiddlewareOption& option) {
+            option.protectHandler = csrfRoutePolicy;
          } );
 
       // Authentication

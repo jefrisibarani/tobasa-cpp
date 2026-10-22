@@ -7,6 +7,7 @@
 #include <iterator>
 #include <thread>
 #include "tobasa/common.h"
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 namespace util {
@@ -52,19 +53,19 @@ inline std::string vetorToCsvString(const std::vector<T>& vec)
 }
 
 /// Generates an identifier using the library's ID generator.
-std::string generateUniqueId();
+TBS_API std::string generateUniqueId();
 
 /// Generates a random alphanumeric string of the requested length.
-std::string getRandomString(size_t length);
+TBS_API std::string getRandomString(size_t length);
 
 /// Generates a random decimal-digit string of the requested length.
-std::string getRandomNumber(size_t length);
+TBS_API std::string getRandomNumber(size_t length);
 
 /// Converts a thread ID to its standard stream representation.
-std::string threadId(std::thread::id tid);
+TBS_API std::string threadId(std::thread::id tid);
 
 /// Formats milliseconds as a space-separated duration using d, h, m, s, and ms units.
-std::string readMilliseconds(long long milliseconds);
+TBS_API std::string readMilliseconds(long long milliseconds);
 
 /**
  * @brief Parses a size string (e.g. "100GB") into bytes.
@@ -76,7 +77,7 @@ std::string readMilliseconds(long long milliseconds);
  * @param value Size string to parse.
  * @return Value in bytes, or -1 on invalid input or overflow.
  */
-int64_t parseSizeInBytes(const std::string& value);
+TBS_API int64_t parseSizeInBytes(const std::string& value);
 
 /** @}*/
 

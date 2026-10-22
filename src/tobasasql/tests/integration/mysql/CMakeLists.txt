@@ -56,3 +56,10 @@ target_compile_definitions(tbs_mysql_db_api_integration_tests PRIVATE
    TOBASA_DB_TEST_MYSQL
 )
 gtest_discover_tests(tbs_mysql_db_api_integration_tests)
+
+foreach(test_target IN ITEMS
+   tbs_mysql_integration_tests
+   tbs_mysql_tpl_api_integration_tests
+   tbs_mysql_db_api_integration_tests)
+   tobasa_stage_shared_runtime(${test_target} tobasasql tobasa)
+endforeach()

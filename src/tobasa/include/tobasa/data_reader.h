@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include "tobasa/exp_imp.h"
 
 namespace tbs {
 
@@ -11,7 +12,7 @@ namespace tbs {
  * Implementations may support sequential reads, position-based reads, and
  * writing read data directly to an output stream.
  */
-class DataReader 
+class TBS_API DataReader
 {
 public:
    DataReader() = default;

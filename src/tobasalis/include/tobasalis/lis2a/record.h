@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasalis/exp_imp.h"
+
 #include <memory>
 #include <vector>
 #include "tobasalis/lis/delimiter.h"
@@ -45,7 +47,7 @@ enum class RecordType
  * Comment Record
  * Message Terminator Record
  */
-class Record
+class TBS_LIS_API Record
    : public lis::Record
 {
 public:

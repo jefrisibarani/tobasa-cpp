@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tobasa/date.h"
+#include "tobasa/exp_imp.h"
 
 // https://github.com/HowardHinnant/date/issues/565
 
@@ -24,7 +25,7 @@ using SysTime   = tbsdate::sys_time<std::chrono::nanoseconds>;
  * formatted strings. It also includes methods to check for null DateTime objects
  * and to set them to null.
  */
-class DateTime
+class TBS_API DateTime
 {
 public:
 

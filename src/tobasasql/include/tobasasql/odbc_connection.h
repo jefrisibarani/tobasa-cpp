@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasasql/exp_imp.h"
+
 #if defined(_MSC_VER) && defined(_WIN32)
 #include <windows.h>
 #endif
@@ -21,7 +23,7 @@ namespace sql {
  * - On Windows, you can use either ODBC or ADO; on Linux/Unix, only ODBC is available.  
  * - **Not intended for other database servers.**
  */
-class OdbcConnection : public ConnectionCommon
+class TBS_SQL_API OdbcConnection : public ConnectionCommon
 {
 public:
    using VariantType = tbs::DefaultVariantType;

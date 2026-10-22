@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tobasaweb/exp_imp.h"
+
 #include <tobasasql/sql_query_option.h>
 #include "tobasaweb/router.h"
 
@@ -10,7 +12,7 @@ namespace util {
  * @{
  */
 
-sql::SqlQueryOption getSqlQueryOption(
+TBS_WEB_API sql::SqlQueryOption getSqlQueryOption(
    const web::RouteArgument& arg,
    std::string& outStartDate,
    std::string& outEndDate,
@@ -23,7 +25,7 @@ sql::SqlQueryOption getSqlQueryOption(
  * \param messageHashOut
  * \param saltHashOut reference to hash result
  */
-void createSecureHash(const std::string& message,std::string& messageHashOut, std::string& saltHashOut);
+TBS_WEB_API void createSecureHash(const std::string& message,std::string& messageHashOut, std::string& saltHashOut);
 
 
 /** 
@@ -33,7 +35,7 @@ void createSecureHash(const std::string& message,std::string& messageHashOut, st
  * \param storedSaltHash
  * \return True if hash ok
  */
-bool verifySecureHash(const std::string& message, const std::string& storedMessageHash, const std::string& storedSaltHash);
+TBS_WEB_API bool verifySecureHash(const std::string& message, const std::string& storedMessageHash, const std::string& storedSaltHash);
 
 /** @}*/
 
