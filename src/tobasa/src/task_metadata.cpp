@@ -4,30 +4,29 @@
 
 namespace tbs {
 
-TaskMetadataDto TaskMetadataDto::fromTaskMetadata(TaskMetadataPtr data)
+TaskMetadataDto TaskMetadataDto::fromTaskMetadata(const TaskMetadata& data)
 {
    TaskMetadataDto dto;
-
-   dto.taskId    = data->id;
-   dto.name      = data->name;
-   dto.status    = data->status;
-   dto.info      = data->info;
+   dto.taskId    = data.id;
+   dto.name      = data.name;
+   dto.status    = data.status;
+   dto.info      = data.info;
 
    // TODO_JEFRI
    dto.userId    = "";
    dto.appModule = "";
 
-   dto.resultMessage  = data->result.message;
-   dto.resultStatus   = data->result.status;
-   dto.resultCode     = data->result.code;
-   dto.resultData     = data->result.container;
+   dto.resultMessage  = data.result.message;
+   dto.resultStatus   = data.result.status;
+   dto.resultCode     = data.result.code;
+   dto.resultData     = data.result.container;
 
-   if (data->startTime.has_value() && data->endTime.has_value())
+   if (data.startTime.has_value() && data.endTime.has_value())
    {
-      DateTime dtStart(data->startTime.value());
+      DateTime dtStart(data.startTime.value());
       dto.startTime = dtStart.isoDateTimeString();
 
-      DateTime dtEnd(data->endTime.value());
+      DateTime dtEnd(data.endTime.value());
       dto.endTime = dtEnd.isoDateTimeString();
 
       using namespace std::chrono;

@@ -7,6 +7,7 @@ add_executable(tobasa_unit_tests
    file_reader_test.cpp
    string_reader_test.cpp
    bytes_reader_test.cpp
+   task_manager_test.cpp
    util_test.cpp
    util_date_test.cpp
    util_string_test.cpp

@@ -673,7 +673,7 @@ TEST(HttpClientTlsIntegrationTest, ConnectsToPublicHttpsSite)
    tbs::log::StdoutLogger logger;
    tbs::http::SettingsClient settings("example.com", 443);
    settings
-      .verifyPeer(true)
+      .verifyPeer(true).caVerificationFile(sslCertFile)
       .timeoutRead(10)
       .timeoutWrite(10);
 

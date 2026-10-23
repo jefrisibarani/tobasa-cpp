@@ -10,7 +10,12 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include <functional>
+#include <optional>
+#include <stdexcept>
+#include <utility>
 #include "tobasa/exp_imp.h"
+#include "tobasa/logger.h"
 #include "tobasa/task_metadata.h"
 
 namespace tbs {
@@ -21,7 +26,7 @@ namespace tbs {
 
 /**
  * @class TaskManager
- * @brief Simple thread pool for running background task.
+ * Simple thread pool for running background task.
  *
  * This class can run many task in background using worker thread.
  * Each task has its own metadata and result.
@@ -36,8 +41,8 @@ namespace tbs {
  *         std::this_thread::sleep_for(std::chrono::seconds(2));
  *         return TaskResult::create(OperationStatus::SUCCESS, "Done importing files");
  *     },
- *     [](TaskMetadataPtr m) {
- *         std::cout << "Task completed: " << m->name << std::endl;
+ *     [](const TaskMetadata& m) {
+ *         std::cout << "Task completed: " << m.name << std::endl;
  *     }
  * );
  *
@@ -50,22 +55,26 @@ namespace tbs {
 class TBS_API TaskManager
 {
 public:
-   /**
-    * @brief Create task manager with some worker threads.
-    * @param numThreads number of worker threads.
-    */
+
+   /// Create task manager with some worker threads.
+   /// @param numThreads number of worker threads.
    TaskManager(size_t numThreads);
 
-   /**
-    * @brief Destructor, will stop all threads if not stopped yet.
-    */
+   /// Destructor, will stop all threads if not stopped yet.
    ~TaskManager();
 
-   /// @brief Stop all worker threads safely.
+   /// TODO_JEFRI
+   /// Request shutdown without waiting for worker threads to finish.
+   /// Pending tasks will be executed before workers exit.
+   /// New tasks cannot be added after this call.
+   void requestStop();
+
+   /// Request shutdown and wait for all worker threads to finish.
+   /// @throws std::logic_error if called from one of this manager's worker threads.
    void stop();
 
    /**
-    * @brief Add new task to be executed in background.
+    * Add new task to be executed in background.
     *
     * @tparam F function type that returns TaskResult.
     * @param taskName name of the task.
@@ -75,41 +84,37 @@ public:
     * @return unique id of created task.
     */
    template <typename F>
-   int addTask(const std::string& taskName, 
-      const std::string& taskInfo, 
-      F&& task, 
-      std::function<void(TaskMetadataPtr)> onCompletion = nullptr);
+   int addTask(const std::string& taskName,
+      const std::string& taskInfo,
+      F&& task,
+      std::function<void(TaskMetadata)> onCompletion = nullptr);
 
-   /// @brief Get list of all tasks (running or completed).
-   std::vector<TaskMetadataPtr> getAllTasks();
+   /// Get list of all tasks (running or completed).
+   std::vector<TaskMetadata> getAllTasks();
 
-   /**
-    * @brief Get task metadata by id.
-    * @param taskId task id.
-    * @return pointer to TaskMetadata or nullptr if not found.
-    */
-   TaskMetadataPtr getTaskById(int taskId);
+   /// Get task metadata by id.
+   /// @param taskId task id.
+   /// @return snapshot of TaskMetadata or std::nullopt if not found.
+   std::optional<TaskMetadata> getTaskById(int taskId);
 
-   // Return "Pending", "Running", "Completed" or "None"
+   /// Return "Pending", "Running", "Completed" or "None"
    std::string getTaskStatus(int taskId);
 
-   /// @brief Convert all task info to DTO for easier API or JSON use.
+   /// Convert all task info to DTO for easier API or JSON use.
    std::vector<TaskMetadataDto> getAllTasksData();
 
-   /**
-    * @brief Check if specific task already finished.
-    * @param taskId task id to check.
-    * @return true if finished, false if still running or pending.
-    */
+   /// Check if specific task already finished.
+   /// @param taskId task id to check.
+   /// @return true if finished, false if still running or pending.
    bool isTaskReady(int taskId);
 
-   /// @brief  @brief Remove completed tasks
+   /// Remove completed tasks
    void cleanup();
 
 private:
    
    /**
-    * @brief Worker thread function.
+    * Worker thread function.
     *
     * This is the main loop for background worker.
     * It waits until there is a new task in queue, then executes it.
@@ -117,59 +122,96 @@ private:
     */
    void workerThread();
 
-   std::mutex _taskMutex;
+   bool isWorkerThread() const;
+
+   std::mutex  _taskMutex;
+   std::mutex _joinMutex;
    std::condition_variable _condition;
    std::queue<std::function<void()>> _tasksQueue;
    std::vector<std::thread> _workers;
-   std::unordered_map<int, TaskMetadataPtr> _tasks;
-   std::atomic<int> _nextTaskId=0;
-   bool _stop;
-   bool _stopped;
+   std::unordered_map<int, TaskMetadata> _tasks;
+
+   std::atomic<int>  _nextTaskId = 0;
+   std::atomic<bool> _stop;
+   std::atomic<bool> _stopped;
+   std::atomic<bool> _shutdownStarted;
 };
 
-// Add a task and assign it a unique ID
+/// Add a task and assign it a unique ID
 template <typename F>
-int TaskManager::addTask(const std::string& taskName, 
-   const std::string& taskInfo, 
-   F&& task, 
-   std::function<void(TaskMetadataPtr)> onCompletion)
+int TaskManager::addTask(
+   const std::string& taskName,
+   const std::string& taskInfo,
+   F&& task,
+   std::function<void(TaskMetadata)> onCompletion)
 {
-   int taskId   = ++_nextTaskId;
-   auto meta    = std::make_shared<TaskMetadata>();
-   meta->id     = taskId;
-   meta->name   = taskName;
-   meta->info   = taskInfo;
-   meta->status = "Pending";
+   if (_workers.empty()) {
+      throw std::invalid_argument("TaskManager requires at least one worker thread");
+   }
+
+   int taskId = ++_nextTaskId;
+
+   TaskMetadata meta;
+   meta.id     = taskId;
+   meta.name   = taskName;
+   meta.info   = taskInfo;
+   meta.status = "Pending";
 
    {
       std::lock_guard<std::mutex> lock(_taskMutex);
+      if (_stop || _shutdownStarted) {
+         throw std::logic_error("TaskManager is stopping; no tasks may be added");
+      }
       _tasks[taskId] = meta;
-      _tasksQueue.push( 
-         [this, meta, task = std::forward<F>(task), onCompletion]() mutable {
-            
-            meta->startTime = std::chrono::system_clock::now();
-            meta->status = "Running";
+      _tasksQueue.push([this, taskId, task = std::forward<F>(task), onCompletion, meta]() mutable 
+      {
+         TaskMetadata localMeta = meta;
+         localMeta.startTime    = std::chrono::system_clock::now();
+         localMeta.status       = "Running";
 
-            try 
-            {
-               meta->result = task();
+         {
+            std::lock_guard<std::mutex> lock(_taskMutex);
+            auto it = _tasks.find(taskId);
+            if (it != _tasks.end())
+               it->second = localMeta;
+         }
+
+         try {
+            localMeta.result = task();
+         } 
+         catch (const std::exception& ex) {
+            localMeta.result = TaskResult::create(OperationStatus::FAILURE, ex.what());
+         } 
+         catch (...) {
+            localMeta.result = TaskResult::create(OperationStatus::FAILURE, "Unknown task error");
+         }
+
+         localMeta.status = "Completed";
+         localMeta.endTime = std::chrono::system_clock::now();
+
+         {
+            std::lock_guard<std::mutex> lock(_taskMutex);
+            auto it = _tasks.find(taskId);
+            if (it != _tasks.end())
+               it->second = localMeta;
+         }
+
+         if (onCompletion) 
+         {
+            try {
+               onCompletion(localMeta);
             } 
-            catch (const std::exception& ex) 
-            {
-               meta->result = TaskResult::create(OperationStatus::FAILURE, ex.what());
+            catch (const std::exception& ex) {
+               Logger::logE("[taskmgr] completion callback failed for task {}: {}", taskId, ex.what());
+            } 
+            catch (...) {
+               Logger::logE("[taskmgr] completion callback failed for task {}: unknown error", taskId);
             }
-
-            meta->status = "Completed";
-            meta->endTime = std::chrono::system_clock::now();
-
-            // Only call the completion callback if it's not nullptr
-            if (onCompletion) {
-               onCompletion(meta);
-            }
+         }
       });
    }
 
-   _condition.notify_one(); // Notify a worker thread to process the task
+   _condition.notify_one();
    return taskId;
 }
 
@@ -213,17 +255,17 @@ int main()
          return "DICOM File Sent";
       },
 
-      [](TaskMetadataPtr metadata) {
-         if (metadata->error.has_value())
-            std::cerr << "Task [" << metadata->id << "] failed with error: " << metadata->error.value() << std::endl;
+      [](const TaskMetadata& metadata) {
+         if (metadata.result.isError())
+            std::cerr << "Task [" << metadata.id << "] failed with error: " << metadata.result.message << std::endl;
          else
-            std::cout << "Task [" << metadata->id << "] completed with result: " << metadata->result.value() << std::endl;
+            std::cout << "Task [" << metadata.id << "] completed with result: " << metadata.result.message << std::endl;
 
          std::cout << "Start Time: ";
-         printTime(metadata->startTime);
+         printTime(metadata.startTime);
 
          std::cout << "End Time: ";
-         printTime(metadata->endTime);
+         printTime(metadata.endTime);
       }
    );
 
