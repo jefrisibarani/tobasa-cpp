@@ -296,7 +296,8 @@ This object maps to [`tbs::web::conf::WebService`](../../tobasaweb/include/tobas
 | Property | JSON type | Default | Description |
 | --- | --- | --- | --- |
 | `routeAuthLists` | object | none | Extra authentication rules for route paths. |
-| `sessionExpirationMinutes` | integer | `15` | Session lifetime. `0` means the session ends when the browser closes. |
+| `sessionExpirationMinutes` | integer | `15` | Session lifetime in minutes. Although the option comment says `0` means browser-close expiry, the app-server login helper maps any non-positive value to 10 minutes. |
+| `sessionStore` | string | `filesystem` | Session backend. Use `filesystem` for the built-in file store or the configured plugin ID; `sqlite` and `sqlite3` select `session_store_sqlite_plugin`. |
 | `sessionSavePath` | string | `./appdata/session` | Directory for session files. Do not add a trailing slash. |
 | `acceptedClientAppId` | string | `TBSRESTC_DEV,TBSRESTC_TOBASA` | Comma-separated client application IDs accepted by the service. |
 | `authJwtIssuer` | string | `TBS_WEBSVC` | Issuer written into JWTs. |

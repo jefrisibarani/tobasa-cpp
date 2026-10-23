@@ -1,4 +1,4 @@
-# Building Tobasa C++
+# Building Tobasa C++ Framework
 
 Tobasa uses CMake. Configure the build from the repository root, then build the generated tree. The project requires C++17; CMake enables C++20 where the compiler and standard library support the required features.
 
@@ -14,9 +14,15 @@ Tobasa uses CMake. Configure the build from the repository root, then build the 
 
 ### Windows
 
-VCPKG is disable by default and supported only with MSVC. Set `VCPKG_TOOLCHAIN_FILE_DEF`, `VCPKG_OVERLAY_PORTS_DEF`, and `VCPKG_TARGET_TRIPLET_DEF` in `CMakeDefaults.txt` for the local VCPKG installation and the selected Visual Studio version. The checked-in defaults point to `d:/vcpkg` and select `vs2022` packages.
+VCPKG is enabled by default and supported only with MSVC. Set
+`VCPKG_TOOLCHAIN_FILE_DEF`, `VCPKG_OVERLAY_PORTS_DEF`, and
+`VCPKG_TARGET_TRIPLET_DEF` in `CMakeDefaults.txt` for the local VCPKG
+installation and selected Visual Studio version. The checked-in defaults
+point to `d:/vcpkg` and select `vs2022` packages. Set
+`TOBASA_BUILD_WITH_VCPKG=OFF` to use the prebuilt dependency paths instead.
 
-To use prebuilt dependencies instead, set `TOBASA_BUILD_WITH_VCPKG=OFF` and configure the dependency directories in `CMakeDefaults.txt`. The compiler, VCPKG triplet, and prebuilt libraries must use compatible architectures, toolsets, and runtime linkage.
+The compiler, VCPKG triplet, and prebuilt libraries must use compatible
+architectures, toolsets, and runtime linkage.
 
 ### Linux
 
@@ -42,7 +48,11 @@ cmake --build build --config Debug --parallel
 cmake --build build --config Release --parallel
 ```
 
-If using `build_all.cmd` helper, update `CMakeDefaults.txt` so the selected package paths and toolset match. The helper configures one `build` directory and builds both Debug and Release.
+The checked-in `build_all.cmd` uses the Visual Studio 2017 generator, while
+`CMakeDefaults.txt` defaults to VS 2022 dependency packages. If using that
+helper, update its generator and the dependency version settings so they
+match. The helper configures one `build` directory and builds both Debug and
+Release.
 
 ### Linux with GCC
 

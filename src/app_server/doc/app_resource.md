@@ -2,21 +2,22 @@
 
 ## Overview
 
-Tobasa uses `app::Resource` to load files either from the executable or from
-the filesystem. This lets you ship one executable when needed, while still
-letting you work with normal files during development.
+`app::Resource` looks up resources compiled into the executable and returns a
+non-owning byte span. It does not read files from disk. Callers such as the
+app server's static-file handler implement their own disk fallback.
 
 The public API is declared by [`app::Resource`](../src/app_resource.h#L10).
 The main lookup code is in [`Resource::get`](../src/app_resource.cpp#L73).
 
 ### Key Features
 
-- **Two resource sources**: use embedded data or files on disk.
+- **Embedded lookup**: read the resource arrays generated during the build.
 - **Direct memory access**: data is returned as
   `nonstd::span<const unsigned char>`.
 - **Separate contexts**: templates, web files, configuration, and other files
   use different context names.
-- **Filesystem fallback**: a missing embedded file can be read from disk.
+- **Caller-selected disk access**: filesystem reads are performed by the
+  caller, not by `Resource::get()`.
 - **Single-file deployment**: include selected resources in the executable.
 - **Smaller builds**: embed only the resource groups you need.
 - **Runtime selection**: use `web::conf::Webapp::useInMemoryResources` to
@@ -36,12 +37,15 @@ name as the second argument:
 | **Static Assets** | `wwwroot/` | `wwwroot` | CSS, JavaScript, images, fonts, and other web files | No* |
 | **Configuration** | `configuration_embed/` | `config` | Default `appsettings.json` and related configuration files | **YES** |
 | **TLS Certificates** | `tls_asset/` | `tls_asset` | Server certificates, private keys, and certificate chains | **YES** |
-| **Timezone Data** | `res/tzdata/` | `tzdata` | IANA timezone data with comments removed | Conditional** |
+| **Timezone Data** | `res/tzdata/` | Not an `app::Resource` context | Data for the bundled date/tz implementation | Conditional** |
 
 **Legend:**
 - `*` Needs `TOBASA_BUILD_IN_MEMORY_RESOURCES=ON`.
-- `**` Needs `TOBASA_BUILD_IN_MEMORY_TZDB=ON`.
-- Embedded resources are placed in the executable during the build.
+- `**` Timezone assets are generated when `TOBASA_BUILD_IN_MEMORY_TZDB=ON`
+  and the selected standard library does not provide the required timezone
+  support.
+- Configuration and TLS resource arrays are generated in every app-server
+  build. Templates and web-root arrays are conditional.
 
 ### Resource Context Mapping
 
@@ -55,14 +59,20 @@ config           -> configuration_embed/     (default configuration)
 tls_asset        -> tls_asset/               (TLS certificates and keys)
 ```
 
+`tzdata` is consumed by the date/time implementation, not by
+`app::Resource::get()`.
+
 ---
 
 ## Loading Strategy
 
 ### Resource Resolution Flow
 
-The resource lookup code normalizes the path before looking for the file. It
-also checks that the context is valid.
+The lookup normalizes path separators and searches the generated array for the
+requested context. It returns an empty span for a missing resource, an
+unsupported context, or a context that was not compiled into this build. It
+does not verify a context against a separate registry or open a filesystem
+path.
 
 **Directory Structure:**
 ```
@@ -89,20 +99,13 @@ app_server/
 +---------------+----------------+
                 |
                 +- Path normalization
-                |  (backslash -> forward slash)
-                |
-                +- Context validation
-                |  (appview, wwwroot, config, and so on)
+                |  (using `/` as the separator)
                 |
                 +- Embedded lookup
-                |  when the resource build option is enabled
-                |  `- Search the compiled resource array
+                |  `- Search the compiled array for the requested context
                 |
-                +- Filesystem fallback
-                |  Read base_path/context/path from disk
-                |
-                `- Return the result
-                   nonstd::span<const unsigned char>
+                `- Return a span, or an empty span when not found
+                   (no disk read is performed)
 ```
 
 ### Resource Lookup Flow for Templates
@@ -113,15 +116,19 @@ For a template, include the path and the `appview` context:
 // views/index.html with {% include 'partial.html' %}
 
 Resource::getString("views/index.html", "appview")
-  -> [Embedded]  Search the compiled template array
-  -> [Fallback]  Read from disk: <base>/views/index.html
+  -> Search the compiled template array when embedding is enabled
+  -> Return an empty string when the resource is not embedded
   
 // For an included partial:
 // extends/includes use the appview context automatically.
 Resource::getString("partial.html", "appview")  // NOT "views/partial.html"
-  -> [Embedded]  Search for "partial.html"
-  -> [Fallback]  Read from disk: <base>/views/partial.html
+  -> Search the compiled array for "partial.html"
 ```
+
+Template rendering selects embedded or filesystem access in its caller. The
+app server's `/` handler also checks the document root when an embedded static
+file is missing. Those caller-specific fallbacks are not performed by
+`Resource::get()`.
 
 ---
 
@@ -139,32 +146,14 @@ option(TOBASA_BUILD_IN_MEMORY_RESOURCES "Whether to use compiled resources"     
 option(TOBASA_BUILD_IN_MEMORY_TZDB      "Whether to use compiled timezone data" ON )
 ```
 
-#### Module-Level Override (`src/app_server/CMakeLists.txt`)
-
-The app server can override the global defaults:
-
-```cmake
-# App server defaults
-option(TOBASA_BUILD_IN_MEMORY_RESOURCES "Whether to use compiled resources"     OFF)
-option(TOBASA_BUILD_IN_MEMORY_TZDB      "Whether to use compiled timezone data" OFF)
-
-# Add generated resource files only when embedding is enabled
-if(TOBASA_BUILD_IN_MEMORY_RESOURCES)
-    target_compile_definitions(app_server PRIVATE TOBASA_BUILD_IN_MEMORY_RESOURCES)
-    target_sources(app_server PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/resources/template_resources.cpp
-        ${CMAKE_CURRENT_BINARY_DIR}/resources/wwwroot_resources.cpp
-        # ... etc
-    )
-endif()
-
-# Build LIS templates only when both options are enabled
-if(TOBASA_BUILD_LIS_ENGINE AND TOBASA_BUILD_IN_MEMORY_RESOURCES)
-    target_sources(app_server PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}/resources/template_lis_resources.cpp
-    )
-endif()
-```
+The top-level project declares both options with an `ON` default. The app
+server directory also declares them with an `OFF` default, but CMake does not
+replace an option already set in the top-level cache. In a normal root build,
+the top-level values therefore control generation. The resource option
+controls templates and `wwwroot`; configuration and TLS arrays are always
+generated. The runtime `useInMemoryResources` setting can choose between
+embedded and disk resources only when the binary was built with the embedded
+template/web-root arrays.
 
 ---
 
@@ -248,12 +237,12 @@ generate_tzdata_assets_file <source_dir> <base_folder> <output_file> <function_n
 
 **Example:**
 ```cmake
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_resources.cpp
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_assets.cpp
     COMMAND generate_tzdata_assets_file
         ${PROJECT_SOURCE_DIR}/res/tzdata
         tzdata
-        ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_resources.cpp
-        getTzdataResources
+        ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_assets.cpp
+        getTzdataAsset
         tzdata
 )
 ```
@@ -267,7 +256,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_resources
 | Static Assets | `wwwroot/` | `wwwroot_resources.cpp` | `getWwwrootResources` | `wwwroot` |
 | Configuration | `configuration_embed/` | `config_resources.cpp` | `getConfigResources` | `config` |
 | TLS Assets | `tls_asset/` | `tls_asset_resources.cpp` | `getTlsAssetResources` | `tls_asset` |
-| Timezone Data | `res/tzdata/` | `tzdata_resources.cpp` | `getTzdataResources` | `tzdata` |
+| Timezone Data | `res/tzdata/` | `` | `getTzdataAsset` | Date/tz asset data; not an `app::Resource` context |
 
 **Conditional Generation:**
 - Configuration and TLS resources are always generated.
@@ -314,9 +303,10 @@ Use forward slashes in resource paths:
 app::Resource::get("views/dashboard/panel.html", "appview");
 ```
 
-Backslashes are normalized, but using them makes paths harder to read and can
-cause inconsistent paths between platforms:
+The resource path normalizer uses `/` as its separator; it does not convert
+backslashes. A backslash is treated as part of a path component, so use
+forward slashes consistently:
 
 ```cpp
-app::Resource::get("views\\dashboard\\panel.html", "appview");  // Works but avoid it
+app::Resource::get("views/dashboard/panel.html", "appview");
 ```

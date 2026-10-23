@@ -13,25 +13,26 @@ This sample demonstrates how to build a client that communicates with the app_se
 ## Building
 
 The sample is built as part of the main build system:
-The compiled executable will be in `_output/app_client/debug/`
+The executable target is `webclient`; with package output enabled, a Debug
+build is copied to `_output/webclient/debug/`.
 
 ## Running
 
-First, start the app_server:
+First, start the `webservice` executable from its packaged output directory:
 
-```bash
-./app_server
+```powershell
+.\_output\webservice\debug\webservice.exe
 ```
 
 Then run the client:
 
-```bash
-./app_client
+```powershell
+.\_output\webclient\debug\webclient.exe
 ```
 
 ## Usage
 
-The client connects to the app_server and performs various API requests:
+The client connects to the `webservice` application and performs API requests:
 
 - User authentication
 - Data retrieval

@@ -113,8 +113,8 @@ MysqlCommand cmd(&conn);
 cmd.prepare("INSERT INTO sample (id, name) VALUES (?, ?)");
 
 MysqlParameterCollection params;
-params.push_back(std::make_shared<MysqlParameter>("id", DataType::int32, 10));
-params.push_back(std::make_shared<MysqlParameter>("name", DataType::string, std::string("alice")));
+params.push_back(std::make_shared<MysqlParameter>("id", DataType::integer, 10));
+params.push_back(std::make_shared<MysqlParameter>("name", DataType::varchar, std::string("alice")));
 
 cmd.bind(params);
 cmd.execute();

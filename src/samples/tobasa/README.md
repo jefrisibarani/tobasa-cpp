@@ -1,6 +1,7 @@
 # Tobasa Plugin Sample
 
-The sample application loads a dummy plugin (`plugin_dummy.dll`) and demonstrates the plugin lifecycle:
+The sample application loads the `plugin_dummy` shared library and demonstrates
+the plugin manager API:
 - Loading the plugin library
 - Creating and initializing the plugin
 - Calling plugin methods
@@ -13,19 +14,17 @@ The compiled executable will be in `_output/test_tobasa/debug/`
 
 ## Running
 
-1. Ensure the plugin DLL is in the same directory as the executable or in the system PATH.
-2. Run the sample:
+1. Build the `test_tobasa` and `plugin_dummy` targets.
+2. Update the hard-coded plugin path in `src/main.cpp` to the built plugin file on your machine.
+3. Run the sample:
    ```bash
    ./test_tobasa
    ```
 
-Expected output:
-```
-DummyPlugin: load() called
-DummyPlugin loaded successfully!
-DummyPlugin: unload() called
-DummyPlugin unloaded successfully!
-```
+`PluginManager::loadPlugin()` invokes `Plugin::load()` after creating the
+plugin instance. `unloadAllPlugins()` invokes `Plugin::unload()` before
+destroying the instance and closing the library. The sample leaves those
+lifecycle calls to the manager and only checks that the plugin was created.
 
 ## Files
 
@@ -39,5 +38,5 @@ DummyPlugin unloaded successfully!
 
 ## Notes
 
-- On Windows, ensure `plugin_dummy.dll` is in the executable's directory or PATH.
-- On Linux/macOS, ensure `libplugin_dummy.so` is in LD_LIBRARY_PATH or the executable's directory.
+- `getPlugin("plugin_dummy")` uses the library filename stem; the plugin factory ID is `dummy_plugin`.
+- On Linux/macOS, the sample source path and library filename need to be changed to match the built `.so` or `.dylib`.

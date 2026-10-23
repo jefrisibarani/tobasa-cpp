@@ -52,15 +52,20 @@ socket bytes -> HTTP parser -> HttpContext -> MiddlewareManager -> Router -> Con
 `Webapp::start()` registers middleware in order in `app_server/src/main.cpp`:
 
 1. Exception handler
-2. Database connectivity check
-3. Multipart support
+2. Multipart middleware, but only when internal HTTP-server multipart parsing is disabled
+3. Database connectivity check
 4. Response header rules
 5. Request identification
 6. Cache control
 7. Content type validation
 8. Session
-9. Authentication
-10. Authorization
+9. CSRF
+10. Authentication
+11. Authorization
+
+The app calls `useMultipart()` before the database check. With the default
+`webapp.httpServer.enableMultipartParsing=true`, the HTTP server parses
+multipart bodies internally and `useMultipart()` does not add middleware.
 
 Each middleware is wrapped as a `Middleware` object and added to the service via `WebService::addMiddleware()`.
 
@@ -69,7 +74,7 @@ Each middleware is wrapped as a `Middleware` object and added to the service via
 This is classic middleware chaining:
 
 ```text
-Exception -> DBCheck -> Multipart -> HeaderRule -> RequestID -> Cache -> ContentType -> Session -> Auth -> Authz -> Router -> Controller
+Exception -> [Multipart middleware when enabled] -> DBCheck -> HeaderRule -> RequestID -> Cache -> ContentType -> Session -> CSRF -> Auth -> Authz -> Router -> Controller
 ```
 
 See [Middleware in Tobasa Web](../src/tobasaweb/doc/middleware.md) for chain order and `next(context)` behavior.

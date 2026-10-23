@@ -98,9 +98,8 @@ public:
       // create connection, and setup onStart callback
       auto conn = std::make_shared<ConnectionType>(
          std::move(tlsSocket), _settings, _logger, requestHandler);
-      
-      conn->setTls(true);
 
+      conn->setTls(true);
 
       // setup connection's onStart functor. onStart will be called from connection's start()
       // which is called from connection manager.
@@ -123,13 +122,12 @@ public:
                      auto serverName = sniContexts->hostname(ssl);
                      if (!serverName)
                         serverName = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+
                      const unsigned char* alpn = nullptr;
                      unsigned int alpnLength = 0;
                      SSL_get0_alpn_selected(ssl, &alpn, &alpnLength);
-                     auto alpnProtocol = alpnLength > 0
-                        ? std::string(reinterpret_cast<const char*>(alpn), alpnLength)
-                        : std::string{};
-                     logger->debug(
+                     auto alpnProtocol = alpnLength > 0 ? std::string(reinterpret_cast<const char*>(alpn), alpnLength) : std::string{};
+                     logger->trace(
                         "[{}] TLS handshake succeeded: SNI={}, version={}, cipher={}, initial_SSL_CTX={}, active_SSL_CTX={}, ALPN={}",
                         logType,
                         serverName ? serverName : "",
@@ -144,7 +142,7 @@ public:
 #ifdef TOBASA_HTTP_USE_HTTP2
                         // Check the selected protocol from ALPN during the TLS handshake
                         // The protocol will be "h2" for HTTP/2, or "http/1.1" for HTTP/1.1
-                        if (settings.http2Enabled() && http2::tlsH2NegotiatedInModule(tlsSock))
+                        if (settings.http2Enabled() && http2::tlsH2Negotiated(tlsSock))
                            c->httpVersion(HttpVersion::two);
                         else
                            c->httpVersion(HttpVersion::one);
@@ -230,7 +228,7 @@ public:
                         sharedGroups << (groupName ? groupName : "unknown");
                      }
 
-                     logger->debug(
+                     logger->trace(
                         "[{}] TLS handshake failed: {}; SNI={}, version={}, cipher={}, initial_SSL_CTX={}, active_SSL_CTX={}, security_level={}, cert_key={}, key_matches_certificate={}, certificate_suitability=0x{:X}, peer_ciphers=[{}], context_ciphers=[{}], peer_sigalgs=[{}], shared_sigalgs=[{}], shared_groups=[{}]",
                         logType,
                         error.message(),
@@ -308,6 +306,7 @@ private:
          auto certChain = _settings.getDefaultTlsAsset(TlsAsset::cerificate_chain);
          auto privateKey = _settings.getDefaultTlsAsset(TlsAsset::private_key);
          auto tmpDh = _settings.getDefaultTlsAsset(TlsAsset::tmp_dh);
+         // configure tls for each host-specific context
          _sniTlsContexts.configure(
             _tlsContex,
             _settings.hostCertificates(),
@@ -323,8 +322,9 @@ private:
          );
 
 #ifdef TOBASA_HTTP_USE_HTTP2
+         // configure tls context for the default context
          if (_settings.http2Enabled())
-            http2::configureTlsContextInModule(_tlsContex);
+            http2::configureTlsContext(_tlsContex);
 #endif
 
       }

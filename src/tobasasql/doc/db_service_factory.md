@@ -50,15 +50,14 @@ The implementation is simple at the top level. The real logic sits in the pool a
 ## Registering connector options
 
 ```cpp
-virtual void addConnectorOption(
-   const std::string& name,
-   const conf::ConnectorOption& option,
-   int poolSize = 0) = 0;
+factory.addConnectorOption("MainDb", options, 4);
 ```
 
-This stores the connector config in a map keyed by name.
-The important detail is that it overwrites the entry if the same name is registered twice. 
-The pool size is also per connector. A value of `0` means “use the global default pool size.” A positive value means “use this pool size for this connector only.”
+`DbServiceFactory::addConnectorOption()` is a concrete method. It stores the
+connector config in a map keyed by name and replaces an existing entry with
+the same name. The pool size is per connector. A value of `0` means “use the
+global default pool size.” A positive value selects a pool size for this
+connector.
 
 ## Default pool size
 
@@ -85,18 +84,32 @@ If the name is missing, the function returns an empty `conf::ConnectorOption` an
 
 ## Creating a service
 
-The actual service creation happens through the templated API:
+The factory provides a templated `createService()` overload for service
+templates that accept the selected driver's connection type:
 
 ```cpp
-template <template <class> class RepoType>
-SqlServicePtr createService(const std::string& optionName, bool pooled = true)
+template <template <class> class ServiceTemplate>
+SqlServicePtr createService(const std::string& optionName, bool pooled = true);
+
+template <template <class> class ServiceTemplate>
+SqlServicePtr createService(const std::string& optionName, bool pooled,
+                            const PoolAcquireOptions& acquireOptions);
 ```
 
-This is the important path in the factory. It resolves the config by name, acquires a connection, then creates the repo or service object for the selected backend.
+For example, the sample's `sample::UserService` is a class template over the
+driver connection type:
+
+```cpp
+auto service = factory.createService<sample::UserService>("MainDb", false);
+```
+
+This resolves the connector config, acquires or reuses a connection, then
+creates the service specialization for the selected backend.
 
 If `pooled` is `true`, it uses the pool manager and returns a pooled connection lease. If `pooled` is `false`, it creates a direct connector and keeps it in the non-pooled list.
 
-The app-specific factory usually wraps this pattern:
+An application-specific factory can wrap this pattern and map service names
+to concrete service templates:
 
 ```cpp
 sql::SqlServicePtr DbServiceFactoryApp::doGetDbService(
@@ -174,15 +187,10 @@ This is a good guarantee for pooled code: you do not want one user to leave a tr
 
 ### Missing connector name
 
-If a connector name is not registered, the factory throws.
-
-For pooled access it throws:
-
-- `std::runtime_error("Invalid connector option: ...")`
-
-For non-pooled creation it throws:
-
-- `AppException("Connector option ... not found")`
+If a connector name is not registered, `getConnector()` throws
+`std::runtime_error` for pooled access or `AppException` for non-pooled
+access. Pooled `createService()` reports an invalid option with
+`AppException("Invalid connector option: ...")`.
 
 So a missing config is not treated like a silent null result.
 

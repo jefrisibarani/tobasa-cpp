@@ -1,11 +1,12 @@
 # Shared Monolithic Build
 
 The shared monolithic configuration compiles Tobasa's core, SQL, HTTP, web,
-and LIS modules into one shared library: `tobasa_monolithic`. The
+and other enabled modules (including LIS when `TOBASA_BUILD_LIS_ENGINE=ON`)
+into one shared library: `tobasa_monolithic`. The
 application can continue to link against the familiar component target names;
 in this configuration those names forward to the monolithic library.
 
-The top-level options default to a shared monolithic build:
+To select a shared monolithic build, enable both options:
 
 ```cmake
 TOBASA_BUILD_SHARED_LIB=ON
@@ -13,8 +14,11 @@ TOBASA_BUILD_MONOLITHIC_SHARED_LIB=ON
 ```
 
 `TOBASA_BUILD_MONOLITHIC_SHARED_LIB` is dependent on
-`TOBASA_BUILD_SHARED_LIB`. Disable the monolithic option to build separate
-shared libraries, or disable shared libraries to build static modules.
+`TOBASA_BUILD_SHARED_LIB` and defaults to `OFF`. The overall defaults are
+shared component libraries (`TOBASA_BUILD_SHARED_LIB=ON`,
+`TOBASA_BUILD_MONOLITHIC_SHARED_LIB=OFF`). Disable the monolithic option to
+build separate shared libraries, or disable shared libraries to build static
+modules; CMake forces the dependent monolithic option off in static mode.
 
 ## Configure and Assemble
 

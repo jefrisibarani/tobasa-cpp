@@ -10,6 +10,7 @@ These technical notes explain internal subsystem behavior, startup, and executio
 | --- | --- |
 | [`plugin.md`](dev_notes/plugin.md) | Plugin factories, dynamic loading, lifecycle, lookup, and app-server session-store plugins. |
 | [`third_party_libraries.md`](dev_notes/third_party_libraries.md) | Vendored, discovered, and prebuilt dependencies, including provider and linkage behavior across Tobasa build modes. |
+| [`tobasa_build_modes.md`](dev_notes/tobasa_build_modes.md) | Static, shared, monolithic, and VCPKG build combinations and their settings. |
 | [`http_connection_cleanup_flow.md`](dev_notes/http_connection_cleanup_flow.md) | How an HTTP connection is removed after the browser closes it or the socket reports an error. |
 | [`http_server_request_handling_flow.md`](dev_notes/http_server_request_handling_flow.md) | Low-level HTTP/1.x parsing, connection registration, and request processing. |
 | [`sse_connection_cleanup_flow.md`](dev_notes/sse_connection_cleanup_flow.md) | How an SSE connection is removed after the client disconnects. |
@@ -24,7 +25,8 @@ These guides explain how to configure, run, and extend the application server un
 | Document | What it covers |
 | --- | --- |
 | [`app_configuration.md`](src/app_server/doc/app_configuration.md) | Runtime and embedded configuration, fallback loading, variables, and the effective configuration object. |
-| [`app_resource.md`](src/app_server/doc/app_resource.md) | Embedded and filesystem resources, resource contexts, build flags, and resource generation. |
+| [`README.md`](src/app_server/README.md) | App-server overview, modules, build, configuration, and runtime behavior. |
+| [`app_resource.md`](src/app_server/doc/app_resource.md) | Embedded resource lookup, caller-managed filesystem fallback, build flags, and resource generation. |
 | [`configuration_reference.md`](src/app_server/doc/configuration_reference.md) | The available `appsettings.json` objects and settings. |
 | [`database_setup.md`](src/app_server/doc/database_setup.md) | SQLite setup, other database drivers, startup migrations, and troubleshooting. |
 | [`endpoints.md`](src/app_server/doc/endpoints.md) | Registered pages, APIs, administration routes, optional module routes, and authentication defaults. |
@@ -50,6 +52,7 @@ These documents cover the Tobasa Web framework, its request pipeline, and its de
 | [`controller.md`](src/tobasaweb/doc/controller.md) | The controller pattern, route registration, and the controller lifecycle in Tobasa Web. |
 | [`middleware.md`](src/tobasaweb/doc/middleware.md) | The middleware pipeline and how requests move through Tobasa Web. |
 | [`built-in-middlewares.md`](src/tobasaweb/doc/built-in-middlewares.md) | The built-in session, authentication, authorization, and multipart middleware and how to configure them. |
+| [`session.md`](src/tobasaweb/doc/session.md) | Session middleware, filesystem and plugin-backed stores, expiry, concurrency, and cookies. |
 | [`router.md`](src/tobasaweb/doc/router.md) | Route matching and request dispatch in Tobasa Web. |
 | [`registering_route.md`](src/tobasaweb/doc/registering_route.md) | How to register a controller route and what each route parameter controls. |
 | [`service_client_base.md`](src/tobasaweb/doc/service_client_base.md) | How controllers and middleware receive and use the app's database service factory. |
@@ -64,6 +67,8 @@ request handling, connection lifecycle, and WebSocket usage.
 | --- | --- |
 | [`README.md`](src/tobasahttp/README.md) | Library overview, protocols, features, dependencies, and architecture. |
 | [`http_server.md`](src/tobasahttp/doc/http_server.md) | Server capabilities, configuration, and the boundary between the transport library and application code. |
+| [`http_client.md`](src/tobasahttp/doc/http_client.md) | HTTP/1 client requests, synchronous/asynchronous operation, connection reuse, and body streaming. |
+| [`settings.md`](src/tobasahttp/doc/settings.md) | HTTP server limits, timeout and TLS settings, compression, multipart, and rate limiting. |
 | [`http_server_connection_and_request_lifetime.md`](src/tobasahttp/doc/http_server_connection_and_request_lifetime.md) | Accepting clients, HTTP/1 and HTTP/2 request processing, timeouts, WebSockets, SSE, and connection cleanup. |
 | [`http_server_compression.md`](src/tobasahttp/doc/http_server_compression.md) | Gzip eligibility, server settings, protocol behavior, byte ranges, and cache variation. |
 | [`http_server_resumable_download.md`](src/tobasahttp/doc/http_server_resumable_download.md) | Opt-in byte ranges, `If-Range` validators, and resuming file downloads over HTTP/1 and HTTP/2. |
@@ -84,6 +89,7 @@ These guides are for applications using the Tobasa SQL library directly.
 | [`data_types.md`](src/tobasasql/doc/data_types.md) | Portable `tbs::sql::DataType` values and backend-specific type mappings. |
 | [`sql_parameter.md`](src/tobasasql/doc/sql_parameter.md) | Parameter order, names, binding rules, and backend-specific behavior. |
 | [`prepared_statement.md`](src/tobasasql/doc/prepared_statement.md) | The prepared-statement flow in `SqlQuery`, the driver `*Command` classes, and the one-shot execution pattern. |
+| [`db_service_factory.md`](src/tobasasql/doc/db_service_factory.md) | Named connector options, service creation, connection-pool behavior, and service lifetime. |
 | [`README.md`](src/tobasasql/README.md) | Module overview, features, supported databases, dependencies, and usage patterns. |
 
 ## Samples
@@ -97,12 +103,17 @@ These README files explain the sample applications under `src/samples`.
 | [`https_client/README.md`](src/samples/https_client/README.md) | HTTPS/TLS client connections, GET and POST requests, JSON payloads, certificate validation, and connection pooling. |
 | [`https_server_minimal/README.md`](src/samples/https_server_minimal/README.md) | A minimal HTTPS server with request handling using a worker pool or the I/O thread. |
 | [`tobasasql/README.md`](src/samples/tobasasql/README.md) | Direct SQL connections, runtime database configuration, services, transactions, connection pools, and MySQL checks. |
+| [`plugin_dummy/README.md`](src/samples/plugin_dummy/README.md) | Building a shared plugin and loading it through `PluginManager`. |
+| [`tobasa/README.md`](src/samples/tobasa/README.md) | Core-library sample, including dynamic plugin loading. |
 
 ## Suggested starting points
 
 - To run or configure the application server, start with
   [`server_architecture.md`](src/app_server/doc/server_architecture.md) and
   [`app_configuration.md`](src/app_server/doc/app_configuration.md).
+- To configure the build, start with [`BUILD.md`](BUILD.md), then see
+  [`tobasa_build_modes.md`](dev_notes/tobasa_build_modes.md) and
+  [`third_party_libraries.md`](dev_notes/third_party_libraries.md).
 - To add or understand an HTTP route, read
   [`endpoints.md`](src/app_server/doc/endpoints.md) and
   [`server_mvc.md`](src/app_server/doc/server_mvc.md).

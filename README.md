@@ -12,16 +12,14 @@ Each sub‑project is self‑contained; you can link only the libraries you need
 | [`tobasa`](src/tobasa/README.md)       | **Common library** – utilities such as logging, configuration, JSON,
 |                | date/time, string helpers, plugins, task manager, etc. 
 |                | This is the foundation for all other Tobasa components. |
-| [`tobasahttp`](src/tobasahttp/README.md)   | **HTTP library** – Asio‑based HTTP/1.1 and HTTP/2(with nghttp) server and client with
-|                | optional TLS, WebSocket, multipart parsing, etc. |
+| [`tobasahttp`](src/tobasahttp/README.md)   | **HTTP library** – Asio-based HTTP/1.1 server and client, with optional HTTP/2 server support through nghttp2, TLS, WebSocket, and multipart parsing. |
 | [`tobasaweb`](src/tobasaweb/README.md)    | **Web App/REST framework** – routing, controllers, middleware, JWT/session
 |                | support built on top of `tobasahttp` and `tobasasql`. |
 | [`tobasasql`](src/tobasasql/README.md)    | **SQL abstraction** – lightweight wrapper around SQLite/MySQL/Postgres
 |                | and MSSQL(through ODBC and ADO) with connection pools, query helpers. |
 | [`tobasalis`](src/tobasalis/README.md)    | **LIS (Lab Instrument) library** – message parsing (LIS2‑A2/ASTM and HL7), 
 |                | TCP/serial transports, session management. |
-| [`webservice`](src/app_server/README.md)   | **Web service application** – demonstrates a complete,
-|                | scalable REST API with JWT/session authentication, middleware pipeline,
+| [`webservice`](src/app_server/README.md)   | **Web service sample application** – demonstrates a REST API with JWT/session authentication, CSRF middleware,
 |                | database migrations, controllers, static-file serving, and configurable
 |                | TLS support. |
 
@@ -34,7 +32,9 @@ Each sub‑project is self‑contained; you can link only the libraries you need
 | [`https_server_minimal`](src/samples/https_server_minimal/README.md) | Minimal HTTPS server showing request handling with and without a worker pool. |
 | [`https_client`](src/samples/https_client/README.md) | HTTPS client sample with TLS, GET/POST requests, JSON, and certificate validation. |
 | [`tobasasql`](src/samples/tobasasql/README.md) | SQL examples for direct connections, configured services, transactions, and connection pools. |
-| [`webclient`](src/samples/app_client/README.md)    | **HTTP client demo** – simple client using `tobasahttp`.
+| [`plugin_dummy`](src/samples/plugin_dummy/README.md) | Shared-library plugin and `PluginManager` lifecycle example. |
+| [`tobasa`](src/samples/tobasa/README.md) | Core library and dynamic plugin loading sample. |
+| [`webclient`](src/samples/app_client/README.md)    | **HTTP client demo** – simple client using `tobasahttp`. |
 
 ## Documentation
 
@@ -62,18 +62,17 @@ _output/              # packaged build result
 ```
 
 ## Build
-Tobasa uses CMake as the build system. The project is currently tested with
-MSVC on Windows and GCC on Linux.
+Tobasa uses CMake as its build system. The repository includes Windows/MSVC
+and Linux/GCC build paths. See [BUILD.md](BUILD.md) for current prerequisites
+and dependency setup.
 
 ### Windows
-- Visual Studio 2017
-- Visual Studio 2022
+- MSVC with Visual Studio 2017 or 2022. Match the compiler to the selected prebuilt package set or VCPKG triplet.
 
-### Ubuntu Server 20.04.5
-- GCC 9.4.0
-- GCC 11.1.0
+### Linux
+- GCC with C++17 support. Install the development packages for enabled system dependencies.
 
-See [build_all.cmd](./build_all.cmd) and [build_all.sh](./build_all.sh) for example\
+See [build_all.cmd](./build_all.cmd) and [build_all.sh](./build_all.sh) for examples.\
 See also [BUILD](./BUILD.md) for more information 
 
 

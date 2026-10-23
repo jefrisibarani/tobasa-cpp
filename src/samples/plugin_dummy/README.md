@@ -9,41 +9,47 @@ DummyPlugin is a minimal implementation of the Tobasa plugin system, showing:
 ## Building
 
 The plugin is built automatically as part of the main build:
-The compiled plugin (`.dll` on Windows, `.so` on Linux) will be located in `_output/plugin_dummy/debug/`.
+The plugin is a separate shared-library target. Package output is placed in
+`_output/plugin_dummy/debug/` for Debug builds. Its filename is
+`plugin_dummy.dll` on Windows and normally `libplugin_dummy.so` on Linux.
 
 ## Usage
 
 Load the plugin using the `PluginManager`:
 
 ```cpp
-#include "tobasa/plugin_manager.h"
+#include <stdexcept>
+#include <string>
+#include <tobasa/plugin_manager.h>
 
-int main() 
+void loadDummyPlugin(const std::string& pluginPath)
 {
-   tbs::PluginManager& manager = tbs::PluginManager::get();
-   
-   // Load the plugin from the built library path
-   if (manager.loadPlugin("path/to/plugin_dummy.dll")) 
+   auto& manager = tbs::PluginManager::get();
+   if (!manager.loadPlugin(pluginPath))
+      throw std::runtime_error("Failed to load plugin");
+
+   auto* plugin = manager.getPluginById("dummy_plugin");
+   if (!plugin)
    {
-      tbs::Plugin* plugin = manager.getPlugin("plugin_dummy");
-      if (plugin) 
-      {
-         // Plugin is now loaded
-         plugin->load();  // Explicit load call (optional)
-         // ... use plugin ...
-         plugin->unload();  // Unload when done
-      }
+      manager.unloadPlugin("plugin_dummy");
+      throw std::runtime_error("Dummy plugin factory ID was not found");
    }
-   
-   manager.unloadAllPlugins();
-   return 0;
+
+   // Use the plugin while its shared library remains loaded.
+   manager.unloadPlugin("plugin_dummy");
 }
 ```
+
+`PluginManager::loadPlugin()` calls the plugin's `load()` method, and
+`unloadPlugin()` calls `unload()` before destroying the instance and closing
+the library. Do not call those lifecycle methods directly. The manager lookup
+name `plugin_dummy` comes from the library filename stem; the factory ID is
+`dummy_plugin`.
 
 ## Plugin Metadata
 
 - **Name**: Dummy Plugin
-- **ID**: plugin_dummy
+- **ID**: dummy_plugin
 - **Author**: Tobasa Team
 - **Version**: 1.0.0
 - **Type**: addon

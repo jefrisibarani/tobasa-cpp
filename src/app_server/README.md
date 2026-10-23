@@ -1,6 +1,10 @@
 # Tobasa Web Service Application
 
-The **app_server** (webservice) is a complete, deployable web service application built with the Tobasa framework. It demonstrates how to architect a modern REST API with layered controllers, pluggable middleware, JWT/session authentication, database migrations, and multi-protocol support (HTTP/1.1, HTTP/2, WebSocket, TLS). Suitable for immediate adaptation to production workloads.
+`app_server` (target `webservice`) is a sample application built with the Tobasa
+libraries. It demonstrates controllers, middleware, JWT and session
+authentication, database migrations, HTTP/HTTPS, WebSocket, and optional LIS
+integration. The checked-in configuration and TLS credentials are for
+development; review and replace them before deployment.
 
 ## Features
 
@@ -17,9 +21,9 @@ The **app_server** (webservice) is a complete, deployable web service applicatio
 
 ### Advanced Features
 
-- **Session Management**: Built-in session handling and JWT support
+- **Session Management**: Filesystem sessions by default, with the SQLite session-store plugin available in shared-library builds, plus JWT and CSRF support
 - **LIS Protocol Support**: Optional integration with `tobasalis` for healthcare instrument communication
-- **Custom Matchers**: Pattern matching for routing (regex, wildcard support)
+- **Route Matching**: Whole-segment path parameters and a literal `starts_with` rule
 - **Database Migrations**: Structured schema management
 - **Timezone Support**: Embedded timezone data or system-based timezone handling
 - **Protobuf Integration**: Optional Protocol Buffer message support
@@ -79,8 +83,12 @@ debug/
 ├── tzdata/           # Time zone data
 └── webservice.exe
 ```
-With CMake option `TOBASA_BUILD_IN_MEMORY_RESOURCES`, `TOBASA_BUILD_IN_MEMORY_TZDB` ON
-we can safely delete views and wwwroot and /tzdata
+Embedding templates and `wwwroot` requires
+`TOBASA_BUILD_IN_MEMORY_RESOURCES=ON`. Timezone assets are controlled by
+`TOBASA_BUILD_IN_MEMORY_TZDB`; they are not an `app::Resource` context.
+Runtime configuration, application data, uploads, and database files remain
+external. Disk fallback for missing embedded templates or static files is
+handled by their callers, not by `app::Resource::get()`.
 
 
 ## Configuration
@@ -95,11 +103,9 @@ Configuration is handled through:
 
 ### TLS/SSL Setup
 
-TLS certificates and keys should be placed in the [`tls_asset/`](tls_asset) directory:
-
-- Server certificate: typically `server.crt` or `server.pem`
-- Private key: typically `server.key`
-- CA certificate (optional): `ca.crt`
+The sample uses development assets under [`tls_asset/`](tls_asset) through its
+TLS asset callback. Configure certificate and key paths in `appsettings.json`
+for your environment; do not deploy the checked-in development credentials.
 
 ### Database Configuration
 
@@ -139,14 +145,14 @@ Or from the build directory:
 
 ### Application Initialization ([`main.cpp`](src/main.cpp), `main_helper.cpp`)
 
-Startup sequence for a production-ready application:
+Startup sequence for the sample application:
 
 1. **Timezone Initialization** – Loads timezone database (in-memory or system)
 2. **Configuration Loading** – Merges embedded defaults with runtime config files (`appsettings.json`)
 3. **Logging Setup** – Initializes structured logging via `tobasa` with configurable levels
 4. **Database Service** – Creates connection pool and registers with `tobasasql` abstraction layer
 5. **Database Migrations** – Automatically applies pending schema migrations on startup
-6. **Middleware Pipeline** – Registers 10-layer middleware chain in execution order
+6. **Middleware Pipeline** – Registers application middleware, including session, CSRF, authentication, and authorization
 7. **Controller Registration** – Registers route handlers (CoreController, ApiCoreController, ApiUsersController, AdminController)
 8. **TLS Asset Callbacks** – Sets up resource loading for certificates and keys (embedded or filesystem)
 9. **Lifecycle Hooks** – Registers `onStart()` and `onStop()` handlers (e.g., for LIS engine startup)
@@ -155,7 +161,9 @@ Startup sequence for a production-ready application:
 
 ### Controllers & Routing (`core/`)
 
-Request handlers organized by domain concern, following the MVC/MVT pattern. Routes are matched using configurable matchers (regex or wildcard patterns) with per-route authentication/authorization rules.
+Request handlers are organized by domain concern. Routes use method/path
+matching with whole-segment parameters and per-route authentication and
+authorization rules.
 
 **Controllers:**
 
@@ -176,36 +184,38 @@ Request handlers organized by domain concern, following the MVC/MVT pattern. Rou
 - **Pattern Matching** – Supports path parameters: `/api/users/{id}/roles/{roleId}`
 - **Authentication** – Per-route JWT or session-based auth via `RouteAuth` configuration
 - **Authorization** – Role-based access control (ACL) per endpoint
-- **HTTP Methods** – GET, POST, PUT, DELETE, HEAD, OPTIONS
+- **HTTP Methods** – Application routes register GET, POST, PUT, and DELETE. HTTP parser support for HEAD/OPTIONS does not add corresponding app routes.
 - **Response Types** – JSON API responses, HTML pages, file downloads, redirects
 
 Routes are configured in `bindHandler()` method of each controller and registered during application startup.
 
 ### Middleware Stack (`middleware/`)
 
-Ordered request/response processing pipeline for cross-cutting concerns. Middleware executes sequentially before reaching the router/controllers:
+The application registers middleware in this order before the router:
 
 1. **Exception Handler** – Catches and formats unhandled exceptions
-2. **Database Check** – Validates database connectivity before processing requests
-3. **Multipart Body Parser** – Parses multipart/form-data for file uploads
-4. **Response Header Rules** – Applies CORS policies and custom response headers
-5. **Request Identification** – Tracks request ID, client info, and User-Agent validation
-6. **Cache Control** – Manages HTTP caching headers (ETag, Cache-Control, etc.)
-7. **Content-Type Validation** – Validates request Content-Type before processing
-8. **Session Management** – Loads/maintains user sessions with configurable expiration
-9. **Authentication** – Validates JWT tokens or session cookies
-10. **Authorization** – Enforces route-level access control and permissions
+2. **Multipart** – Added only when internal HTTP-server multipart parsing is disabled; otherwise the HTTP server parses the body.
+3. **Database Check** – Validates database connectivity before processing requests
+4. **Response Header Rules** – Applies configured response headers
+5. **Request Identification** – Adds request-identification data
+6. **Cache Control** – Applies configured cache rules
+7. **Content-Type Validation** – Validates request Content-Type
+8. **Session Management** – Loads or creates a session when the route policy requires it
+9. **CSRF** – Validates tokens on selected browser routes
+10. **Authentication** – Validates the configured credentials
+11. **Authorization** – Enforces route-level access rules
 
 Custom middleware can be inserted at any point in the chain.
 
 ### Database Repository (`db_repo_app.h`)
 
-Data access layer (DAL) abstracting database operations via `tobasasql`. Provides type-safe, multi-database compatible queries without writing SQL directly.
+Data access layer (DAL) built on `tobasasql`. Repository methods own SQL and
+database-specific mapping; this is not a generated CRUD layer.
 
 **Architecture:**
 
-- **Base Repositories** – Inherit from `RepositoryBase<Entity>` providing CRUD operations (Create, Read, Update, Delete)
-- **Custom Queries** – Repository methods wrap parameterized SQL calls, returning strongly-typed entities or collections
+- **Repositories** – Encapsulate application queries and database operations
+- **Custom Queries** – Methods use parameterized SQL and return application entities or collections
 - **Entity/DTO Mapping** – Automatic JSON serialization via NLOHMANN_JSON macros (see `test_sql_json_dto.h`)
 - **Connection Abstraction** – Queries run transparently against SQLite, MySQL, PostgreSQL, or MSSQL
 
@@ -216,11 +226,14 @@ Data access layer (DAL) abstracting database operations via `tobasasql`. Provide
 - **Transaction Support** – Explicit transaction management for multi-step operations
 - **Error Handling** – Exceptions on query failures with detailed diagnostics
 
-Controllers instantiate repositories and call methods to fetch/persist data. No SQL strings exposed to business logic layer.
+Controllers call repository/service methods; SQL remains in the repository or
+service implementation.
 
 ### Resource Management (`app_resource.cpp`)
 
-Flexible asset loading system supporting both embedded binary resources and filesystem fallback. Enables containerized deployments without external file dependencies.
+The app server embeds selected resources and performs caller-specific
+filesystem lookup where applicable. Embedding does not remove runtime
+configuration, TLS, data, upload, or database-file requirements.
 
 **Resource Types:**
 
@@ -232,17 +245,19 @@ Flexible asset loading system supporting both embedded binary resources and file
 
 **Loading Strategy:**
 
-1. **Embedded First** – If CMake flag `TOBASA_BUILD_IN_MEMORY_RESOURCES` is ON, resources are compiled into binary
-2. **Filesystem Fallback** – If embedded resource not found, attempts to load from disk
-3. **Error Handling** – Returns embedded defaults if filesystem access fails
+1. Configuration and TLS resource arrays are generated for every app-server build.
+2. Templates and `wwwroot` files are embedded when `TOBASA_BUILD_IN_MEMORY_RESOURCES=ON`.
+3. `app::Resource::get()` searches embedded arrays only; callers such as the static-file handler implement any disk fallback.
 
 
 **CMake Build Options:**
 
-- `TOBASA_BUILD_IN_MEMORY_RESOURCES=ON` – Embeds all assets, enables single-file deployment
-- `TOBASA_BUILD_IN_MEMORY_TZDB=ON` – Embeds timezone data, eliminates `tzdata/` folder requirement
+- `TOBASA_BUILD_IN_MEMORY_RESOURCES=ON` – Embeds templates and `wwwroot` assets
+- `TOBASA_BUILD_IN_MEMORY_TZDB=ON` – Builds timezone assets when the selected date implementation needs them
 
-With embedded resources, only the executable is needed for deployment (no external files required).
+Embedded resources do not make the application self-contained; external
+configuration, application data, database, and any non-embedded files are
+still required.
 
 Further Documentation See [doc/app_resource.md](doc/app_resource.md)
 
@@ -254,7 +269,9 @@ Common helper functions for date/time handling, string processing, JSON manipula
 
 ### Integrated Test Modules
 
-Tests are compiled conditionally via the `TOBASA_USE_TESTS_MODULE` CMake flag and accessible through controller endpoints.
+The `TOBASA_BUILD_TESTS` CMake option controls the app-server test sources and
+controller endpoints. CMake defines `TOBASA_USE_TESTS_MODULE` for the target
+when those sources are included.
 
 #### SQL Database Tests (`src/test/`)
 
@@ -266,7 +283,8 @@ Multi-driver database compatibility tests validating `tobasasql` abstraction acr
 - **MSSQL** (`test_sql_ado_defs.h`, `test_sql_odbc_mssql_defs.h`) – ADO.NET and ODBC connectors
 - **DTO/JSON Serialization** (`test_sql_json_dto.h`) – Entity-to-JSON mapping validation
 
-Accessible via `/test/sql` endpoint when enabled.
+Individual SQL test endpoints are listed in
+[`doc/endpoints.md`](doc/endpoints.md); there is no general `/test/sql` route.
 
 #### WebSocket Tests / Real-Time Chat (`src/test_ws/`)
 

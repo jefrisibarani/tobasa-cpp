@@ -60,12 +60,15 @@ The library is built as part of the main project build.
 
 ### Tests
 
-Unit tests are built with `TOBASA_BUILD_TESTS=ON`. MySQL integration tests are
-opt-in because they require a running MySQL or MariaDB server:
+Unit tests are built with `TOBASA_BUILD_TESTS=ON`. SQL integration targets are
+generated when `TOBASA_BUILD_TESTS_SQLDB_INTEGRATION=ON` and the matching
+driver is enabled. This option defaults to `ON`, as do the SQL drivers. The
+tests that need a live database skip when their connection configuration is
+not supplied. For example, build the MySQL integration target with:
 
-```text
-cmake -S . -B build -DTOBASA_BUILD_INTEGRATION_TESTS=ON
-cmake --build build --target tobasasql_mysql_command_integration_tests --config Debug
+```powershell
+cmake -S . -B build -DTOBASA_BUILD_TESTS=ON -DTOBASA_BUILD_TESTS_SQLDB_INTEGRATION=ON
+cmake --build build --target tbs_mysql_integration_tests --config Debug
 ```
 
 Set `TOBASA_MYSQL_TEST_CONNECTION` before running CTest. The value uses the

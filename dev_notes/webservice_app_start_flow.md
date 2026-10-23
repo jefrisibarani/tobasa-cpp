@@ -15,35 +15,39 @@ This note follows the current code in `src/app_server/src/main.cpp` and `src/tob
 ## 2. Building the application in `main()`
 
 8. The app reads the `webapp` settings and sets the in-memory resource flag for the current build.
-9. It adds database migrations to `webapp.migrationJob()`:
+9. It loads plugin libraries from `TOBASA_PLUGIN_DIR` (when set) and the
+   executable-relative `plugins` directory. This happens before a plugin-backed
+   session store is first requested.
+10. It adds database migrations to `webapp.migrationJob()`:
    - test migration when `TOBASA_USE_TESTS_MODULE` is enabled
    - LIS migration when `TOBASA_USE_LIS_ENGINE` is enabled
-10. A custom `DbServiceFactoryApp` is created, configured with the main database connection, and passed into the app with `webapp.useDbService(dbService)`.
-11. An `EventEngine` is created and passed to the app controllers.
-12. The home page is set with `tbs::web::Page::homePage()`.
-13. HTTP response-header rules are loaded from the app config.
-14. A custom status result builder is registered for the router.
-15. Middleware is added in this order:
+11. A custom `DbServiceFactoryApp` is created, configured with the main database connection, and passed into the app with `webapp.useDbService(dbService)`.
+12. An `EventEngine` is created and passed to the app controllers.
+13. The home page is set with `tbs::web::Page::homePage()`.
+14. HTTP response-header rules are loaded from the app config.
+15. A custom status result builder is registered for the router.
+16. Middleware is registered in this order:
    - exception handler
+   - multipart middleware when internal HTTP-server multipart parsing is disabled
    - database connectivity check
-   - multipart parsing
    - response-header rules
    - request identification
    - cache-control
    - content type validation
    - session handling
+   - CSRF protection
    - authentication
    - authorization
-16. Controllers are added for the main app, user API, admin API, and application APIs.
-17. If the LIS engine is enabled, `AppLisModule` is created and its start/stop callbacks are stored in `ModuleConfig`.
-18. The default TLS asset callback is registered so HTTPS resources can be served from embedded data.
-19. `webapp.onStart()` is set to call `moduleConfig.startLisEngine()`, and `webapp.onStop()` is set to call `moduleConfig.stopLisEngine()`.
+17. Controllers are added for the main app, user API, admin API, and application APIs.
+18. If the LIS engine is enabled, `AppLisModule` is created and its start/stop callbacks are stored in `ModuleConfig`.
+19. The default TLS asset callback is registered. It looks up the configured development certificate, key, and DH parameter in the embedded TLS resource arrays.
+20. `webapp.onStart()` is set to call `moduleConfig.startLisEngine()`, and `webapp.onStop()` is set to call `moduleConfig.stopLisEngine()`.
 
 ## 3. `Webapp::start()`
 
 20. `Webapp::start()` runs after the app is assembled.
 21. It checks whether config is valid. If not, it returns `1`.
-22. `Session::clearOldSessionFiles()` removes old session files.
+22. `Session::clearOldSessionFiles()` removes stale filesystem session files. It does not invoke `ISessionStore::cleanupExpired()` for plugin-backed stores.
 23. `setThreadPoolSize(ioPoolSize, workerPoolSize)` calculates:
    - IO thread count
    - HTTP worker thread count
@@ -126,10 +130,11 @@ shutdown();
 main()
   +--> initialize timezone data
   +--> create Webapp
-  +--> load config
+   +--> load config
+   +--> load plugins from configured and executable-relative folders
   +--> add migrations
   +--> create DB service and event engine
-  +--> register middleware and controllers
+   +--> register middleware (including session and CSRF) and controllers
   +--> register onStart/onStop
   +--> start webapp
 

@@ -1,9 +1,13 @@
 
 # Tobasa Web Library
 
-Tobasa Web provides comprehensive server-side application infrastructure built on top of the Tobasa ecosystem. It combines HTTP transport (`tobasahttp`), database abstraction (`tobasasql`), and authentication/session management into a cohesive framework for building scalable REST APIs and web services.
+Tobasa Web provides routing, middleware, controller, authentication, and
+session APIs on top of `tobasahttp` and `tobasasql`. The app server is an
+example application built with these libraries; it is not part of the
+`tobasaweb` library itself.
 
-The library handles all infrastructure concerns—routing, middleware pipelines, request/response handling, authentication, and database integration—so you can focus on business logic in controllers and services.
+Applications compose the request pipeline by registering middleware and
+controllers. Tobasa Web does not impose one fixed middleware count or order.
 
 ## Features
 
@@ -14,7 +18,7 @@ The library handles all infrastructure concerns—routing, middleware pipelines,
 - Per-route authentication and authorization rules
 
 **Middleware Pipeline:**
-- 10-layer middleware chain (exception handling, authentication, session management, etc.)
+- Ordered middleware chain, including built-in session, CSRF, authentication, authorization, and multipart helpers
 - Pluggable middleware components
 - Request/response interception and transformation
 - Error handling and logging integration
@@ -54,27 +58,21 @@ The library is built as part of the main build system:
 | **Router** | HTTP route definition and matching |
 | **ControllerBase** | Base class for request handlers |
 | **ControllerFactory** | Dependency injection and controller creation |
-| **Middleware** | Request processing pipeline (10-layer chain) |
+| **Middleware** | Ordered request-processing chain |
 
-## Configuration
+## Middleware and security
 
-Configure your application in `appsettings.json`:
+`Webapp::useSession()`, `useCsrf()`, `useAuthentication()`, and
+`useAuthorization()` add the corresponding built-in middleware. Register
+session handling before CSRF and authentication. The application chooses its
+middleware order and route policy; see
+[built-in-middlewares.md](doc/built-in-middlewares.md).
 
-
-## Middleware Pipeline
-
-The 10-layer middleware chain processes each request:
-
-1. **Exception Handler** – Catches unhandled exceptions
-2. **Database Check** – Validates database connectivity
-3. **Multipart Parser** – Parses file uploads
-4. **Response Headers** – Applies CORS and security headers
-5. **Request Identification** – Tracks request ID and client info
-6. **Cache Control** – Manages HTTP caching
-7. **Content-Type Validation** – Validates request content
-8. **Session Management** – Loads/maintains sessions
-9. **Authentication** – Validates JWT or session
-10. **Authorization** – Enforces access control (ACL)
+Sessions use the filesystem backend by default and can use a plugin-backed
+store. The app-server build includes a SQLite session-store plugin in shared
+library mode. The filesystem backend does not imply that session cookies or
+session data are automatically secure; review cookie and storage settings for
+the deployment.
 
 
 ## Architecture
@@ -113,10 +111,8 @@ The 10-layer middleware chain processes each request:
 ## Performance Characteristics
 
 - Non-blocking async I/O
-- Efficient request routing (trie-based)
-- Connection pooling reduces latency
-- Middleware pipeline optimized for throughput
-- Suitable for high-concurrency scenarios
+- Route matching checks registered routes in order.
+- Database connection pooling is provided by TobasaSQL, not by the router.
 
 ## License
 

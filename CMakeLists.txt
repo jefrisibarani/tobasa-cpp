@@ -13,7 +13,7 @@ CMAKE_DEPENDENT_OPTION(TOBASA_BUILD_MONOLITHIC_SHARED_LIB
       "TOBASA_BUILD_SHARED_LIB" OFF)
 
 # Valid only when using the MSVC compiler
-option(TOBASA_BUILD_WITH_VCPKG   "Build Tobasa with VCPKG libraries"  ON )
+option(TOBASA_BUILD_WITH_VCPKG   "Build Tobasa with VCPKG libraries"  OFF )
 
 # Database Drivers
 option(TOBASA_SQL_USE_PGSQL      "Enable PostgreSQL driver"           ON )

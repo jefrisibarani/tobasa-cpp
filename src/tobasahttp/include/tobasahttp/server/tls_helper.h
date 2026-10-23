@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <iostream>
 #include <new>
 #include <memory>
 #include <unordered_map>
@@ -15,26 +14,6 @@
 
 namespace tbs {
 namespace http {
-
-/// Lookup function
-TBS_HTTP_API SSL_CTX* lookupSslCtx(const std::string& hostname);
-
-/// Return the SNI hostname saved for this SSL connection, if available.
-TBS_HTTP_API const char* getSniHostname(const SSL* ssl);
-
-/// SNI callback
-TBS_HTTP_API int sniCallback(SSL* ssl, int* ad, void* arg);
-
-TBS_HTTP_API void setupCertificateforSNI(
-     const std::vector<HostCertificate>& list
-   , const std::string& tmpDhFile
-   , nonstd::span<const unsigned char> defaultCertChain
-   , nonstd::span<const unsigned char> defaultPrivateKey
-   , nonstd::span<const unsigned char> defaulTmpDh
-#ifdef TOBASA_HTTP_USE_HTTP2
-   , bool http2Enabled
-#endif
-);
 
 class SniTlsContexts final
 {
@@ -98,6 +77,15 @@ public:
       return value ? value->c_str() : nullptr;
    }
 
+   /**
+    * Installs SNI selection on the default context and creates a TLS context
+    * for each configured host. Host certificates and keys are loaded from
+    * their configured files, with the supplied defaults as fallback.
+    *
+    * When HTTP/2 is enabled, configures each host context for HTTP/2.
+    * Keep this object alive while the default context may invoke its SNI
+    * callback. An unmatched hostname continues to use the default context.
+    */   
    void configure(
       asio::ssl::context& defaultContext,
       const std::vector<HostCertificate>& hosts,
@@ -138,7 +126,7 @@ public:
 
 #ifdef TOBASA_HTTP_USE_HTTP2
          if (http2Enabled)
-            http2::configureTlsContextInModule(*context);
+            http2::configureTlsContext(*context);
 #endif
 
          _contexts[entry.hostname] = std::move(context);

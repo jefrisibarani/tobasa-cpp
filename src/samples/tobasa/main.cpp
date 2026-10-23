@@ -15,10 +15,7 @@ void testPlugin()
       tbs::Plugin* plugin = manager.getPlugin("plugin_dummy");
       if (plugin) 
       {
-         // Plugin is now loaded
-         plugin->load();  // Explicit load call (optional)
-         // ... use plugin ...
-         plugin->unload();  // Unload when done
+         std::cout << "DummyPlugin is loaded" << std::endl;
       }
    }
    
