@@ -12,6 +12,7 @@
 #endif
 
 #include <asio/ssl.hpp>
+#include <openssl/ssl.h>
 #include <openssl/objects.h>
 #include <openssl/tls1.h>
 #include <sstream>
@@ -153,6 +154,7 @@ public:
                   }
                   else
                   {
+                  #if 0
                      auto ssl = tlsSock.native_handle();
                      auto context = SSL_get_SSL_CTX(ssl);
                      auto clientCiphers = SSL_get_client_ciphers(ssl);
@@ -246,6 +248,7 @@ public:
                         peerSigalgs.str(),
                         sharedSigalgs.str(),
                         sharedGroups.str());
+                  #endif
                   }
                
                   onStartCallback(error);

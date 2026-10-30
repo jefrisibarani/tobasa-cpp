@@ -33,7 +33,11 @@ void doRunMigration(sql::SqlConnection<Driver>& conn)
       try
       {
 
-         if constexpr (std::is_same_v<Driver, sql::AdodbDriver> ||  std::is_same_v<Driver, sql::OdbcDriver>)
+         if constexpr ( std::is_same_v<Driver, sql::OdbcDriver>
+#if defined(TOBASA_SQL_USE_ADODB) && defined(_MSC_VER)
+            || std::is_same_v<Driver, sql::AdodbDriver> 
+#endif
+         )
             conn.executeVoid("BEGIN TRANSACTION");
          else
             conn.executeVoid("BEGIN");

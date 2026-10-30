@@ -34,7 +34,7 @@ public:
    AppException(const char* msg, const std::string& src = "", const char* fl = "", int ln = 0);
    AppException(const std::exception &ex, const std::string& src = "", const char* fl = "", int ln = 0);
 
-   virtual char const* what() const;
+   virtual char const* what() const noexcept;
 
    AppError appError;
 };

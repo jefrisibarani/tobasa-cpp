@@ -138,7 +138,7 @@ bool SqliteCommand::bind(const SqlParameterCollection& parameters)
                   }
                   else if (std::holds_alternative<std::string>(param->value()))
                   {
-                     const char* paramValue = SqliteCommand::VariantHelper::value<std::string>(param->value()).c_str();
+                     const char* paramValue = VariantHelper<VariantType>::value<std::string>(param->value()).c_str();
                      rc = sqlite3_bind_text(_pStatement, index, paramValue, -1, SQLITE_STATIC);
                   }
                   else {
@@ -156,7 +156,7 @@ bool SqliteCommand::bind(const SqlParameterCollection& parameters)
                   }
                   else
                   {
-                     const char* paramValue = SqliteCommand::VariantHelper::value<std::string>(param->value()).c_str();
+                     const char* paramValue = VariantHelper<VariantType>::value<std::string>(param->value()).c_str();
                      rc = sqlite3_bind_text(_pStatement, index, paramValue, -1, SQLITE_STATIC);
                   }
 

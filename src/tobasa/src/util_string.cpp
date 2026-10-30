@@ -1,11 +1,14 @@
 #include <chrono>
 
-#include <charconv>  // for double/float to string
-#include <limits>    // for double/float to string
-
-// #include <iomanip>   // for double/float to string
-// #include <limits>    // for double/float to string
-// #include <sstream>   // for double/float to string
+#if (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 13) \
+    || (defined(_MSC_VER) && _MSC_VER >= 1910)
+  #include <charconv>  // for double/float to string
+  #include <limits>    // for double/float to string
+#else
+  #include <iomanip>   // for double/float to string
+  #include <limits>    // for double/float to string
+  #include <sstream>   // for double/float to string
+#endif
 
 #include "tobasa/util_string.h"
 
@@ -313,6 +316,9 @@ void parseNameValue(const std::string& line, std::function<void(const std::strin
 
 void doubleToString(double value, std::string& outStr)
 {
+#if (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 13) \
+    || (defined(_MSC_VER) && _MSC_VER >= 1910)
+
    char buffer[64];
 
    auto result = std::to_chars(
@@ -327,11 +333,22 @@ void doubleToString(double value, std::string& outStr)
       throw std::runtime_error("double conversion failed");
 
    outStr.assign(buffer, result.ptr);
+#else
+   std::ostringstream ss;
+
+   ss << std::setprecision(
+      std::numeric_limits<double>::max_digits10
+   ) << value;
+
+   outStr = ss.str();
+#endif
 }
 
 
 void floatToString(float value, std::string& outStr)
 {
+#if (defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 13) \
+    || (defined(_MSC_VER) && _MSC_VER >= 1910)
    char buffer[32];
 
    auto result = std::to_chars(
@@ -346,6 +363,15 @@ void floatToString(float value, std::string& outStr)
       throw std::runtime_error("float conversion failed");
 
    outStr.assign(buffer, result.ptr);
+#else
+   std::ostringstream ss;
+
+   ss << std::setprecision(
+      std::numeric_limits<float>::max_digits10
+   ) << value;
+
+   outStr = ss.str();
+#endif
 }
 
 
@@ -364,27 +390,6 @@ std::string floatToString(float value)
    return res;
 }
 
-// std::string doubleToString(double value)
-// {
-//    std::ostringstream ss;
-
-//    ss << std::setprecision(
-//       std::numeric_limits<double>::max_digits10
-//    ) << value;
-
-//    return ss.str();
-// }
-
-// std::string floatToString(float value)
-// {
-//    std::ostringstream ss;
-
-//    ss << std::setprecision(
-//       std::numeric_limits<float>::max_digits10
-//    ) << value;
-
-//    return ss.str();
-// }
 
 /** @}*/
 

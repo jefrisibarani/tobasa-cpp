@@ -1,0 +1,5 @@
+
+#pragma once
+
+#cmakedefine01 TOBASA_HAS_FLOAT_TO_CHARS
+#cmakedefine01 TOBASA_HAS_STD_CHRONO_PARSE

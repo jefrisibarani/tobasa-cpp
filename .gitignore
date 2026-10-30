@@ -43,6 +43,12 @@ _notes/
 _output*/
 docs/html/
 build*/
+
+/src/ext/zlib*
+/src/ext/sqlite3mc*
+/src/ext/mariadb*
+/src/ext/nghttp2*
+
 /src/app_server/wwwroot/assets/doctors_profile
 /src/app_server/wwwroot/assets/carousel_items
 /src/app_server/wwwroot/assets/data

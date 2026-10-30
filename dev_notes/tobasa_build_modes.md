@@ -89,7 +89,7 @@ monolithic.
 
 - `TOBASA_USE_BUNDLED_SQLITE3_MC` is the user-facing CMake option. It defaults
    to `ON` and selects the bundled SQLite3 Multiple Ciphers sources.
-- `TOBASA_USE_SQLITE3_MC` is derived by `tobasa_configure_sqlite()`; it is not
+- `TOBASA_USE_SQLITE3_MC` is derived by `tobasa_configure_sqlite3()`; it is not
    an independent option. It is set to `OFF` only when dependency-package
    lookup is enabled (`TOBASA_FIND_DEPS` or `TOBASA_BUILD_WITH_VCPKG`) and
    `TOBASA_USE_BUNDLED_SQLITE3_MC` is `OFF`. In that case CMake requires the

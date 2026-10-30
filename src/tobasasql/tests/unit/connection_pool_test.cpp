@@ -8,9 +8,9 @@
 #include <thread>
 
 #include <tobasasql/db_api.h>
-#include <tobasasql\database_service_factory.h>
-#include <tobasasql\sql_connection.h>
-#include <tobasasql\sql_connection_pool.h>
+#include <tobasasql/database_service_factory.h>
+#include <tobasasql/sql_connection.h>
+#include <tobasasql/sql_connection_pool.h>
 
 namespace tbs::sql::detail {
 

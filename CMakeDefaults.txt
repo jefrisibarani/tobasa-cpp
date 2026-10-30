@@ -32,6 +32,8 @@ if(WIN32)
    set(TOBASA_OPENSSL_DIR_DEF          "d:/dev/tbs_3rdparty_packages/openssl_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
    set(TOBASA_LIBPQ_DIR_DEF            "d:/dev/tbs_3rdparty_packages/libpq_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
    
+   set(TOBASA_SQLITE3_DIR_DEF           "d:/dev/tbs_3rdparty_packages/sqlite3_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
+
    set(TOBASA_ZLIB_DIR_DEF             "d:/dev/tbs_3rdparty_packages/zlib_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
    set(TOBASA_MINIZIP_DIR_DEF          "d:/dev/tbs_3rdparty_packages/minizip_x64-windows-${MSVS_LINK}-${MSVS_VER}" )
 

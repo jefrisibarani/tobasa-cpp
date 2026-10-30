@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12-3.18)
+cmake_minimum_required(VERSION 3.14-3.18)
 cmake_policy(SET CMP0091 NEW)
 if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
    cmake_policy(SET CMP0079 NEW)
@@ -54,70 +54,25 @@ else()
 endif()
 
 
-
 # -------------------------------------------------------
 # Date and timezone library
 # -------------------------------------------------------
 if(NOT TOBASA_USE_STD_CALENDAR_TZONE)
-   if((TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG) AND NOT TOBASA_BUILD_IN_MEMORY_TZDB)
-      find_package(date CONFIG REQUIRED)
-      set(TOBASA_USE_BUNDLED_TZ_LIB FALSE CACHE INTERNAL "" )
-   else()
-      set(TOBASA_USE_BUNDLED_TZ_LIB TRUE CACHE INTERNAL "" )
-      message(STATUS "tobasa Using bundled timezone library")
-
-      if(TOBASA_BUILD_IN_MEMORY_TZDB)
-         add_custom_command(
-            OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_assets.cpp"
-            COMMAND generate_tzdata_assets_file ${TOBASA_FRAMEWORK_ROOTDIR}/res/tzdata tzdata ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_assets.cpp getTzdataAsset tzdata
-            DEPENDS generate_tzdata_assets_file
-         )
-      endif()
-
-      add_library(timezone STATIC)
-      target_sources( timezone PRIVATE ${TOBASA_EXTERNAL_DEPS_DIR}/date/src/tz.cpp )
-      
-      if(TOBASA_BUILD_IN_MEMORY_TZDB)
-         target_sources( timezone PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/resources/tzdata_assets.cpp )
-      endif()   
-
-      target_include_directories(timezone PRIVATE ${TOBASA_EXTERNAL_DEPS_DIR}/date/include )
-
-      if(TOBASA_BUILD_IN_MEMORY_TZDB)
-         target_include_directories(timezone 
-            PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
-            PRIVATE ${TOBASA_FRAMEWORK_ROOTDIR}/src/tobasa/include)
-      endif()
-      
-      target_compile_definitions(timezone PRIVATE HAS_REMOTE_API=0)
-
-      if (WIN32 )
-         if(TOBASA_BUILD_IN_MEMORY_TZDB)
-            target_compile_definitions(timezone PRIVATE USE_IN_MEMORY_TZDB=1)
-         endif()
-      else() 
-         if(TOBASA_BUILD_IN_MEMORY_TZDB)
-            target_compile_definitions(timezone PRIVATE USE_IN_MEMORY_TZDB=1)
-         else()
-            target_compile_definitions(timezone PRIVATE USE_OS_TZDB=1)
-         endif()
-      endif()
-
-      if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-         target_compile_options(timezone PRIVATE -fpic -c -Wall)
-      endif()
-
-      if(CMAKE_CXX20_COMPILE_FEATURES)
-         message(STATUS "tobasa use cxx_std_20")
-         target_compile_features(timezone PUBLIC cxx_std_20)
-      else()
-         message(STATUS "tobasa use cxx_std_17")
-         target_compile_features(timezone PUBLIC cxx_std_17)
-      endif()      
-
-   endif()
+   include(cmake/tobasa_date_timezone.cmake)
+   tobasa_configure_date_and_timezone_lib()
 else()
    message(STATUS "tobasa Using std::date date library")
+endif()
+
+
+# -------------------------------------------------------
+# spdlog
+# -------------------------------------------------------
+if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
+   find_package(spdlog REQUIRED)
+else()
+   set(TOBASA_SPDLOG_INCLUDE_DIRS ${TOBASA_EXTERNAL_DEPS_DIR}/spdlog/include)
+   message(STATUS "tobasa spdlog include dir: ${TOBASA_SPDLOG_INCLUDE_DIRS}")
 endif()
 
 
@@ -158,7 +113,6 @@ function(configure_tobasa_target target)
       endif()
    endif()
 
-
    if(NOT TOBASA_USE_STD_CALENDAR_TZONE)
       if(NOT TOBASA_USE_BUNDLED_TZ_LIB)
          target_link_libraries(${target} PUBLIC date::date date::date-tz)
@@ -181,6 +135,18 @@ function(configure_tobasa_target target)
       endif()
    endif()
 
+   if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
+      target_link_libraries(${target} PRIVATE spdlog::spdlog)
+   else()
+      message(STATUS "${target} use bundled spdlog")
+      target_include_directories(${target} PRIVATE ${TOBASA_SPDLOG_INCLUDE_DIRS})
+
+      if(TOBASA_USE_STD_TEXT_FORMATTING)
+         target_compile_definitions(${target} PRIVATE SPDLOG_USE_STD_FORMAT )
+      else()
+         target_compile_definitions(${target} PRIVATE SPDLOG_FMT_EXTERNAL )
+      endif()
+   endif()
 
    if(MSVC)
       target_compile_definitions(${target} PUBLIC _CRT_SECURE_NO_WARNINGS _UNICODE NOMINMAX)
@@ -188,19 +154,22 @@ function(configure_tobasa_target target)
       target_link_libraries(${target} PUBLIC shlwapi)
    endif()
 
+   target_link_libraries(${target} PRIVATE ${CMAKE_DL_LIBS})
 
    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
       target_compile_options(${target} PRIVATE -fpic -Wall)
+      target_compile_options(${target} PUBLIC -pthread )
+      target_link_libraries(${target} PUBLIC pthread)
    endif()
 
-
-   if(CMAKE_CXX20_COMPILE_FEATURES)
-      message(STATUS "tobasa use cxx_std_20")
+   if("cxx_std_20" IN_LIST CMAKE_CXX_COMPILE_FEATURES)
+      message(STATUS "tobasa C++20 compile features are supported")
       target_compile_features(${target} PUBLIC cxx_std_20)
    else()
-      message(STATUS "tobasa use cxx_std_17")
+      message(STATUS "tobasa C++17 compile features are supported")
       target_compile_features(${target} PUBLIC cxx_std_17)
    endif()
+
 endfunction()
 
 configure_tobasa_target(${TOBASA_MODULE_TARGET})

@@ -1,9 +1,9 @@
 #include <iostream>
 #include <tobasa/config.h>
+#include <tobasa/settings_log.h>
+#include <tobasa/logger_sink_multiple.h>
 #include <tobasahttp/client/http_client.h>
-#include <tobasaweb/settings_log.h>
-#include <tobasaweb/settings_http_client.h>
-#include <tobasaweb/multi_logger.h>
+#include <tobasahttp/client/settings_http_client.h>
 
 bool loadConfig()
 {
@@ -25,7 +25,7 @@ bool loadConfig()
       {
          auto logOption = Config::getOption<log::conf::Logging>("logging");
          // setup Tobasa Logger actual target
-         Logger::setTarget(new log::MultiLogger(std::move(logOption))) ;
+         Logger::setTarget(new log::MultipleLogSink(std::move(logOption))) ;
 
          return true;
       }
@@ -49,7 +49,7 @@ void runClient()
 
    log::TobasaLogger logger;  // use tbs::Logger internally
 
-   auto config = Config::getOption<http::conf::Client>("client");
+   auto config = Config::getOption<conf::Client>("client");
 
    auto caFilePath = path::executableDir() + path::SEPARATOR + config.caVerificationFile;
 

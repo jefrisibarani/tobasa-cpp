@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12-3.18)
+cmake_minimum_required(VERSION 3.14-3.18)
 cmake_policy(SET CMP0091 NEW)
 if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
    cmake_policy(SET CMP0079 NEW)
@@ -68,6 +68,9 @@ endif()
 
 if(MSVC)
    target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE /bigobj /FS )
+endif()
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE -fpic -Wall)
 endif()
 
 # Show filtered headers in IDE

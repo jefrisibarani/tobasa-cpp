@@ -9,7 +9,7 @@ This note follows the current code in `src/app_server/src/main.cpp` and `src/tob
 3. `DateTime::initTimezoneData()` runs first. If it fails, the app exits with code `1`.
 4. A `web::Webapp` object is created.
 5. The app loads `appsettings.json` from the app folder and uses embedded config as a fallback when needed.
-6. `webapp.loadConfig()` loads the app settings and sets up the logger with `log::MultiLogger`.
+6. `webapp.loadConfig()` loads the app settings and sets up the logger with `log::MultipleLogSink`.
 7. If the temp folder or TLS files are not valid, startup stops with an error.
 
 ## 2. Building the application in `main()`

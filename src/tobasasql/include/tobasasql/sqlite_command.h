@@ -18,7 +18,6 @@ class SqliteResult;
 class TBS_SQL_API SqliteCommand : public Notifier
 {
    using VariantType   = DefaultVariantType;
-   using VariantHelper = VariantHelper<VariantType>;
    using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
    using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;

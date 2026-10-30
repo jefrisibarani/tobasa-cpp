@@ -666,19 +666,19 @@ public:
       const std::string&   sqlcmd = "",
       bool                 isReadOnly = true)
       : _conn(conn)
-      , _tableName {tableName}
       , _pResult {nullptr}
+      , _pColumnsInfo {nullptr}
+      , _pColumnMaps {nullptr}
+      , _pSavedRow {nullptr}
+      , _tableName {tableName}
       , _sqlCommandToRun {sqlcmd}
       , _setReadOnly {isReadOnly}
       , _colLabelWithType {false}
       , _valid {false}
-      , _pColumnsInfo {nullptr}
-      , _pColumnMaps {nullptr}
-      , _pSavedRow {nullptr}
       , _query {""}
-      , _totalRows {0}
-      , _initialRows {0}
       , _numColumns {0}
+      , _initialRows {0}
+      , _totalRows {0}
       , _lastModifiedRow {-1}
       , _lastInsertedRow {-1}
       , _rowsCached {0}
@@ -1771,20 +1771,18 @@ protected:
    bool _setReadOnly;                   ///< Is table read only
    bool _colLabelWithType;              ///< Should column label also show column type?
    bool _valid;                         ///< The Table is filled with data and the data is OK
-
    std::string _query;                  ///< Sql query run by init()
-
    long _numColumns;                    ///< Total column count.
+   long _initialRows;                   ///< Initial rows count after init()
+   long _totalRows;                     ///< Total rows in this table (existing and new)
    int _lastModifiedRow;                ///< Last modified row
    int _lastInsertedRow;                ///< Last Inserted row;
    int _rowsCached;                     ///< Rows read from dataset. if nRows=rowsCached, _pResult can be deleted
    int _rowsAdded;                      ///< Rows added (never been in dataSet).
    int _rowsDeleted;                    ///< Rows deleted from initial dataSet.
    int _lastSuccessfullyDeletedRows;    ///< Last successfully deleted rows count;
-   long _initialRows;                   ///< Initial rows count after init()
-   long _totalRows;                     ///< Total rows in this table (existing and new)
-   bool _changed;                       ///<
 
+   bool _changed;                       ///<
    long _optionPageSize;                ///< Total rows in a page/paging
    long _pageCount;                     ///< Total page count
 

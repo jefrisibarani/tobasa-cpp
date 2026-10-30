@@ -4,6 +4,7 @@
 #include <tobasa/util_date.h>
 #include <tobasa/json.h>
 #include <tobasahttp/multipart_body_reader.h>
+#include <tobasaweb/result.h>
 #include <tobasaweb/json_result.h>
 #include <tobasasql/exception.h>
 #include "test_controller.h"
@@ -11,16 +12,16 @@
 namespace tbs {
 namespace test {
 
-using namespace http;
 
 //! Handle request to /test/crypto
 http::ResultPtr TestController::onCrypto(const web::RouteArgument& arg)
 {
+   using namespace tbs::http;
    auto httpCtx = arg.httpContext();
    auto request = httpCtx->request();
 
    if (!util::startsWith(httpCtx->request()->contentType(), "application/json"))
-      return jsonResult(StatusCode::BAD_REQUEST);
+      return http::jsonResult(StatusCode::BAD_REQUEST);
 
    try
    {
@@ -45,27 +46,27 @@ http::ResultPtr TestController::onCrypto(const web::RouteArgument& arg)
       jsonResultBody["encrypted_password_src"] = encryptedPasswordSrc;
       jsonResultBody["decrypred_password"]     = decryptedPassword;
 
-      return jsonResult(jsonResultBody);
+      return http::jsonResult(jsonResultBody);
    }
    catch (const SqlException &ex)
    {
       Logger::logE("[webapp] [conn:{}] {}", httpCtx->connId(), ex.what());
-      return jsonResult(StatusCode::INTERNAL_SERVER_ERROR, "SQL server error");
+      return http::jsonResult(StatusCode::INTERNAL_SERVER_ERROR, "SQL server error");
    }
    catch (const tbs::AppException &ex)
    {
       Logger::logE("[webapp] [conn:{}] {}", httpCtx->connId(), ex.what());
-      return jsonResult(StatusCode::INTERNAL_SERVER_ERROR, ex.what());
+      return http::jsonResult(StatusCode::INTERNAL_SERVER_ERROR, ex.what());
    }
    catch (const Json::exception &ex)
    {
       Logger::logE("[webapp] [conn:{}] {}", httpCtx->connId(), ex.what());
-      return jsonResult(StatusCode::BAD_REQUEST, "JSON data error: " + cleanJsonException(ex));
+      return http::jsonResult(StatusCode::BAD_REQUEST, "JSON data error: " + cleanJsonException(ex));
    }
    catch (const std::exception &ex)
    {
       Logger::logE("[webapp] [conn:{}] {}", httpCtx->connId(), ex.what());
-      return jsonResult(StatusCode::INTERNAL_SERVER_ERROR);
+      return http::jsonResult(StatusCode::INTERNAL_SERVER_ERROR);
    }
 }
 
@@ -73,6 +74,7 @@ http::ResultPtr TestController::onCrypto(const web::RouteArgument& arg)
 //! Handle POST request to /test/datetime
 http::ResultPtr TestController::onDateTime(const web::RouteArgument& arg)
 {
+   using namespace tbs::http;
    // simulate long processing
    //std::this_thread::sleep_for(std::chrono::milliseconds(15000));
 
@@ -80,7 +82,7 @@ http::ResultPtr TestController::onDateTime(const web::RouteArgument& arg)
    auto request = httpCtx->request();
 
    if (!util::startsWith(httpCtx->request()->contentType(), "application/json"))
-      return jsonResult(StatusCode::BAD_REQUEST);
+      return http::jsonResult(StatusCode::BAD_REQUEST);
 
    Json res;
 
@@ -151,13 +153,14 @@ http::ResultPtr TestController::onDateTime(const web::RouteArgument& arg)
    auto expiredDt    = DateTime(expireTimeTp);
 #endif
 
-   return jsonResult(res);
+   return http::jsonResult(res);
 }
 
 
 //! Handle POST request to /upload
 http::ResultPtr TestController::onUpload(const web::RouteArgument& arg)
 {
+   using namespace tbs::http;
    auto httpCtx = arg.httpContext();
    auto request = httpCtx->request();
 
@@ -177,7 +180,7 @@ http::ResultPtr TestController::onUpload(const web::RouteArgument& arg)
       auto part  = body->find("profileImage");
       if (part && part->isFile)
       {
-         return http::fileResult(part->location, FileResult::EnableFileRangeResponse);
+         return http::fileResult(part->location, true);
       }
    }
 

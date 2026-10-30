@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12-3.18)
+cmake_minimum_required(VERSION 3.14-3.18)
 cmake_policy(SET CMP0091 NEW)
 if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
    cmake_policy(SET CMP0079 NEW)
@@ -12,14 +12,6 @@ if(NOT DEFINED TOBASA_EXTERNAL_DEPS_DIR)
 endif()
 
 option(TOBASA_FIND_DEPS "Use `find_package()` for including Tobasa Web dependencies." OFF)
-
-if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
-   find_package(spdlog REQUIRED)
-else()
-   set(SPDLOG_INCLUDE_DIR ${TOBASA_EXTERNAL_DEPS_DIR}/spdlog/include)
-   message(STATUS "tobasaweb spdlog include dir: ${SPDLOG_INCLUDE_DIR}")
-endif()
-
 
 # Use bundled nlohmann and jwt-cpp package
 set(JWTCPP_INCLUDE_DIR   ${TOBASA_EXTERNAL_DEPS_DIR}/jwt-cpp/include)
@@ -61,25 +53,6 @@ if(TOBASA_BUILD_TESTS)
    add_subdirectory(tests)
 endif()
 
-if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
-   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC spdlog::spdlog)
-else()
-   message(STATUS "${PROJECT_NAME} use bundled spdlog")
-   target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${SPDLOG_INCLUDE_DIR})
-
-   set(HAS_STD_TEXT_FORMATTING FALSE) # __cpp_lib_format (Text formatting)
-   if(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.30.30705)
-      set(HAS_STD_TEXT_FORMATTING TRUE)
-   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
-      set(HAS_STD_TEXT_FORMATTING TRUE)
-   endif()
-
-   if(HAS_STD_TEXT_FORMATTING)
-      target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC SPDLOG_USE_STD_FORMAT )
-   else()
-      target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC SPDLOG_FMT_EXTERNAL )
-   endif()
-endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
    message(STATUS "${PROJECT_NAME} use cxx_std_20")
@@ -91,6 +64,10 @@ endif()
 
 if(MSVC)
    target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE /bigobj /FS )
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+   target_compile_options(${TOBASA_MODULE_TARGET} PRIVATE -fpic -Wall)
 endif()
 
 # Show filtered headers in IDE

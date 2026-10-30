@@ -1,16 +1,7 @@
-cmake_minimum_required(VERSION 3.12-3.18)
+cmake_minimum_required(VERSION 3.14-3.18)
 cmake_policy(SET CMP0091 NEW)
 
 project(plugin_sqlite_session_store VERSION 1.0.0 LANGUAGES CXX)
-
-if(TOBASA_USE_SQLITE3_MC)
-   # SQLite3 Multiple Chipers sources included
-   set(TOBASA_SQLITE3_LIB "sqlite3_mc")
-else()
-   # SQLite3 library via find_package
-   find_package(unofficial-sqlite3 CONFIG REQUIRED)
-   set(TOBASA_SQLITE3_LIB "unofficial::sqlite3::sqlite3")
-endif()
 
 set(PLUGIN_EXE_NAME "session_store_sqlite_plugin")
 
@@ -35,7 +26,7 @@ target_include_directories(${PLUGIN_EXE_NAME}
 
 # Link against Tobasa framework
 target_link_libraries(${PLUGIN_EXE_NAME}
-   PRIVATE tobasa tobasahttp tobasaweb tobasasql ${TOBASA_SQLITE3_LIB})
+   PRIVATE tobasa tobasahttp tobasaweb tobasasql ${TOBASA_SQLITE3_LIBRARIES})
 
 if(MSVC)
    target_compile_definitions( ${PLUGIN_EXE_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS )

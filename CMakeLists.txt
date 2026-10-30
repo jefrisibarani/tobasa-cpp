@@ -1,7 +1,6 @@
-cmake_minimum_required(VERSION 3.12-3.18)
+cmake_minimum_required(VERSION 3.13-3.18)
 include(CMakeDependentOption)
 cmake_policy(SET CMP0091 NEW)
-
 
 # When OFF, build Tobasa as static libraries and link against the static MSVC runtime
 option(TOBASA_BUILD_SHARED_LIB 
@@ -11,9 +10,6 @@ option(TOBASA_BUILD_SHARED_LIB
 CMAKE_DEPENDENT_OPTION(TOBASA_BUILD_MONOLITHIC_SHARED_LIB
       "Build Tobasa modules into one shared library" OFF
       "TOBASA_BUILD_SHARED_LIB" OFF)
-
-# Valid only when using the MSVC compiler
-option(TOBASA_BUILD_WITH_VCPKG   "Build Tobasa with VCPKG libraries"  OFF )
 
 # Database Drivers
 option(TOBASA_SQL_USE_PGSQL      "Enable PostgreSQL driver"           ON )
@@ -40,10 +36,13 @@ CMAKE_DEPENDENT_OPTION(TOBASA_SQL_USE_MARIADB_DLL
       "Use libmariadb shared (.dll) library" OFF 
       "TOBASA_SQL_USE_MYSQL" OFF )
 
-option(TOBASA_USE_BUNDLED_SQLITE3_MC    "Tobasa uses bundled SQLite3 MC"         ON )
 option(TOBASA_BUILD_IN_MEMORY_RESOURCES "Whether to use compiled resources"      ON )
 option(TOBASA_BUILD_IN_MEMORY_TZDB      "Whether to use compiled timezone data"  ON )
 
+
+# Valid only when using the MSVC compiler
+option(TOBASA_BUILD_WITH_VCPKG "Build Tobasa with VCPKG libraries"  OFF )
+option(TOBASA_FIND_DEPS        "Use `find_package()` for including Tobasa dependencies." OFF)
 
 # -------------------------------------------------------
 # External library deps location
@@ -52,7 +51,6 @@ option(TOBASA_BUILD_IN_MEMORY_TZDB      "Whether to use compiled timezone data" 
 # so we have correct path for required libs when building with MSVC or VCPKG
 include("CMakeDefaults.txt")
 
-
 if(TOBASA_BUILD_WITH_VCPKG)
    set(VCPKG_TARGET_TRIPLET ${VCPKG_TARGET_TRIPLET_DEF} CACHE STRING "VCPKG triplet to use" )
    set(VCPKG_OVERLAY_PORTS  ${VCPKG_OVERLAY_PORTS_DEF}  CACHE STRING "VCPKG custom port folder" )
@@ -60,12 +58,11 @@ if(TOBASA_BUILD_WITH_VCPKG)
    set(CMAKE_TOOLCHAIN_FILE ${VCPKG_TOOLCHAIN_FILE})
 endif() 
 
+option(TOBASA_USE_PREBUILT_ZLIB    "Use prebuilt Zlib"      OFF)
+option(TOBASA_USE_PREBUILT_SQLITE3 "Use prebuilt SQLite3"   OFF)
 
 set(TOBASA_PACKAGE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/_output CACHE STRING "Location of package directory" )
 set(TOBASA_CREATE_PACKAGE_OUTPUT_DIR ON CACHE BOOL "Create a package directory bundle" )
-# Use prebuilt zlib library (on windows only)
-set(TOBASA_USE_PREBUILT_ZLIB OFF)
-
 
 # -------------------------------------------------------
 # Global MSVC runtime to the selected library type.
@@ -99,12 +96,27 @@ endif()
 project(TobasaFramework VERSION 1.0
    DESCRIPTION "Modular C++ libraries for building HTTP services, SQL-backed applications, and laboratory instrument integrations")
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 if(TOBASA_BUILD_WITH_VCPKG AND MSVC)
    message(STATUS "Using VCPKG as CMake toolchain")
 elseif(TOBASA_BUILD_WITH_VCPKG)
    message(FATAL_ERROR "VCPKG only valid for building with MSVC")
 endif()
+
+include(cmake/utils.cmake)
+# -------------------------------------------------------
+# Features check
+# -------------------------------------------------------
+include(cmake/tobasa_check_features.cmake)
+tobasa_check_float_to_chars()
+tobasa_check_std_chrono_parse()
+configure_file(
+   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tobasa_config.h.in"
+   "${CMAKE_CURRENT_BINARY_DIR}/include/tobasa/tobasa_config.h"
+)
 
 
 # -------------------------------------------------------
@@ -113,7 +125,7 @@ endif()
 include(cmake/tobasa_prepare.cmake NO_POLICY_SCOPE)
 include(cmake/tobasa_stage_shared_runtime.cmake)
 if(TOBASA_BUILD_TESTS)
-    include(cmake/tobasa_testing.cmake)
+   include(cmake/tobasa_testing.cmake)
 endif()
 
 
@@ -130,11 +142,13 @@ elseif(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
    if(NOT TOBASA_USE_PREBUILT_ZLIB)
       set(TOBASA_USE_BUNDLED_ZLIB ON CACHE BOOL "Use bundled zlib library")
    endif()
-
    # tobasasql(mysql), tobasahttp
    set(TOBASA_ZLIB_DIR           ${TOBASA_ZLIB_DIR_DEF} )
    # app_server
    set(TOBASA_MINIZIP_DIR        ${TOBASA_MINIZIP_DIR_DEF} )
+
+   set(TOBASA_SQLITE3_DIR_DEF    ${TOBASA_SQLITE3_DIR_DEF})
+
    # tobasahttp
    set(TOBASA_OPENSSL_DIR        ${TOBASA_OPENSSL_DIR_DEF} )  # tobasahttp
    # tobasasql
@@ -149,8 +163,6 @@ elseif(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
    endif()
 
 elseif(NOT WIN32)
-   set(TOBASA_USE_PREBUILT_ZLIB  OFF)
-   set(TOBASA_USE_BUNDLED_ZLIB   OFF)
    set(TOBASA_PROTOBUF_DIR       ${TOBASA_PROTOBUF_DIR_DEF} )
 
    if(TOBASA_HTTP_USE_HTTP2)
@@ -179,13 +191,13 @@ endif()
 # Zlib library
 # -------------------------------------------------------
 include(cmake/tobasa_zlib.cmake)
-tobasa_configure_bundled_zlib()
+tobasa_configure_zlib()
 
 
 # SQLite3 library
 # -------------------------------------------------------
-include(cmake/tobasa_sqlite.cmake)
-tobasa_configure_sqlite()
+include(cmake/tobasa_sqlite3.cmake)
+tobasa_configure_sqlite3()
 
 
 # Projects to build

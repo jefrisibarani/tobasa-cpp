@@ -267,7 +267,7 @@ std::string OdbcCommand::executeScalar()
          SQLCloseCursor(_pStatement);
          _resultSetOpen = false;
 
-         return VariantHelper::toString(vdata);
+         return VariantHelper<VariantType>::toString(vdata);
       }
    }
    else

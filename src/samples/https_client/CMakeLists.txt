@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12-3.18)
+cmake_minimum_required(VERSION 3.14-3.18)
 cmake_policy(SET CMP0091 NEW)
 
 project(https_client LANGUAGES CXX)
@@ -26,8 +26,8 @@ if(MSVC)
 
 else()
    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-      target_compile_options(${PROJECT_NAME} PRIVATE -pthread )
-      target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
+      # target_compile_options(${PROJECT_NAME} PRIVATE -pthread )
+      # target_link_libraries(${PROJECT_NAME} PRIVATE pthread)
    endif()
 endif()
 

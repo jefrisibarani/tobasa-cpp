@@ -1,11 +1,11 @@
 #pragma once
 
+#include <memory>
 #include "tobasaweb/exp_imp.h"
-
 #include <tobasa/non_copyable.h>
 #include <tobasa/logger_tobasa.h>
+#include <tobasa/settings_log.h>
 #include <tobasa/span.h>
-#include <memory>
 #include <tobasahttp/server/http_server.h>
 #include <tobasahttp/server/settings_tls.h>
 #include <tobasasql/database_service_factory.h>
@@ -17,7 +17,6 @@
 #include "tobasaweb/router.h"
 #include "tobasaweb/web_service.h"
 #include "tobasaweb/settings_webapp.h"
-#include "tobasaweb/settings_log.h"
 #include "tobasaweb/webapp_agent.h"
 #include "tobasaweb/db_migration.h"
 

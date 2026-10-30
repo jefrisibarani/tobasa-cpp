@@ -256,6 +256,9 @@ set_target_properties(fmt PROPERTIES
   PUBLIC_HEADER "${FMT_HEADERS}"
   DEBUG_POSTFIX "${FMT_DEBUG_POSTFIX}")
 
+# NOTE_JEFRI, added -fPIC for GCC
+set_target_properties(fmt PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # Set FMT_LIB_NAME for pkg-config fmt.pc. We cannot use the OUTPUT_NAME target
 # property because it's not set by default.
 set(FMT_LIB_NAME fmt)

@@ -177,9 +177,9 @@ std::string DataLink::strInRaw(const std::string& data)
          out.append("<VT>");
       else if (data[i] == '\x1C')
          out.append("<FS>");
-      else if (data[i] == '\0x10')
+      else if (data[i] == '\x10')
          out.append("<ENQ_HL7>");
-      else if (data[i] == '\0x0F')
+      else if (data[i] == '\x0F')
          out.append("<ETX_HL7>");
 
       else 

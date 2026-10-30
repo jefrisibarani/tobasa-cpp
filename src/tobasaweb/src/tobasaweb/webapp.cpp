@@ -1,6 +1,6 @@
-#include <tobasa/config.h>
 #include <new>
-#include "tobasaweb/multi_logger.h"
+#include <tobasa/config.h>
+#include <tobasa/logger_sink_multiple.h>
 #include "tobasaweb/credential_info.h"
 #include "tobasaweb/webapp.h"
 #include "tobasaweb/db_migrations/001_initial_base_schema.h"
@@ -229,7 +229,7 @@ bool Webapp::loadConfig(const std::string& configFile, nonstd::span<const unsign
 
          // setup Tobasa Logger actual target
          auto logOption = Config::getOption<log::conf::Logging>("logging");
-         Logger::setTarget(new log::MultiLogger(std::move(logOption)));
+         Logger::setTarget(new log::MultipleLogSink(std::move(logOption)));
 
          // Check temporary dir
          // -------------------------------------------------------

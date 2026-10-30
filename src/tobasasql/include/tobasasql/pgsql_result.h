@@ -30,7 +30,6 @@ class TBS_SQL_API PgsqlResult : public ResultCommon
 {
 public:
    using VariantType   = DefaultVariantType;
-   using VariantHelper = VariantHelper<VariantType>;
    using VectorVariant = std::vector<VariantType>;
    using RecordVariant = std::vector<VectorVariant>;
    using DataSetPtr    = std::shared_ptr<DataSet<VariantType>>;

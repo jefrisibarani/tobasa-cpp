@@ -149,7 +149,7 @@ std::string SqliteResult::getStringValue(const int columnIndex) const
       throw std::runtime_error("getStringValue, Invalid DataSet pointer");
 
    auto& value = _pDataset->data().at(row).at(columnIndex);
-   return VariantHelper::toString(value);
+   return VariantHelper<VariantType>::toString(value);
 }
 
 std::string SqliteResult::getStringValue(const std::string& columnName) const

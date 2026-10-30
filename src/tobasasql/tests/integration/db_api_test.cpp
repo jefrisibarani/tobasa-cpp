@@ -259,7 +259,7 @@ TEST(DB_GENERIC_TEST_SUITE, CRUDAndDataRetrieval)
    int count = 0;
    for (auto &row : vSampleData) // access by reference to avoid copying
    {
-      cmdInsert.addParam("bigint",   sql::DataType::bigint,     row.valBigint);
+      cmdInsert.addParam("bigint",   sql::DataType::bigint,     (int64_t)row.valBigint);
       cmdInsert.addParam("varchar",  sql::DataType::varchar,    row.valVarchar);
       cmdInsert.addParam("text",     sql::DataType::text,       row.valText);
       cmdInsert.addParam("char",     sql::DataType::character,  row.valChar);

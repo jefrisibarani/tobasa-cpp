@@ -2,7 +2,7 @@
 
 #include <tobasa/json.h>
 #include <tobasasql/settings.h>
-#include "tobasaweb/settings_http_server.h"
+#include <tobasahttp/server/settings_http_server.h>
 
 namespace tbs {
 namespace web {

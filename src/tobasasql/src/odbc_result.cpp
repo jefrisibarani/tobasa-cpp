@@ -154,7 +154,7 @@ std::string OdbcResult::getStringValue(const int columnIndex) const
       throw std::runtime_error("getVariantValue, Invalid DataSet pointer");
 
    auto& value = _pDataset->data().at(row).at(columnIndex);
-   return VariantHelper::toString(value);
+   return VariantHelper<VariantType>::toString(value);
 }
 
 std::string OdbcResult::getStringValue(const std::string& columnName) const

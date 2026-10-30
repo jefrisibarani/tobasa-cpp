@@ -150,7 +150,6 @@ private:
    bool        _enableFileRange = false;
 
 public:
-   static const bool EnableFileRangeResponse = true;
 
    FileResult(const std::string& filePath, bool enableFileRange=false);
    FileResult(const std::string& filePath, const std::string& contentType, bool enableFileRange=false);
