@@ -15,7 +15,7 @@ set(NEW_TEXT "if(ZLIB_FOUND AND ((SQLITE_ENABLE_COMPRESS OR SQLITE_ENABLE_SQLAR 
 if(CONTENTS MATCHES
    "if\\(ZLIB_FOUND AND \\(\\(SQLITE_ENABLE_COMPRESS OR SQLITE_ENABLE_SQLAR OR SQLITE_ENABLE_ZIPFILE\\)\\)\\)"
 )
-   message(STATUS "SQLite3MC patch already applied")
+   message(STATUS "tobasa SQLite3MC patch already applied")
 else()
    # Expect exactly two occurrences in the original file.
    string(REGEX MATCHALL "if\\(ZLIB_FOUND\\)" MATCHES "${CONTENTS}")
@@ -33,5 +33,5 @@ else()
 
    file(WRITE "${TARGET_FILE}" "${CONTENTS}")
 
-   message(STATUS "Applied SQLite3MC ZLIB condition patch")
+   message(STATUS "tobasa Applied SQLite3MC ZLIB condition patch")
 endif()

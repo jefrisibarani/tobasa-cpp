@@ -5,20 +5,13 @@
         baseUrlMCU: "",
         runInTbsServer: true,
         refreshToTbsServer: true,
-
         alertData: {{ default(pageAlerts, "[]") }},
         sessionExpNotice: {{ default(sessExpNotice, -1) }}, // seconds
-        sessionExpires: {{ default(sessExpTime, -1) }},     // seconds        
-
-        // this can be stored in cookie
+        sessionExpires: {{ default(sessExpTime, -1) }},     // seconds
         refreshToken: null,
-        
-        // these values must stay in memory
         accessToken: null,
-
         wsConnIdentity: null,
         sseConnIdentity: null,
-
         PROJECT_ID: '',
         CLIENT_APP_ID: '',
         WEBSERVICE_VERSION: '',
@@ -27,4 +20,3 @@
         USER_AGENT: ''
       };
     </script> <!-- JS TBS -->
-    

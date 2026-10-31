@@ -43,6 +43,8 @@ _notes/
 _output*/
 docs/html/
 build*/
+/.github
+/src/tobasahttp/tests/curl
 
 /src/ext/zlib*
 /src/ext/sqlite3mc*
@@ -57,4 +59,4 @@ build*/
 /src/app_server/wwwroot/css/styles.min.css.map
 /src/app_server/src/build_info.cpp
 /src/samples/app_client/src/build_info.cpp
-/.github
+

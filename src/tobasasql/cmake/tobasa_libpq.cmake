@@ -49,8 +49,8 @@ macro(tobasa_configure_libpq)
 
    endif()
 
-   message(STATUS "tobasasql Libpq include dirs : ${TOBASA_LIBPQ_INCLUDE_DIRS}")
-   message(STATUS "tobasasql Libpq library dirs : ${TOBASA_LIBPQ_LIBRARY_DIRS}")
-   message(STATUS "tobasasql Libpq libraries    : ${TOBASA_LIBPQ_LIBRARIES}")
+   message(STATUS "tobasasql Libpq include dirs    : ${TOBASA_LIBPQ_INCLUDE_DIRS}")
+   message(STATUS "tobasasql Libpq library dirs    : ${TOBASA_LIBPQ_LIBRARY_DIRS}")
+   message(STATUS "tobasasql Libpq libraries       : ${TOBASA_LIBPQ_LIBRARIES}")
 
 endmacro()

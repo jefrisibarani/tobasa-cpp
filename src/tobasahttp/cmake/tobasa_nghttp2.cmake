@@ -1,6 +1,6 @@
 macro(tobasa_configure_nghttp2)
 
-   set(NGHTTP2_VERSION_TAG "v1.68.0")
+   set(NGHTTP2_VERSION_TAG "v1.70.0")
 
    check_cmake_project("${TOBASA_EXTERNAL_DEPS_DIR}/nghttp2" "${NGHTTP2_VERSION_TAG}" _has_bundled_nghttp2)
    if(_has_bundled_nghttp2)
@@ -27,9 +27,11 @@ macro(tobasa_configure_nghttp2)
       if(TOBASA_BUILD_WITH_VCPKG)
          message(STATUS "tobasasql Finding nghttp2 with find_package VCPKG")
 
-         find_package(nghttp2 REQUIRED)
-         set(TOBASA_NGHTTP2_INCLUDE_DIRS "${NGHTTP2_INCLUDE_DIRS}")
-         set(TOBASA_NGHTTP2_LIBRARIES    "${NGHTTP2_LIBRARIES}")
+         list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" )
+         find_package(NGHTTP2 REQUIRED)
+
+         set(TOBASA_NGHTTP2_INCLUDE_DIRS "${NGHTTP2_INCLUDE_DIR}")
+         set(TOBASA_NGHTTP2_LIBRARIES    "${NGHTTP2_LIBRARY}")
          set(TOBASA_NGHTTP2_FOUND        TRUE)
 
       else()
@@ -37,8 +39,8 @@ macro(tobasa_configure_nghttp2)
 
          find_package(PkgConfig REQUIRED)
          pkg_check_modules(NGHTTP2 REQUIRED IMPORTED_TARGET libnghttp2)
-         set(TOBASA_NGHTTP2_INCLUDE_DIRS "${NGHTTP2_INCLUDE_DIRS}")
-         set(TOBASA_NGHTTP2_LIBRARIES    "${NGHTTP2_LIBRARIES}")  #PkgConfig::NGHTTP2
+         set(TOBASA_NGHTTP2_INCLUDE_DIRS "${NGHTTP2_INCLUDE_DIR}")
+         set(TOBASA_NGHTTP2_LIBRARIES    "${NGHTTP2_LIBRARY}")  #PkgConfig::NGHTTP2
          set(TOBASA_NGHTTP2_FOUND        TRUE)
       endif()
 
@@ -71,8 +73,13 @@ macro(tobasa_configure_nghttp2)
          FetchContent_MakeAvailable(nghttp2)
       endif()
 
-      set(TOBASA_NGHTTP2_LIBRARIES    "nghttp2_static")
-      set(TOBASA_NGHTTP2_INCLUDE_DIRS "${nghttp2_SOURCE_DIR}" "${nghttp2_BINARY_DIR}")
+      set(TOBASA_NGHTTP2_LIBRARIES "nghttp2_static")
+      if(WIN32)
+         set(TOBASA_NGHTTP2_INCLUDE_DIRS "${nghttp2_SOURCE_DIR}/lib" "${nghttp2_SOURCE_DIR}/lib/includes" "${nghttp2_BINARY_DIR}" "${nghttp2_BINARY_DIR}/lib/includes")
+      else()
+         set(TOBASA_NGHTTP2_INCLUDE_DIRS "${nghttp2_SOURCE_DIR}" "${nghttp2_BINARY_DIR}")
+      endif()
+
       set(TOBASA_NGHTTP2_FOUND        TRUE)
 
       restore_cmake_pic_state()

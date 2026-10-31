@@ -15,7 +15,7 @@ option(TOBASA_FIND_DEPS "Use `find_package()` for including Tobasa Web dependenc
 
 # Use bundled nlohmann and jwt-cpp package
 set(JWTCPP_INCLUDE_DIR   ${TOBASA_EXTERNAL_DEPS_DIR}/jwt-cpp/include)
-message(STATUS "tobasaweb jwt-cpp include dir: ${JWTCPP_INCLUDE_DIR}")
+message(STATUS "tobasaweb jwt-cpp include dir   : ${JWTCPP_INCLUDE_DIR}")
 
 # The library
 if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)

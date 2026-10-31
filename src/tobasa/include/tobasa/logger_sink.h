@@ -23,19 +23,19 @@ public:
    virtual ~LogSink() = default;
 
    /// Log Trace message
-   virtual void trace(const std::string& message) {}
+   virtual void trace(const std::string& message) { (void)message; }
 
    /// Log Debug message
-   virtual void debug(const std::string& message) {}
+   virtual void debug(const std::string& message) { (void)message; }
 
    /// Log Information message
-   virtual void info(const std::string& message) {}
+   virtual void info(const std::string& message)  { (void)message; }
 
    /// Log Warning message
-   virtual void warn(const std::string& message) {}
+   virtual void warn(const std::string& message)  { (void)message; }
 
    /// Log Error message
-   virtual void error(const std::string& message) {}
+   virtual void error(const std::string& message) { (void)message; }
 };
 
 

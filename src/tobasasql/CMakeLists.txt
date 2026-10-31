@@ -20,12 +20,8 @@ option(TOBASA_SQL_USE_ODBC       "Enable ODBC driver"                 ON )
 option(TOBASA_SQL_USE_SQLITE     "Enable SQLite driver"               ON )
 option(TOBASA_SQL_USE_MYSQL      "Enable MariaDB driver"              ON )
 
-CMAKE_DEPENDENT_OPTION(TOBASA_SQL_USE_MARIADB_DLL 
-                       "Use libmariadb shared (.dll) library" OFF "TOBASA_SQL_USE_MYSQL" OFF )
-
-
 option(TOBASA_SQL_USE_PREBUILT_MARIADB "Use prebuilt MariaDB Connector/C library"  OFF)
-option(TOBASA_SQL_USE_PREBUILT_LIBPQ   "Use prebuilt nghttp2"  OFF)
+option(TOBASA_SQL_USE_PREBUILT_LIBPQ   "Use prebuilt Libpq"  OFF)
 
 # -------------------------------------------------------
 # SQLite3 library
@@ -35,7 +31,7 @@ if(NOT TOBASA_SQL_USE_SQLITE)
 endif()
 if(TOBASA_SQL_USE_SQLITE)
    if(TOBASA_SQLITE3_FOUND)
-      message(STATUS "tobasasql use tobasa's SQLite3 lib: ${TOBASA_SQLITE3_LIBRARIES}")
+      message(STATUS "tobasasql SQLite3 lib           : ${TOBASA_SQLITE3_LIBRARIES}")
    else()
       include(cmake/tobasa_sqlite3.cmake)
       tobasa_configure_sqlite3()
@@ -58,10 +54,10 @@ endif()
 if(TOBASA_SQL_USE_ODBC)
    find_package(ODBC REQUIRED)
    if(ODBC_FOUND)
-      message(STATUS "tobasasql ODBC include dir : ${ODBC_INCLUDE_DIRS}")
-      message(STATUS "tobasasql ODBC libraries   : ${ODBC_LIBRARIES}")
+      message(STATUS "tobasasql ODBC include dir      : ${ODBC_INCLUDE_DIRS}")
+      message(STATUS "tobasasql ODBC libraries        : ${ODBC_LIBRARIES}")
    else()
-      message(STATUS "tobasasql ODBC library     : Not found")
+      message(STATUS "tobasasql ODBC library          : Not found")
    endif()
 endif()
 
@@ -124,10 +120,10 @@ endif()
 
 if(TOBASA_SQL_USE_SQLITE)
    target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_SQLITE3_LIBRARIES})
+   target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_SQLITE3_INCLUDE_DIRS} )
    target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_SQLITE)
    if(TOBASA_USE_SQLITE3_MC)
       target_compile_definitions(${TOBASA_MODULE_TARGET} PUBLIC TOBASA_SQL_USE_SQLITE3_MC)
-      target_include_directories(${TOBASA_MODULE_TARGET} PRIVATE ${TOBASA_SQLITE3_INCLUDE_DIRS} )
    endif()
 endif()
 

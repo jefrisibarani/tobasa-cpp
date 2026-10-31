@@ -1,0 +1,26 @@
+
+include(FindPackageHandleStandardArgs)
+
+find_path(NGHTTP2_INCLUDE_DIR
+   NAMES nghttp2/nghttp2.h)
+
+find_library(NGHTTP2_LIBRARY
+   NAMES nghttp2)
+
+find_package_handle_standard_args(NGHTTP2
+   REQUIRED_VARS
+      NGHTTP2_INCLUDE_DIR
+      NGHTTP2_LIBRARY
+)
+
+if(NGHTTP2_FOUND AND NOT TARGET NGHTTP2::NGHTTP2)
+   add_library(NGHTTP2::NGHTTP2 UNKNOWN IMPORTED)
+
+   set_target_properties(NGHTTP2::NGHTTP2 PROPERTIES
+      IMPORTED_LOCATION "${NGHTTP2_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${NGHTTP2_INCLUDE_DIR}")
+endif()
+
+mark_as_advanced(
+   NGHTTP2_INCLUDE_DIR
+   NGHTTP2_LIBRARY)

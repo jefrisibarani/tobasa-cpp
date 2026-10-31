@@ -11,12 +11,12 @@ option(TOBASA_BUILD_IN_MEMORY_RESOURCES "Whether to use compiled resources" OFF)
 
 if(TOBASA_FIND_DEPS OR TOBASA_BUILD_WITH_VCPKG)
    if(TOBASA_BUILD_TESTS_WSCHAT_USE_PROBUF OR TOBASA_BUILD_CHAT_MODULE)
-      find_package(protobuf REQUIRED)
+      find_package(Protobuf REQUIRED)
    endif()
 else()
    if(TOBASA_BUILD_TESTS_WSCHAT_USE_PROBUF OR TOBASA_BUILD_CHAT_MODULE)
       set(PROTOBUF_INCLUDE_DIR ${TOBASA_PROTOBUF_DIR}/include)
-      message(STATUS "webservice use protocol buffer include dir: ${PROTOBUF_INCLUDE_DIR}")
+      message(STATUS "tobasa Protobuf include dir     : ${PROTOBUF_INCLUDE_DIR}")
    endif()
 endif()
 
@@ -144,10 +144,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 if(CMAKE_CXX20_COMPILE_FEATURES)
-   message(STATUS "webservice use cxx_std_20")
+   message(STATUS "tobasa webservice Use cxx_std_20")
    target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 else()
-   message(STATUS "webservice use cxx_std_17")
+   message(STATUS "tobasa webservice Use cxx_std_17")
    target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 endif()
 
@@ -240,7 +240,7 @@ endif()
 if(TOBASA_SQL_USE_PGSQL AND MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
    # For Pgsql 11.7 x64
    if( ${TOBASA_LIBPQ_DIR} STREQUAL "D:/programs/PostgreSQL/11.7_x64" )
-      message(STATUS "webservice use libpq from: ${TOBASA_LIBPQ_DIR} - ${PROJECT_NAME}")
+      message(STATUS "tobasa webservice Use libpq from: ${TOBASA_LIBPQ_DIR} - ${PROJECT_NAME}")
       set(LIBPQ_BIN_DLLS libcrypto-1_1-x64.dll libiconv-2.dll libintl-9.dll libpq.dll libssl-1_1-x64.dll libwinpthread-1.dll)
 
       foreach(DLL IN LISTS LIBPQ_BIN_DLLS)
@@ -251,7 +251,7 @@ if(TOBASA_SQL_USE_PGSQL AND MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
 
    # For Pgsql 10.19 x32
    if( ${TOBASA_LIBPQ_DIR} STREQUAL "D:/programs/PostgreSQL/10.19_x86" )
-      message(STATUS "webservice use libpq from: ${TOBASA_LIBPQ_DIR} - ${PROJECT_NAME}")
+      message(STATUS "tobasa webservice Use libpq from: ${TOBASA_LIBPQ_DIR} - ${PROJECT_NAME}")
       set(LIBPQ_BIN_DLLS libpq.dll libintl-8.dll libiconv-2.dll libcrypto-1_1.dll libssl-1_1.dll)
 
       foreach(DLL IN LISTS LIBPQ_BIN_DLLS)
@@ -265,7 +265,7 @@ endif()
 # Copy libmariadb.dll
 # -------------------------------------------------------
 if(TOBASA_SQL_USE_MYSQL AND TOBASA_SQL_USE_MARIADB_DLL)
-   if(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
+   if(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG AND NOT TOBASA_SQL_USE_PREBUILT_MARIADB)
       add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
          COMMAND ${CMAKE_COMMAND} -E copy
          ${TOBASA_FRAMEWORK_BINARY_DIR}/bin/$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>/libmariadb.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>/)

@@ -26,19 +26,19 @@ endif()
 
 # Use bundled asio, nlohmann and jwt-cpp package
 set(ASIO_INCLUDE_DIR     ${TOBASA_EXTERNAL_DEPS_DIR}/asio/include)
-message(STATUS "tobasahttp Asio include dir: ${ASIO_INCLUDE_DIR}")
+message(STATUS "tobasahttp Asio include dir     : ${ASIO_INCLUDE_DIR}")
 
 # Alway use find_package for OpenSSL
 # if we set OPENSSL_ROOT_DIR environment variable, find_package will find in that dir
 find_package(OpenSSL REQUIRED)
 if(OPENSSL_FOUND)
-   message(STATUS "tobasahttp OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
-   message(STATUS "tobasahttp OpenSSL libraries: ${OPENSSL_LIBRARIES}")
+   message(STATUS "tobasahttp OpenSSL include dir  : ${OPENSSL_INCLUDE_DIR}")
+   message(STATUS "tobasahttp OpenSSL libraries    : ${OPENSSL_LIBRARIES}")
 endif(OPENSSL_FOUND)
 
 
 if(TOBASA_ZLIB_FOUND) # only for windows build
-   message(STATUS "tobasahttp uses tobasa's zlib: ${TOBASA_ZLIB_LIBRARIES}")
+   message(STATUS "tobasahttp uses tobasa's zlib   : ${TOBASA_ZLIB_LIBRARIES}")
 else()
    include(cmake/tobasa_zlib.cmake)
    tobasa_configure_zlib()
@@ -83,8 +83,8 @@ if(MSVC)
 endif()
 
 if(TOBASA_HTTP_USE_HTTP2)
-   target_link_libraries(${TOBASA_MODULE_TARGET} PRIVATE ${TOBASA_NGHTTP2_LIBRARIES})
-   target_include_directories(${TOBASA_MODULE_TARGET} PRIVATE ${TOBASA_NGHTTP2_INCLUDE_DIRS})
+   target_link_libraries(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_NGHTTP2_LIBRARIES})
+   target_include_directories(${TOBASA_MODULE_TARGET} PUBLIC ${TOBASA_NGHTTP2_INCLUDE_DIRS})
 endif()
 
 target_include_directories(${TOBASA_MODULE_TARGET}

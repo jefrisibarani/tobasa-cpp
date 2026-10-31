@@ -82,7 +82,7 @@ endif()
 # Copy libmariadb.dll
 # -------------------------------------------------------
 if(TOBASA_SQL_USE_MYSQL AND TOBASA_SQL_USE_MARIADB_DLL)
-   if(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
+   if(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG AND NOT TOBASA_SQL_USE_PREBUILT_MARIADB)
       add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
          COMMAND ${CMAKE_COMMAND} -E copy
          ${TOBASA_FRAMEWORK_BINARY_DIR}/bin/$<$<CONFIG:Debug>:Debug>$<$<CONFIG:Release>:Release>/libmariadb.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>/)

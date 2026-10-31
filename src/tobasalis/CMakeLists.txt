@@ -15,7 +15,7 @@ option(TOBASA_FIND_DEPS "Use `find_package()` for including Tobasa LIS dependenc
 
 # Use bundled asio package
 set(ASIO_INCLUDE_DIR ${TOBASA_EXTERNAL_DEPS_DIR}/asio/include)
-message(STATUS "tobasalis Asio include folder: ${ASIO_INCLUDE_DIR}")
+message(STATUS "tobasalis Asio include folder   : ${ASIO_INCLUDE_DIR}")
 
 # The library
 if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)

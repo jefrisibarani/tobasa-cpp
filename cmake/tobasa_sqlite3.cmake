@@ -11,7 +11,7 @@ macro(tobasa_configure_sqlite3)
       message(STATUS "tobasa Using prebuilt SQLite3")
       
       set(TOBASA_USE_SQLITE3_MC OFF)
-      set(TOBASA_SQLITE3_LIBRARIES  optimized ${TOBASA_SQLITE3_DIR}/lib/sqlite3.lib debug ${TOBASA_SQLITE3_DIR}/lib/sqlite3.lib )
+      set(TOBASA_SQLITE3_LIBRARIES  optimized ${TOBASA_SQLITE3_DIR}/lib/sqlite3.lib debug ${TOBASA_SQLITE3_DIR}/debug/lib/sqlite3.lib )
       set(TOBASA_SQLITE3_INCLUDE_DIRS ${TOBASA_SQLITE3_DIR}/include)
       set(TOBASA_SQLITE3_FOUND TRUE)
 
@@ -22,8 +22,8 @@ macro(tobasa_configure_sqlite3)
          message(STATUS "tobasa Finding SQLite3 with find_package VCPKG")
          find_package(unofficial-sqlite3 CONFIG REQUIRED)
          set(TOBASA_SQLITE3_LIBRARIES "unofficial::sqlite3::sqlite3")
-         set(TOBASA_SQLITE3_INCLUDE_DIRS "")
-         set(TOBASA_SQLITE3_FOUND TRUE)
+         set(TOBASA_SQLITE3_INCLUDE_DIRS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include")
+         set(TOBASA_SQLITE3_FOUND $unofficial-sqlite3_FOUND)
 
       else()
          message(STATUS "tobasa Finding SQLite3 with find_package")
@@ -59,7 +59,7 @@ macro(tobasa_configure_sqlite3)
          set(TOBASA_USE_BUNDLED_SQLITE3_MC TRUE)
          set(SQLITE3MC_SOURCE_DIR "${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3mc")
          # patch original CMakeLists.txt
-         include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_sqlite3mc_patch.cmake")         
+         include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_sqlite3mc_patch.cmake")
          add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3mc ${CMAKE_BINARY_DIR}/_exts/sqlite3mc EXCLUDE_FROM_ALL)
       else()
          message(STATUS "tobasa Fetching SQLite3MC")
@@ -92,7 +92,7 @@ macro(tobasa_configure_sqlite3)
 
    endif()
 
-   message(STATUS "tobasa SQLite3 include dirs ${TOBASA_SQLITE3_INCLUDE_DIRS}")
-   message(STATUS "tobasa SQLite3 libraries ${TOBASA_SQLITE3_LIBRARIES}")
+   message(STATUS "tobasa SQLite3 include dirs     : ${TOBASA_SQLITE3_INCLUDE_DIRS}")
+   message(STATUS "tobasa SQLite3 libraries        : ${TOBASA_SQLITE3_LIBRARIES}")
 
 endmacro()

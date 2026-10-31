@@ -33,9 +33,9 @@ if(NOT TOBASA_STD_FORMAT_AND_DATE_CHECKED)
 endif()
 
 if(TOBASA_BUILD_WITH_VCPKG)
-   message(STATUS "tobasa VCPKG Target triplet ${VCPKG_TARGET_TRIPLET}")
-   message(STATUS "tobasa VCPKG Overlay ports ${VCPKG_OVERLAY_PORTS}")
-   message(STATUS "tobasa CMake toolchain ${CMAKE_TOOLCHAIN_FILE}")
+   message(STATUS "tobasa VCPKG Target triplet     : ${VCPKG_TARGET_TRIPLET}")
+   message(STATUS "tobasa VCPKG Overlay ports      : ${VCPKG_OVERLAY_PORTS}")
+   message(STATUS "tobasa CMake toolchain          : ${CMAKE_TOOLCHAIN_FILE}")
 endif() 
 
 

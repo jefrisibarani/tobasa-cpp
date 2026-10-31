@@ -11,7 +11,7 @@ macro(tobasa_configure_zlib)
       message(STATUS "tobasa Using prebuilt Zlib")
 
       set(TOBASA_ZLIB_INCLUDE_DIRS ${TOBASA_ZLIB_DIR}/include)
-      set(TOBASA_ZLIB_LIBRARIES optimized ${TOBASA_ZLIB_DIR}/lib/zlib.lib debug ${TOBASA_ZLIB_DIR}/lib/zlibd.lib )
+      set(TOBASA_ZLIB_LIBRARIES    optimized ${TOBASA_ZLIB_DIR}/lib/zlib.lib debug ${TOBASA_ZLIB_DIR}/debug/lib/zlibd.lib )
       set(TOBASA_ZLIB_FOUND        TRUE)
       set(ZLIB_FOUND               TRUE)
       set(ZLIB_INCLUDE_DIRS        "${TOBASA_ZLIB_INCLUDE_DIRS}")
@@ -74,7 +74,7 @@ macro(tobasa_configure_zlib)
       restore_cmake_pic_state()
    endif()
 
-   message(STATUS "tobasa Zlib include dirs ${TOBASA_ZLIB_INCLUDE_DIRS}")
-   message(STATUS "tobasa Zlib libraries ${TOBASA_ZLIB_LIBRARIES}")
+   message(STATUS "tobasa Zlib include dirs        : ${TOBASA_ZLIB_INCLUDE_DIRS}")
+   message(STATUS "tobasa Zlib libraries           : ${TOBASA_ZLIB_LIBRARIES}")
 
 endmacro()

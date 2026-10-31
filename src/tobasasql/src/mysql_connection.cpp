@@ -44,6 +44,19 @@ std::string MysqlConnection::name()
 
 bool MysqlConnection::connect(const std::string& connString)
 {
+   auto checkResult = [this] (int result, const std::string& errMessage="") {
+      if (result != 0)
+      {
+         std::string errmsg = lastBackendError();
+         if (errmsg.empty())
+            errmsg = errMessage;
+
+         onNotifyError(logId() + errmsg);
+         disconnect();
+         throw SqlException(errmsg, "MysqlConnection");
+      }
+   };
+
    if (status() == ConnectionStatus::ok)
       return true;
    else
@@ -59,8 +72,36 @@ bool MysqlConnection::connect(const std::string& connString)
       throw SqlException(errmsg, "MysqlConnection");
    }
 
+   onNotifyInfo(tbsfmt::format("{}MariaDB C Connector version {}", logId(), mysql_get_client_info() ));
+
+   int rc = 0;
+
+   // Plugin directory
+   std::string pluginDir = path::executableDir() + path::SEPARATOR + "mariadb_plugin";
+   if (path::exists(pluginDir))
+   {
+      rc = mysql_optionsv(_pMYcon, MYSQL_PLUGIN_DIR, const_cast<char*>(pluginDir.c_str()));
+      checkResult(rc, "Failed to configure MariaDB MYSQL_PLUGIN_DIR");
+   }
+
+   // Prevent loading my.ini / my.cnf.
+   rc = mysql_optionsv(_pMYcon, MYSQL_READ_DEFAULT_FILE, nullptr);
+   checkResult(rc, "Failed to configure MariaDB MYSQL_READ_DEFAULT_FILE");
+   
+   rc = mysql_optionsv(_pMYcon, MYSQL_READ_DEFAULT_GROUP, nullptr);
+   checkResult(rc, "Failed to configure MariaDB MYSQL_READ_DEFAULT_GROUP");
+
+
+   // TODO_JEFRI: add TLS connection string parameters
+   // SSLENFORCE=true;
+   // SSLVERIFY=true;
+   // SSLCA=C:/certs/ca.pem;
+   // SSLCERT=;
+   // SSLKEY=;
+
    // "Database=sampledata;User=admin;Password=xxxxxxxx;Server=127.0.0.1;Port=3306"
    std::string parDatabase, parUser, parPassword, parHost, parPort;
+   std::string parSslEnforce, parSslVerify, parSslCa, parSslCert, parSSlKey;
    auto vectorParam = util::split(connString, ';');
    for (auto param : vectorParam)
    {
@@ -89,13 +130,64 @@ bool MysqlConnection::connect(const std::string& connString)
          auto parLen = param.length();
          parPort = param.substr(5, parLen - (size_t)5);
       }
+
+      if (util::startsWith(param, "SSLVERIFY"))
+      {
+         auto parLen = param.length();
+         parSslVerify = param.substr(10, parLen - (size_t)10);
+      }
+      if (util::startsWith(param, "SSLCA"))
+      {
+         auto parLen = param.length();
+         parSslCa = param.substr(6, parLen - (size_t)6);
+      }
+      if (util::startsWith(param, "SSLCERT"))
+      {
+         auto parLen = param.length();
+         parSslCert = param.substr(8, parLen - (size_t)8);
+      }
+      if (util::startsWith(param, "SSLKEY"))
+      {
+         auto parLen = param.length();
+         parSSlKey = param.substr(7, parLen - (size_t)7);
+      }
    }
 
    int port;
    if (util::isNumber(parPort))
       port = std::stoi(parPort);
    else 
-      throw SqlException("Invalid port in connecion string", "MysqlConnection");   
+      throw SqlException("Invalid port in connection string", "MysqlConnection");
+
+   my_bool sslEnforce = (parSslEnforce=="true") ? 1 : 0;
+   rc = mysql_optionsv(_pMYcon, MYSQL_OPT_SSL_ENFORCE, (void*)&sslEnforce);
+   checkResult(rc, "Failed to configure MariaDB MYSQL_OPT_SSL_ENFORCE");
+
+   my_bool sslVerify = (parSslVerify=="true") ? 1 : 0;
+   rc = mysql_optionsv(_pMYcon, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (void*)&sslVerify);
+   checkResult(rc, "Failed to configure MariaDB MYSQL_OPT_SSL_VERIFY_SERVER_CERT");
+
+   if (rc==0 && sslVerify==1 && sslEnforce==1)
+   {
+      if (!parSslCa.empty()) 
+      {
+         rc = mysql_optionsv(_pMYcon, MYSQL_OPT_SSL_CA,   parSslCa.c_str());
+         checkResult(rc, "Failed to configure MariaDB MYSQL_OPT_SSL_CA");
+      }
+
+      if (!parSslCert.empty())
+      {
+         rc = mysql_optionsv(_pMYcon, MYSQL_OPT_SSL_CERT, parSslCert.c_str());
+         checkResult(rc, "Failed to configure MariaDB MYSQL_OPT_SSL_CERT");
+      }
+
+      if (!parSSlKey.empty())
+      {
+         rc = mysql_optionsv(_pMYcon, MYSQL_OPT_SSL_KEY,  parSSlKey.c_str());
+         checkResult(rc, "Failed to configure MariaDB MYSQL_OPT_SSL_KEY");
+      }
+   }
+
 
    MYSQL* handle = mysql_real_connect(
                      _pMYcon, parHost.c_str(), parUser.c_str(), parPassword.c_str(),
@@ -109,7 +201,8 @@ bool MysqlConnection::connect(const std::string& connString)
       //mysql_close(_pMYcon);
       throw SqlException(errmsg, "MysqlConnection");
    }
-   else {
+   else 
+   {
       _connStatus = ConnectionStatus::ok;
       return true;
    }
@@ -298,7 +391,7 @@ std::string MysqlConnection::versionString()
    SqlApplyLogInternal applyLogRule(this);
  
 #if defined(TOBASA_SQL_USE_MARIADB_DLL)
-   std::string mariaDBlib = "LibmariaDB";
+   std::string mariaDBlib = "LibMariaDB";
 #else   
    std::string mariaDBlib = "MariaDBClient";
 #endif

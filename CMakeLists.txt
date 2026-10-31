@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.13-3.18)
 include(CMakeDependentOption)
 cmake_policy(SET CMP0091 NEW)
 
+
 # When OFF, build Tobasa as static libraries and link against the static MSVC runtime
 option(TOBASA_BUILD_SHARED_LIB 
-      "Build Tobasa as a shared library and use the dynamic MSVC runtime" ON)
+      "Build Tobasa as a shared library and use the dynamic MSVC runtime" OFF)
 
 # Build Tobasa as single shared library
 CMAKE_DEPENDENT_OPTION(TOBASA_BUILD_MONOLITHIC_SHARED_LIB
@@ -32,17 +33,13 @@ CMAKE_DEPENDENT_OPTION(TOBASA_BUILD_TESTS_WSCHAT_USE_PROBUF
       "Build Test Websocket with protobuf" ON
       "TOBASA_BUILD_TESTS" OFF )
 
-CMAKE_DEPENDENT_OPTION(TOBASA_SQL_USE_MARIADB_DLL 
-      "Use libmariadb shared (.dll) library" OFF 
-      "TOBASA_SQL_USE_MYSQL" OFF )
-
-option(TOBASA_BUILD_IN_MEMORY_RESOURCES "Whether to use compiled resources"      ON )
-option(TOBASA_BUILD_IN_MEMORY_TZDB      "Whether to use compiled timezone data"  ON )
-
+option(TOBASA_BUILD_IN_MEMORY_RESOURCES "Whether to use compiled resources"              ON )
+option(TOBASA_BUILD_IN_MEMORY_TZDB      "Whether to use compiled timezone data"          ON )
 
 # Valid only when using the MSVC compiler
-option(TOBASA_BUILD_WITH_VCPKG "Build Tobasa with VCPKG libraries"  OFF )
+option(TOBASA_BUILD_WITH_VCPKG "Build Tobasa with VCPKG libraries"                       OFF )
 option(TOBASA_FIND_DEPS        "Use `find_package()` for including Tobasa dependencies." OFF)
+
 
 # -------------------------------------------------------
 # External library deps location
@@ -58,8 +55,6 @@ if(TOBASA_BUILD_WITH_VCPKG)
    set(CMAKE_TOOLCHAIN_FILE ${VCPKG_TOOLCHAIN_FILE})
 endif() 
 
-option(TOBASA_USE_PREBUILT_ZLIB    "Use prebuilt Zlib"      OFF)
-option(TOBASA_USE_PREBUILT_SQLITE3 "Use prebuilt SQLite3"   OFF)
 
 set(TOBASA_PACKAGE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/_output CACHE STRING "Location of package directory" )
 set(TOBASA_CREATE_PACKAGE_OUTPUT_DIR ON CACHE BOOL "Create a package directory bundle" )
@@ -80,12 +75,10 @@ if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB)
    endif()
 endif()
 # -------------------------------------------------------
-if(TOBASA_BUILD_MONOLITHIC_SHARED_LIB AND TOBASA_SQL_USE_MYSQL)
-   set(TOBASA_SQL_USE_MARIADB_DLL OFF CACHE BOOL
-      "Use libmariadb shared (.dll) library" FORCE)
-elseif(TOBASA_BUILD_SHARED_LIB AND TOBASA_SQL_USE_MYSQL)
-   set(TOBASA_SQL_USE_MARIADB_DLL ON CACHE BOOL
-       "Use libmariadb shared (.dll) library" FORCE)
+if(TOBASA_BUILD_SHARED_LIB AND TOBASA_SQL_USE_MYSQL)
+   set(TOBASA_SQL_USE_MARIADB_DLL ON CACHE BOOL "" FORCE)
+else()
+   set(TOBASA_SQL_USE_MARIADB_DLL OFF CACHE BOOL "" FORCE)
 endif()
 # -------------------------------------------------------
 
@@ -96,32 +89,27 @@ endif()
 project(TobasaFramework VERSION 1.0
    DESCRIPTION "Modular C++ libraries for building HTTP services, SQL-backed applications, and laboratory instrument integrations")
 
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
-if(TOBASA_BUILD_WITH_VCPKG AND MSVC)
-   message(STATUS "Using VCPKG as CMake toolchain")
-elseif(TOBASA_BUILD_WITH_VCPKG)
+if(TOBASA_BUILD_WITH_VCPKG AND NOT MSVC)
    message(FATAL_ERROR "VCPKG only valid for building with MSVC")
 endif()
 
 include(cmake/utils.cmake)
-# -------------------------------------------------------
+
 # Features check
-# -------------------------------------------------------
 include(cmake/tobasa_check_features.cmake)
 tobasa_check_float_to_chars()
 tobasa_check_std_chrono_parse()
 configure_file(
    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/tobasa_config.h.in"
-   "${CMAKE_CURRENT_BINARY_DIR}/include/tobasa/tobasa_config.h"
-)
+   "${CMAKE_CURRENT_BINARY_DIR}/include/tobasa/tobasa_config.h")
 
 
-# -------------------------------------------------------
 # Helper functions
-# -------------------------------------------------------
 include(cmake/tobasa_prepare.cmake NO_POLICY_SCOPE)
 include(cmake/tobasa_stage_shared_runtime.cmake)
 if(TOBASA_BUILD_TESTS)
@@ -133,45 +121,37 @@ set(TOBASA_FRAMEWORK_ROOTDIR     ${CMAKE_CURRENT_SOURCE_DIR} )
 set(TOBASA_FRAMEWORK_BINARY_DIR  ${CMAKE_BINARY_DIR} )
 # external package dependencies location (asio,date,fmt ...)
 set(TOBASA_EXTERNAL_DEPS_DIR     ${TOBASA_FRAMEWORK_ROOTDIR}/src/ext )
-message(STATUS "Tobasa: External dependencies folder => ${TOBASA_EXTERNAL_DEPS_DIR}" )
 
-# -------------------------------------------------------
-if(MSVC AND TOBASA_BUILD_WITH_VCPKG)
-   set(TOBASA_USE_PREBUILT_ZLIB OFF)
-elseif(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
-   if(NOT TOBASA_USE_PREBUILT_ZLIB)
-      set(TOBASA_USE_BUNDLED_ZLIB ON CACHE BOOL "Use bundled zlib library")
-   endif()
-   # tobasasql(mysql), tobasahttp
-   set(TOBASA_ZLIB_DIR           ${TOBASA_ZLIB_DIR_DEF} )
-   # app_server
-   set(TOBASA_MINIZIP_DIR        ${TOBASA_MINIZIP_DIR_DEF} )
 
-   set(TOBASA_SQLITE3_DIR_DEF    ${TOBASA_SQLITE3_DIR_DEF})
+# Prebuilt libraries
+if(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
 
-   # tobasahttp
-   set(TOBASA_OPENSSL_DIR        ${TOBASA_OPENSSL_DIR_DEF} )  # tobasahttp
-   # tobasasql
-   set(TOBASA_LIBPQ_DIR          ${TOBASA_LIBPQ_DIR_DEF} )    # tobasasql
-   
-   # chat 
-   set(TOBASA_PROTOBUF_DIR       ${TOBASA_PROTOBUF_DIR_DEF} )
+   # When these PREBUILT lib OFF, we build from source
+   # ------------------------------------------------------
+   set(TOBASA_USE_PREBUILT_ZLIB         OFF CACHE BOOL "")
+   set(TOBASA_USE_PREBUILT_SQLITE3      OFF CACHE BOOL "")
+   set(TOBASA_HTTP_USE_PREBUILT_NGHTTP2 OFF CACHE BOOL "")
+   set(TOBASA_SQL_USE_PREBUILT_MARIADB  OFF CACHE BOOL "")
 
-   if(TOBASA_HTTP_USE_HTTP2)
-      # HTTP/2 support
-      set(TOBASA_HTTP2_DIR       ${TOBASA_HTTP2_DIR_DEF} )
-   endif()
+   set(TOBASA_SQL_USE_PREBUILT_LIBPQ    ON  CACHE BOOL "")   # we don't fetch and build libpq
+   # ------------------------------------------------------
+
+   set(TOBASA_ZLIB_DIR      ${TOBASA_ZLIB_DIR_DEF} )
+   set(TOBASA_MINIZIP_DIR   ${TOBASA_MINIZIP_DIR_DEF} )
+   set(TOBASA_SQLITE3_DIR   ${TOBASA_SQLITE3_DIR_DEF})
+   set(TOBASA_OPENSSL_DIR   ${TOBASA_OPENSSL_DIR_DEF} )
+
+   set(TOBASA_LIBPQ_DIR     ${TOBASA_LIBPQ_DIR_DEF} )
+   set(TOBASA_MARIADB_DIR   ${TOBASA_MARIADB_DIR_DEF})
+   set(TOBASA_PROTOBUF_DIR  ${TOBASA_PROTOBUF_DIR_DEF} ) # chat
+   set(TOBASA_HTTP2_DIR     ${TOBASA_HTTP2_DIR_DEF} )
 
 elseif(NOT WIN32)
-   set(TOBASA_PROTOBUF_DIR       ${TOBASA_PROTOBUF_DIR_DEF} )
-
-   if(TOBASA_HTTP_USE_HTTP2)
-      set(TOBASA_HTTP2_DIR       ${TOBASA_HTTP2_DIR_DEF} )
-   endif()
+   set(TOBASA_PROTOBUF_DIR  ${TOBASA_PROTOBUF_DIR_DEF} )
+   set(TOBASA_HTTP2_DIR     ${TOBASA_HTTP2_DIR_DEF} )
 endif()
 
 
-# -------------------------------------------------------
 # Only do these if this is the main project,
 # and not if it is included through add_subdirectory
 set(TOBASA_FRAMEWORK_MASTER_PROJECT OFF)
@@ -183,23 +163,30 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
    if(Doxygen_FOUND)
       add_subdirectory(docs)
    else()
-      message(STATUS "Tobasa: Doxygen not found, skipping documentation build")
+      message(STATUS "tobasa Doxygen not found, skipping documentation build")
    endif()
 endif()
 
 
 # Zlib library
-# -------------------------------------------------------
 include(cmake/tobasa_zlib.cmake)
 tobasa_configure_zlib()
 
 
 # SQLite3 library
-# -------------------------------------------------------
 include(cmake/tobasa_sqlite3.cmake)
 tobasa_configure_sqlite3()
 
 
+# Disable selected MSVC C++ warnings.
+add_compile_options(
+   "$<$<COMPILE_LANGUAGE:CXX>:/wd4251>"  # DLL interface warning
+   "$<$<COMPILE_LANGUAGE:CXX>:/wd4275>"  # Non-DLL base class warning
+   "$<$<COMPILE_LANGUAGE:CXX>:/wd4566>"  # Character encoding warning
+)
+
+
+# -------------------------------------------------------
 # Projects to build
 # -------------------------------------------------------
 
@@ -224,3 +211,12 @@ if(TOBASA_BUILD_SHARED_LIB)
 endif()
 
 add_subdirectory(src/samples)
+
+
+# -------------------------------------------------------
+if(TOBASA_BUILD_WITH_VCPKG)
+   message(STATUS "tobasa Using VCPKG as CMake toolchain")
+endif()
+message(STATUS "tobasa Build shared library     : ${TOBASA_BUILD_SHARED_LIB}" )
+message(STATUS "tobasa Build monolithic library : ${TOBASA_BUILD_MONOLITHIC_SHARED_LIB}" )
+message(STATUS "tobasa External dependencies    : ${TOBASA_EXTERNAL_DEPS_DIR}" )
