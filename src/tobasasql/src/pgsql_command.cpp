@@ -106,7 +106,7 @@ bool PgsqlCommand::bind(const SqlParameterCollection& parameters)
    if (_pPGconn == nullptr)
       throw SqlException("Invalid connection object", "PgsqlCommand");
 
-   onNotifyTrace(_pConn->logId() + "SqliteCommand, Binding paramaters" );
+   //onNotifyTrace(_pConn->logId() + "Binding paramaters" );
 
    int totalParam  = static_cast<int>(parameters.size());
    if (totalParam > 0)

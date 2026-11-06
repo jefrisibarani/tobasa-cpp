@@ -16,10 +16,10 @@ used unless a corresponding feature is enabled.
 | utf8cpp | UTF-8 handling in core | Vendored headers at `src/ext/utf8cpp`; added as a public include directory. |
 | jwt-cpp | Web authentication/token support | Vendored headers at `src/ext/jwt-cpp`; added as a public include directory. |
 | fmt | Formatting when standard formatting is unavailable | Uses the standard library when supported; otherwise uses bundled `src/ext/fmt`, or `find_package(fmt CONFIG)` with VCPKG/`TOBASA_FIND_DEPS`. The target links `fmt::fmt`. |
-| date/tz | Calendar and timezone support when the standard library lacks it | Uses standard chrono when supported. Otherwise uses bundled `src/ext/date`, or `find_package(date CONFIG)` when package lookup is enabled and `TOBASA_BUILD_IN_MEMORY_TZDB=OFF`. The bundled path builds a `timezone` static target. |
+| date/tz | Calendar and timezone support when the standard library lacks it | Uses standard chrono when supported. Otherwise, `TOBASA_BUILD_IN_MEMORY_TZDB=ON` uses bundled `src/ext/date` and embeds timezone data; with it `OFF`, `TOBASA_FIND_DEPS` or VCPKG can use `find_package(date CONFIG)`, while other configurations still use the bundled library with the OS timezone database. |
 | spdlog | Logging in Tobasa Web | Uses vendored headers at `src/ext/spdlog` when VCPKG and `TOBASA_FIND_DEPS` are both disabled; otherwise uses `find_package(spdlog)` and links `spdlog::spdlog`. |
-| zlib | Compression in HTTP and MariaDB Connector C | Windows non-VCPKG builds use bundled `src/ext/zlib` by default. VCPKG uses `find_package(ZLIB)`; other non-bundled paths also discover ZLIB. A prebuilt Windows branch exists in module CMake, but top-level CMake currently forces `TOBASA_USE_PREBUILT_ZLIB=OFF`. |
-| SQLite3 MC | SQL SQLite driver | Bundled source at `src/ext/sqlite3_mc` is selected by default. If package lookup is enabled and `TOBASA_USE_BUNDLED_SQLITE3_MC=OFF`, CMake requires `unofficial-sqlite3` and links `unofficial::sqlite3::sqlite3`. |
+| zlib | Compression in HTTP and MariaDB Connector C | `TOBASA_USE_PREBUILT_ZLIB=ON` uses the configured prebuilt paths. Otherwise, VCPKG or `TOBASA_FIND_DEPS=ON` uses `find_package(ZLIB)`; with both options `OFF`, Tobasa builds bundled `src/ext/zlib` or fetches zlib at version `v1.3.2`. |
+| SQLite3 MC | SQL SQLite driver | `TOBASA_USE_PREBUILT_SQLITE3=ON` uses the configured prebuilt SQLite library. Otherwise, VCPKG uses `find_package(unofficial-sqlite3 CONFIG)` and `TOBASA_FIND_DEPS=ON` uses `find_package(SQLite3 CONFIG)`. With both options `OFF`, Tobasa builds bundled `src/ext/sqlite3mc` or fetches SQLite3 MC at version `v2.6.1`. `TOBASA_SQL_USE_SQLITE=OFF` is currently forced back to `ON`. |
 | MariaDB Connector C | MySQL/MariaDB SQL driver | Built from `src/ext/mariadb-connector-c` when package lookup is disabled; otherwise found as `unofficial-libmariadb`. The bundled path links `mariadbclient` by default or `libmariadb` when `TOBASA_SQL_USE_MARIADB_DLL=ON`. |
 | GoogleTest | Unit and integration tests | Fetched by CMake FetchContent when tests are enabled and `GTest::gtest_main` is not already available. The default version is `v1.14.0` and can be changed with `TOBASA_GOOGLETEST_VERSION`. Configuration may need network access. |
 
@@ -34,7 +34,7 @@ currently referenced by the active project CMake targets.
 | Dependency | When it is used | Discovery/link path |
 | --- | --- | --- |
 | OpenSSL | Required by Tobasa HTTP | Always uses `find_package(OpenSSL REQUIRED)`. On MSVC, `TOBASA_OPENSSL_DIR` is exported as `OPENSSL_ROOT_DIR` to direct discovery to the configured prebuilt package. Linked to `tobasahttp`. |
-| nghttp2 | HTTP/2, enabled by default | VCPKG builds use the selected triplet's `include`, `lib`, and `debug/lib` paths. Unix builds or builds with `TOBASA_FIND_DEPS=ON` use pkg-config (`libnghttp2`). Windows without either uses `TOBASA_HTTP2_DIR`. Disable with `TOBASA_HTTP_USE_HTTP2=OFF`. |
+| nghttp2 | HTTP/2, enabled by default | `TOBASA_HTTP_USE_PREBUILT_NGHTTP2=ON` uses `TOBASA_HTTP2_DIR`. VCPKG uses the custom `FindNGHTTP2.cmake` package path; `TOBASA_FIND_DEPS=ON` without VCPKG uses pkg-config (`libnghttp2`). With both options `OFF`, Tobasa builds bundled `src/ext/nghttp2` or fetches version `v1.70.0`. Disable with `TOBASA_HTTP_USE_HTTP2=OFF`. |
 | PostgreSQL/libpq | PostgreSQL SQL driver, enabled by default | MSVC without VCPKG uses libraries and headers under `TOBASA_LIBPQ_DIR` (and OpenSSL paths); otherwise CMake uses `find_package(PostgreSQL REQUIRED)` and `PostgreSQL::PostgreSQL`. Disable with `TOBASA_SQL_USE_PGSQL=OFF`. |
 | ODBC | ODBC SQL driver, enabled by default | Uses `find_package(ODBC REQUIRED)` and links the discovered ODBC libraries. Disable with `TOBASA_SQL_USE_ODBC=OFF`. |
 | ADO | ADO SQL driver on Windows | Enabled by default on MSVC and uses Windows ADO/COM facilities; it does not use a separate VCPKG package. |
@@ -57,16 +57,17 @@ third-party code into Tobasa:
 	propagate through the relevant Tobasa targets.
 - **Shared component mode** builds separate Tobasa DLLs/shared libraries and
 	selects the dynamic MSVC runtime. Dependencies remain independently linked
-	libraries or packages. The Windows VCPKG triplet is `tbs-shared`.
+	libraries or packages. The Windows VCPKG triplet is generated as
+	`x64-windows-tbs-shared-vs2022` with the checked-in defaults.
 - **Shared monolithic mode** combines Tobasa module sources in
 	`tobasa_monolithic`. It still links external third-party targets/libraries;
 	the monolithic option is not a promise that all dependencies are embedded
-	into that one library. The Windows VCPKG triplet is
-	`tbs-shared-monolithic`.
-- **Windows non-VCPKG mode** derives prebuilt dependency paths from
+	into that one library. The Windows VCPKG triplet is generated as
+	`x64-windows-tbs-shared-monolithic-vs2022` with the checked-in defaults.
+- **Windows non-VCPKG mode** derives configured dependency paths from
 	`MSVS_LINK` and `MSVS_VER` in `CMakeDefaults.txt`. The configured packages
 	must match the compiler version, architecture, and runtime. Both shared
-	triplets are documented as using static third-party libraries; Tobasa's
+	triplet modes are documented as using static third-party libraries; Tobasa's
 	runtime linkage is selected separately.
 - The MySQL/MariaDB connector is a mode-specific exception: top-level CMake
 	forces `TOBASA_SQL_USE_MARIADB_DLL=ON` for separate shared builds and `OFF`
@@ -76,7 +77,8 @@ third-party code into Tobasa:
 	not used, the selected package's linkage is controlled by its package
 	manager/build configuration.
 
-VCPKG defaults to `ON` and is supported only with MSVC. Set
-`TOBASA_BUILD_WITH_VCPKG=OFF` for Linux and other non-MSVC configurations.
-The modules also expose `TOBASA_FIND_DEPS` for package discovery without
-VCPKG; behavior is still dependency-specific, so check the tables above.
+VCPKG defaults to `OFF` and is supported only with MSVC. Set it to `ON` only
+for an MSVC configuration. The modules also expose `TOBASA_FIND_DEPS` for
+package discovery without VCPKG; behavior is dependency-specific. For
+example, zlib and SQLite use CMake package discovery, while MariaDB and
+nghttp2 use pkg-config in the non-VCPKG path. Check the tables above.

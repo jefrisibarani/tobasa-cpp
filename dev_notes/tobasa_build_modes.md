@@ -9,12 +9,12 @@ fresh build directory.
 
 | Mode | `TOBASA_BUILD_SHARED_LIB` | `TOBASA_BUILD_MONOLITHIC_SHARED_LIB` | `TOBASA_BUILD_WITH_VCPKG` | Dependency setup |
 | --- | --- | --- | --- | --- |
-| Shared component libraries | `ON` | `OFF` | `OFF` | Windows: configure the dependency paths in `CMakeDefaults.txt`; Linux: use installed system dependencies. |
-| Shared monolithic library | `ON` | `ON` | `OFF` | Windows: configure the dependency paths in `CMakeDefaults.txt`; Linux: use installed system dependencies. |
-| Shared component libraries with VCPKG | `ON` | `OFF` | `ON` | Windows/MSVC only; use the `tbs-shared` VCPKG triplet. |
-| Shared monolithic library with VCPKG | `ON` | `ON` | `ON` | Windows/MSVC only; use the `tbs-shared-monolithic` VCPKG triplet. |
-| Static libraries | `OFF` | `OFF` | `OFF` | Windows: configure the dependency paths in `CMakeDefaults.txt`; Linux: use installed system dependencies. |
-| Static libraries with VCPKG | `OFF` | `OFF` | `ON` | Windows/MSVC only; use the `static` VCPKG triplet. |
+| Shared component libraries | `ON` | `OFF` | `OFF` | Windows: configure dependency paths in `CMakeDefaults.txt` where prebuilt branches are used; Linux: bundled or fetched sources provide zlib, SQLite3 MC, MariaDB Connector/C, and nghttp2, with system packages for discovered dependencies. |
+| Shared monolithic library | `ON` | `ON` | `OFF` | Windows: configure dependency paths in `CMakeDefaults.txt` where prebuilt branches are used; Linux: bundled or fetched sources provide zlib, SQLite3 MC, MariaDB Connector/C, and nghttp2, with system packages for discovered dependencies. |
+| Shared component libraries with VCPKG | `ON` | `OFF` | `ON` | Windows/MSVC only; use the generated `x64-windows-tbs-shared-vs2022`-style triplet. |
+| Shared monolithic library with VCPKG | `ON` | `ON` | `ON` | Windows/MSVC only; use the generated `x64-windows-tbs-shared-monolithic-vs2022`-style triplet. |
+| Static libraries | `OFF` | `OFF` | `OFF` | Windows: configure dependency paths in `CMakeDefaults.txt` where prebuilt branches are used; Linux: bundled or fetched sources provide zlib, SQLite3 MC, MariaDB Connector/C, and nghttp2, with system packages for discovered dependencies. |
+| Static libraries with VCPKG | `OFF` | `OFF` | `ON` | Windows/MSVC only; use the generated `x64-windows-static-vs2022`-style triplet. |
 
 For example, a static VCPKG build on Windows is configured with:
 
@@ -39,7 +39,7 @@ toolchain settings in each build directory.
 
 ## Option Behavior
 
-- `TOBASA_BUILD_SHARED_LIB` defaults to `ON`. On MSVC, it selects the dynamic
+- `TOBASA_BUILD_SHARED_LIB` defaults to `OFF`. On MSVC, it selects the dynamic
    MSVC runtime; `OFF` selects the static MSVC runtime and static Tobasa
    component libraries.
 - `TOBASA_BUILD_MONOLITHIC_SHARED_LIB` defaults to `OFF` and is dependent on
@@ -47,7 +47,7 @@ toolchain settings in each build directory.
    mode `OFF`. When enabled, Tobasa modules are compiled into
    `tobasa_monolithic`.
 - Monolithic mode requires CMake 3.13 or newer because it uses policy CMP0079.
-- `TOBASA_BUILD_WITH_VCPKG` defaults to `ON`, but the top-level project permits
+- `TOBASA_BUILD_WITH_VCPKG` defaults to `OFF`, but the top-level project permits
    VCPKG only with MSVC. Set it to `OFF` for Linux and other non-MSVC builds.
 - On Windows, `CMakeDefaults.txt` selects the VCPKG triplet from the library
    mode: `static`, `tbs-shared`, or `tbs-shared-monolithic`. Its default
@@ -55,8 +55,9 @@ toolchain settings in each build directory.
    packages must use matching versions and architectures.
 - With VCPKG disabled on Windows, dependency directories are derived from
    `MSVS_LINK` and `MSVS_VER` in `CMakeDefaults.txt`. Set those paths to match
-   the selected compiler and linkage. The current top-level configuration sets
-   bundled zlib ON by default for fresh build directories on this path.
+   the selected compiler and linkage. The current top-level configuration
+   uses prebuilt libpq and builds or fetches zlib, SQLite3 MC, nghttp2, and
+   MariaDB Connector/C from source by default.
 - On Linux, VCPKG and the Windows prebuilt-library paths are not used. Install
    development packages for enabled system dependencies and configure with
    `TOBASA_BUILD_WITH_VCPKG=OFF`.
@@ -69,37 +70,26 @@ monolithic.
 
 ### Zlib
 
-- `TOBASA_USE_PREBUILT_ZLIB` is intended to select the Windows prebuilt zlib
-   libraries under `TOBASA_ZLIB_DIR`. The top-level `CMakeLists.txt` currently
-   sets this variable to `OFF`, so it cannot be enabled with a normal
-   `-D` configure argument. The zlib paths in `CMakeDefaults.txt` are still
-   used by other dependency configurations.
-- `TOBASA_USE_BUNDLED_ZLIB` selects the bundled zlib source under
-   `src/ext/zlib`. On fresh MSVC non-VCPKG configurations, the top-level build
-   creates this cache setting as `ON`. On non-Windows configurations it sets
-   the variable to `OFF`; VCPKG configurations use `find_package(ZLIB)` when
-   bundled zlib is not selected. The HTTP and MariaDB connector targets use
-   this setting to choose between bundled zlib and a discovered ZLIB package.
-- With bundled zlib disabled, the HTTP and MariaDB connector configuration
-   falls back to `find_package(ZLIB)` unless the prebuilt-zlib branch is active.
-   Because prebuilt zlib is currently forced off, that fallback is the active
-   non-bundled path.
+- `TOBASA_USE_PREBUILT_ZLIB` selects the prebuilt zlib libraries under
+   `TOBASA_ZLIB_DIR` when it is `ON`. The top-level cache default is `OFF`, but
+   an explicit cache value can enable the branch.
+- When prebuilt zlib is `OFF`, VCPKG or `TOBASA_FIND_DEPS=ON` uses
+   `find_package(ZLIB)`. With both options `OFF`, CMake builds the bundled
+   `src/ext/zlib` tree or fetches zlib version `v1.3.2`. The internal
+   `TOBASA_USE_BUNDLED_ZLIB` variable records that source choice; it is not the
+   user-facing selector.
 
 ### SQLite
 
-- `TOBASA_USE_BUNDLED_SQLITE3_MC` is the user-facing CMake option. It defaults
-   to `ON` and selects the bundled SQLite3 Multiple Ciphers sources.
-- `TOBASA_USE_SQLITE3_MC` is derived by `tobasa_configure_sqlite3()`; it is not
-   an independent option. It is set to `OFF` only when dependency-package
-   lookup is enabled (`TOBASA_FIND_DEPS` or `TOBASA_BUILD_WITH_VCPKG`) and
-   `TOBASA_USE_BUNDLED_SQLITE3_MC` is `OFF`. In that case CMake requires the
-   `unofficial-sqlite3` package. Otherwise the bundled SQLite3 MC sources are
-   used, including when the bundled option is `OFF` but package lookup is not
-   enabled.
-- To use SQLite from VCPKG instead of the bundled SQLite3 MC sources, set
-   both `TOBASA_BUILD_WITH_VCPKG=ON` and
-   `TOBASA_USE_BUNDLED_SQLITE3_MC=OFF`. Do not pass
-   `TOBASA_USE_SQLITE3_MC` as a configure option; the SQLite setup overwrites
-   it based on the conditions above.
+- `TOBASA_USE_PREBUILT_SQLITE3=ON` selects the prebuilt SQLite library under
+   `TOBASA_SQLITE3_DIR`.
+- Otherwise, `TOBASA_BUILD_WITH_VCPKG=ON` uses `unofficial-sqlite3` from VCPKG.
+   `TOBASA_FIND_DEPS=ON` without VCPKG uses `find_package(SQLite3 CONFIG)`.
+- With both options `OFF`, CMake builds bundled `src/ext/sqlite3mc` or fetches
+   SQLite3 MC version `v2.6.1`. The internal `TOBASA_USE_SQLITE3_MC` value is
+   derived from the selected branch and should not be passed as a configure
+   option.
+- `TOBASA_SQL_USE_SQLITE=OFF` is currently forced back to `ON` by the SQL
+   module, so it does not disable the SQLite driver.
 
 

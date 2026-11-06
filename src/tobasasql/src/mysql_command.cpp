@@ -70,7 +70,7 @@ bool MysqlCommand::bind(const MysqlParameterCollection& parameters)
 
    try
    {
-      onNotifyTrace(_pConn->logId() + "MysqlCommand, Binding paramaters" );
+      //onNotifyTrace(_pConn->logId() + "Binding paramaters" );
 
       int totalParam = static_cast<int>(parameters.size());
       _paramContext = ParameterContext(totalParam);

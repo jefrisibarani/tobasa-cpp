@@ -5,5 +5,5 @@
     <meta name="author" content="" />
 
     {% if not exists("statusCode") or statusCode != "500" %}
-    <meta name="csrf-token" content="{{ csrfToken }}" />
+    <meta name="csrf-token" content="{{ default(csrfToken, "") }}" />
     {% endif %}

@@ -60,7 +60,7 @@ bool OdbcCommand::bind(const SqlParameterCollection& parameters)
    if (_pStatement == SQL_NULL_HSTMT)
       throw SqlException("Invalid statement object", "OdbcCommand");
 
-   onNotifyTrace(_pConn->logId() + "OdbcCommand, Binding paramaters" );
+   //onNotifyTrace(_pConn->logId() + "Binding paramaters" );
 
    SQLFreeStmt(_pStatement, SQL_CLOSE);
    _boundParameters = &parameters;

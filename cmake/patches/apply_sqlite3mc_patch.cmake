@@ -1,4 +1,4 @@
-set(TARGET_FILE "${SQLITE3MC_SOURCE_DIR}/CMakeLists.txt")
+set(TARGET_FILE "${TOBASA_SQLITE3MC_SOURCE_DIR}/CMakeLists.txt")
 
 if(NOT EXISTS "${TARGET_FILE}")
    message(FATAL_ERROR
@@ -25,8 +25,7 @@ else()
       message(FATAL_ERROR
          "Expected 2 occurrences of 'if(ZLIB_FOUND)' in SQLite3MC "
          "CMakeLists.txt, but found ${MATCH_COUNT}. "
-         "The source may have changed."
-      )
+         "The source may have changed.")
    endif()
 
    string(REPLACE "${OLD_TEXT}" "${NEW_TEXT}" CONTENTS "${CONTENTS}")

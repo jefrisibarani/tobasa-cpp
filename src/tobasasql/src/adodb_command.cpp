@@ -69,7 +69,7 @@ bool AdodbCommand::bind(const AdoParameterCollection& parameters)
       if (_pAdoCommand == nullptr)
          throw SqlException("Invalid command object", "AdodbCommand");
 
-      onNotifyTrace(_pConn->logId() + "AdodbCommand, Binding paramaters" );
+      //onNotifyTrace(_pConn->logId() + "Binding paramaters" );
 
       if (_parameters.empty() && parameters.size()>0)
       {

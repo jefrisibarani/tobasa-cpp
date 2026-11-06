@@ -57,7 +57,7 @@ macro(tobasa_configure_sqlite3)
       if(_has_bundled_sqlite3mc)
          message(STATUS "tobasa Using bundled SQLite3MC")
          set(TOBASA_USE_BUNDLED_SQLITE3_MC TRUE)
-         set(SQLITE3MC_SOURCE_DIR "${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3mc")
+         set(TOBASA_SQLITE3MC_SOURCE_DIR "${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3mc")
          # patch original CMakeLists.txt
          include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_sqlite3mc_patch.cmake")
          add_subdirectory(${TOBASA_EXTERNAL_DEPS_DIR}/sqlite3mc ${CMAKE_BINARY_DIR}/_exts/sqlite3mc EXCLUDE_FROM_ALL)
@@ -78,7 +78,7 @@ macro(tobasa_configure_sqlite3)
             FetchContent_Populate(sqlite3mc)
          endif()
 
-         set(SQLITE3MC_SOURCE_DIR "${sqlite3mc_SOURCE_DIR}")
+         set(TOBASA_SQLITE3MC_SOURCE_DIR "${sqlite3mc_SOURCE_DIR}")
          # patch original CMakeLists.txt
          include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_sqlite3mc_patch.cmake")
          add_subdirectory("${sqlite3mc_SOURCE_DIR}" "${sqlite3mc_BINARY_DIR}")

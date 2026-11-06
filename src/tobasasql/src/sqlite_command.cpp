@@ -66,7 +66,7 @@ bool SqliteCommand::bind(const SqlParameterCollection& parameters)
    if (_pStatement == nullptr)
       throw SqlException("Invalid statement object", "SqliteCommand");
 
-   onNotifyTrace(_pConn->logId() + "SqliteCommand, Binding paramaters" );
+   //onNotifyTrace(_pConn->logId() + "Binding paramaters" );
 
    sqlite3_clear_bindings(_pStatement);
 

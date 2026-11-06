@@ -129,6 +129,7 @@ if(MSVC AND NOT TOBASA_BUILD_WITH_VCPKG)
    # When these PREBUILT lib OFF, we build from source
    # ------------------------------------------------------
    set(TOBASA_USE_PREBUILT_ZLIB         OFF CACHE BOOL "")
+   set(TOBASA_USE_PREBUILT_MINIZIP      OFF CACHE BOOL "")
    set(TOBASA_USE_PREBUILT_SQLITE3      OFF CACHE BOOL "")
    set(TOBASA_HTTP_USE_PREBUILT_NGHTTP2 OFF CACHE BOOL "")
    set(TOBASA_SQL_USE_PREBUILT_MARIADB  OFF CACHE BOOL "")

@@ -4,7 +4,7 @@ Tobasa uses CMake. Configure the build from the repository root, then build the 
 
 ## Prerequisites
 
-- CMake 3.12 or newer. Enabling the monolithic shared library requires CMake 3.13 or newer.
+- CMake 3.13 or newer.
 - A C++17-capable compiler. The repository has Windows/MSVC and Linux/GCC build paths.
 - OpenSSL development files. HTTP/2 is enabled by default and also needs nghttp2.
 - Dependencies for enabled SQL drivers: PostgreSQL, ODBC, SQLite, and MariaDB/MySQL are enabled by default. ADO is applicable to Windows. Some dependencies are bundled; others are found through VCPKG, CMake package discovery, or the paths in `CMakeDefaults.txt`.
@@ -14,33 +14,44 @@ Tobasa uses CMake. Configure the build from the repository root, then build the 
 
 ### Windows
 
-VCPKG is enabled by default and supported only with MSVC. Set
+VCPKG is supported only with MSVC and is disabled by default. To enable it, set
 `VCPKG_TOOLCHAIN_FILE_DEF`, `VCPKG_OVERLAY_PORTS_DEF`, and
 `VCPKG_TARGET_TRIPLET_DEF` in `CMakeDefaults.txt` for the local VCPKG
 installation and selected Visual Studio version. The checked-in defaults
-point to `d:/vcpkg` and select `vs2022` packages. Set
-`TOBASA_BUILD_WITH_VCPKG=OFF` to use the prebuilt dependency paths instead.
+point to `d:/vcpkg` and generate a triplet such as
+`x64-windows-static-vs2022` from the selected library mode and `MSVS_VER`.
+Set `TOBASA_BUILD_WITH_VCPKG=ON` to use VCPKG; with it `OFF`, Windows uses
+the configured prebuilt paths where the current CMake branch requires them
+and builds or fetches other dependencies from source.
 
 The compiler, VCPKG triplet, and prebuilt libraries must use compatible
 architectures, toolsets, and runtime linkage.
 
 ### Linux
 
-Set `TOBASA_BUILD_WITH_VCPKG` to `OFF` when configuring on Linux. Install development packages for enabled system dependencies. On Ubuntu, a typical starting set is:
+VCPKG is not supported on Linux, so leave `TOBASA_BUILD_WITH_VCPKG` `OFF`.
+With the default `TOBASA_FIND_DEPS=OFF`, zlib, SQLite3 MC, MariaDB Connector/C,
+and nghttp2 are built from bundled or fetched sources. Install development
+packages for dependencies discovered by CMake. On Ubuntu, a typical starting
+set is:
 
 ```bash
 sudo apt-get update
 sudo apt-get install build-essential cmake pkg-config libssl-dev zlib1g-dev \
-   libpq-dev unixodbc-dev libnghttp2-dev
+   libpq-dev unixodbc-dev
 ```
 
-The MariaDB connector and SQLite encryption library can be built from bundled sources. Disable HTTP/2 with `-DTOBASA_HTTP_USE_HTTP2=OFF` if nghttp2 is not installed. Additional packages may be required for enabled features or tests.
+If `TOBASA_FIND_DEPS=ON`, also install the packages required by the selected
+provider paths, including zlib, SQLite3, MariaDB Connector/C, nghttp2, and
+the date library as applicable. Additional packages may be required for
+enabled features or tests.
 
 ## Configure and Build
 
 ### Windows with Visual Studio 2022
 
-First configure the VCPKG or prebuilt dependency paths as described above. The checked-in dependency defaults select Visual Studio 2022 packages.
+The following is a static, non-VCPKG configuration. Configure the VCPKG or
+prebuilt dependency paths first when using another provider.
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
@@ -71,16 +82,16 @@ Options and defaults are defined in the top-level `CMakeLists.txt`. Pass overrid
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `TOBASA_BUILD_SHARED_LIB` | `ON` | Build Tobasa modules as shared libraries and use the dynamic MSVC runtime. Set `OFF` for static libraries and the static MSVC runtime. |
+| `TOBASA_BUILD_SHARED_LIB` | `OFF` | Build Tobasa modules as shared libraries and use the dynamic MSVC runtime. `OFF` builds static libraries and uses the static MSVC runtime. |
 | `TOBASA_BUILD_MONOLITHIC_SHARED_LIB` | `OFF` | Combine Tobasa modules into one shared library. Requires `TOBASA_BUILD_SHARED_LIB=ON`; CMake forces this option off when shared builds are disabled. |
-| `TOBASA_BUILD_WITH_VCPKG` | `ON` | Use VCPKG. Supported only with MSVC; explicitly set `OFF` on Linux. |
+| `TOBASA_BUILD_WITH_VCPKG` | `OFF` | Use VCPKG. Supported only with MSVC; keep `OFF` on Linux. |
 | `TOBASA_BUILD_LIS_ENGINE` | `ON` | Include the LIS engine. |
 | `TOBASA_BUILD_TESTS` | `ON` | Build test modules. GoogleTest is fetched during configuration. |
 | `TOBASA_BUILD_TESTS_SQLDB_INTEGRATION` | `ON` | Include SQL database integration tests when tests and the relevant driver are enabled. |
 | `TOBASA_BUILD_TESTS_WSCHAT_USE_PROBUF` | `ON` | Include protobuf-based websocket tests; this option is disabled when tests are disabled. |
 | `TOBASA_HTTP_USE_HTTP2` | `ON` | Enable HTTP/2 support; nghttp2 is required. |
 | `TOBASA_BUILD_IN_MEMORY_RESOURCES` | `ON` | Compile selected application resources into the executable. |
-| `TOBASA_BUILD_IN_MEMORY_TZDB` | `ON` | Compile timezone data into the build when the platform does not provide the required standard library support. |
+| `TOBASA_BUILD_IN_MEMORY_TZDB` | `ON` | Use the bundled timezone library and, when enabled, compile timezone data into the build. With this `OFF`, package lookup can use the `date` package when `TOBASA_FIND_DEPS` or VCPKG is enabled. |
 
 The SQL driver options `TOBASA_SQL_USE_PGSQL`, `TOBASA_SQL_USE_ADODB`, `TOBASA_SQL_USE_ODBC`, `TOBASA_SQL_USE_SQLITE`, and `TOBASA_SQL_USE_MYSQL` default to `ON`. The current SQL CMake configuration forces SQLite support on, so `TOBASA_SQL_USE_SQLITE=OFF` does not disable it.
 
@@ -105,10 +116,15 @@ cmake -S . -B build-monolithic \
 Run registered tests after building:
 
 ```bash
-ctest --test-dir build --output-on-failure
+ctest --test-dir build -C Debug --output-on-failure
 ```
 
-For a multi-configuration generator such as Visual Studio, select the configuration with `-C Debug` or `-C Release`. SQL integration tests may require accessible database services and test configuration. To see the targets generated for the current options and generator, run `cmake --build build --target help`.
+For a multi-configuration generator such as Visual Studio, replace `Debug`
+with `Release` as needed. SQL integration tests may require accessible
+database services and test configuration. The default websocket test sources
+also use protobuf; with package lookup disabled, configure `TOBASA_PROTOBUF_DIR`
+to the local protobuf installation. To see the targets generated for the
+current options and generator, run `cmake --build build --target help`.
 
 ## Outputs
 
